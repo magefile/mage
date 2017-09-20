@@ -1,0 +1,2 @@
+# magoo
+a Makefile replacement
