@@ -102,8 +102,6 @@ target is used when no target is specified.
 ```
 
 
-
-
 # How it works
 
 Mage scans the current directory for go files with the `mage` build tag, using
