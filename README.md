@@ -122,3 +122,14 @@ Mage itself requires no dependencies to run. However, because it is compiling
 go code, you must have a valid go environment set up on your machine.  Mage is
 compatibile with any go 1.x environment. 
 
+# Why?
+
+Makefiles suck.  Mostly because makefiles are just fancy bash scripts, and bash
+sucks.  Mage lets you have multiple magefiles, name your magefiles whatever you
+want, and they're easy to customize for multiple operating systems.  Mage has no
+dependencies (aside from go) and runs just fine on all major operating systems.
+Go is obviously superior to bash for any non-trivial task, both in readability
+and error handling.  And if your project is written in Go, why introduce another
+language as idiosyncratic as bash?  Why not use the language your contributors
+are already comfortable with?
+
