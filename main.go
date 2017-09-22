@@ -67,8 +67,7 @@ func main() {
 
 	if !force {
 		if _, err := os.Stat(out); err == nil {
-			run(out, flag.Args()...)
-			return
+			os.Exit(run(out, flag.Args()...))
 		}
 	}
 
