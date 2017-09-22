@@ -35,11 +35,13 @@ magefiles based on OS, arch, etc, whether in the filename or in the +build line.
 Any exported function that has no arguments and either no return values or a
 single error value is considered a mage target.  If the function has an error
 return, errors returned from the function will print to stdout and cause the
-magefile to exit with an exit code of 1.  Comments on the target function will
-become documentation accessible by running `mage -l` which will list all the
-build targets in this directory with the first sentence from their docs, or
-`mage -h <target>` which will show the full comment from the docs on the
-function.
+magefile to exit with an exit code of 1.  Any functions that do not fit this
+pattern are not considered targets by mage.
+
+Comments on the target function will become documentation accessible by running
+`mage -l` which will list all the build targets in this directory with the first
+sentence from their docs, or `mage -h <target>` which will show the full comment
+from the docs on the function.
 
 ## Full Example
 

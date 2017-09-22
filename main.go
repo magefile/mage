@@ -295,7 +295,6 @@ func main() {
 		os.Exit(1)
 	{{- end}}
 	}
-	fmt.Println(os.Args)
 	switch strings.ToLower(os.Args[1]) {
 		{{range .Funcs}}case "{{lower .Name}}":
 			{{if .IsError}}if err := {{.Name}}(); err != nil {
