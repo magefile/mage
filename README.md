@@ -133,3 +133,10 @@ and error handling.  And if your project is written in Go, why introduce another
 language as idiosyncratic as bash?  Why not use the language your contributors
 are already comfortable with?
 
+# TODO
+
+Makefile-style dependenecies.  The plan is to allow a targets to register
+functions as dependencies that will form a dependency tree where each dependency
+will be run exactly once in a separate goroutine, from leaves upward through the
+tree.
+
