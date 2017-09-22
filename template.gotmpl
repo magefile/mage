@@ -17,7 +17,7 @@ func main() {
 		w := tabwriter.NewWriter(os.Stdout, 0, 4, 4, ' ', 0)
 		log.Println("Targets: ")
 		{{- range .Funcs}}
-		fmt.Fprintln(w, "  {{.Name}}\t{{.Synopsis}}")
+		fmt.Fprintln(w, "  {{lower .Name}}\t{{.Synopsis}}")
 		{{- end}}
 		if err := w.Flush(); err != nil {
 			fmt.Println(err)
@@ -33,7 +33,7 @@ func main() {
 		}
 		switch strings.ToLower(os.Args[1]) {
 			{{range .Funcs}}case "{{lower .Name}}":
-				fmt.Print("mage {{.Name}}:\n\n")
+				fmt.Print("mage {{lower .Name}}:\n\n")
                 fmt.Println(`{{.Comment}}`)
 				return
 			{{end}}

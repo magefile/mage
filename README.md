@@ -54,14 +54,14 @@ import (
 )
 
 
-// A build target is any exported function with zero args and either no return
-// or an error return.  If a target has an error return and returns an non-nil
-// error, mage will print that error to stdout and return with an exit code of 1.
+// Build target is any exported function with zero args with no return or an error return. 
+// If a target has an error return and returns an non-nil error, mage will print
+// that error to stdout and return with an exit code of 1.
 func Install() error {
 
 }
 
-// This comment will be the short help text shown with mage -l
+// The first sentence in the comment will be the short help text shown with mage -l.
 // The rest of the comment is long help text that will be shown with mage -h <target>
 func Target() {
     // by default, the log stdlib package will be set to discard outpout.
@@ -69,8 +69,8 @@ func Target() {
     log.Printf("Hi!")
 }
 
-// any function that lowercases to "build" becomes the default target for when 
-// no target is specified.
+// Any function that lowercases to "build" becomes the default target.  This 
+// target is used when no target is specified.
 func Build() { 
     // using os.Exit will do what you expect.
     os.Exit(99)
@@ -84,6 +84,25 @@ func Build() {
 
 
 ```
+
+```
+$ mage -l 
+Targets:
+  build     Any function that lowercases to "build" becomes the default target.
+  install   Build target is any exported function with zero args with no return or an error return.
+  target    The first sentence in the comment will be the short help text shown with mage -l.
+```
+
+```
+$ mage -h build
+mage build:
+
+Any function that lowercases to "build" becomes the default target.  This 
+target is used when no target is specified.
+```
+
+
+
 
 # How it works
 
@@ -104,3 +123,4 @@ customized by setting the MAGEFILE_CACHE environment variable.
 Mage itself requires no dependencies to run. However, because it is compiling
 go code, you must have a valid go environment set up on your machine.  Mage is
 compatibile with any go 1.x environment. 
+
