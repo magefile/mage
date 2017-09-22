@@ -48,7 +48,11 @@ function.
 
 package main
 
-import "os"
+import (
+    "log"
+    "os"
+)
+
 
 // A build target is any exported function with zero args and either no return
 // or an error return.  If a target has an error return and returns an non-nil
@@ -60,7 +64,9 @@ func Install() error {
 // This comment will be the short help text shown with mage -l
 // The rest of the comment is long help text that will be shown with mage -h <target>
 func Target() {
-
+    // by default, the log stdlib package will be set to discard outpout.
+    // Running with mage -v will set the output to stdout.
+    log.Printf("Hi!")
 }
 
 // any function that lowercases to "build" becomes the default target for when 
@@ -93,3 +99,8 @@ will be reused next time, to avoid the generation overhead.
 Compiled magefile binaries are stored in $HOME/.magefile.  This location can be
 customized by setting the MAGEFILE_CACHE environment variable.
 
+## Requirements
+
+Mage itself requires no dependencies to run. However, because it is compiling
+go code, you must have a valid go environment set up on your machine.  Mage is
+compatibile with any go 1.x environment. 
