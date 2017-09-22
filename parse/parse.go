@@ -3,12 +3,15 @@ package parse
 import (
 	"fmt"
 	"go/ast"
+	"go/importer"
 	"go/parser"
 	"go/token"
 	"go/types"
 	"os"
 	"strings"
 	"unicode"
+
+	"github.com/pkg/errors"
 )
 
 type Function struct {
@@ -52,7 +55,7 @@ func getPackage(path string, files []string, fset *token.FileSet) (*ast.Package,
 
 	pkgs, err := parser.ParseDir(fset, path, filter, parser.ParseComments)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	for name, pkg := range pkgs {
@@ -64,7 +67,9 @@ func getPackage(path string, files []string, fset *token.FileSet) (*ast.Package,
 }
 
 func makeInfo(dir string, fset *token.FileSet, f *ast.File) (types.Info, error) {
-	cfg := types.Config{IgnoreFuncBodies: true}
+	cfg := types.Config{
+		Importer: importer.Default(),
+	}
 
 	info := types.Info{
 		Types: make(map[ast.Expr]types.TypeAndValue),
@@ -73,7 +78,7 @@ func makeInfo(dir string, fset *token.FileSet, f *ast.File) (types.Info, error) 
 	}
 
 	_, err := cfg.Check(dir, fset, []*ast.File{f}, &info)
-	return info, err
+	return info, errors.WithStack(err)
 }
 
 func functions(f *ast.File, info types.Info, fset *token.FileSet) ([]Function, error) {
