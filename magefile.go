@@ -5,12 +5,14 @@ package main
 import (
 	"errors"
 	"fmt"
+	"log"
 	"os"
 )
 
-// Builds things
-func Build() { // This one?
-	fmt.Println("Build it!")
+// Builds things.
+// And you know, other stuff.
+func Build() {
+	log.Println("Build it!")
 	os.Exit(111)
 }
 

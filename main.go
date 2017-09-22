@@ -21,17 +21,38 @@ import (
 	"github.com/magefile/mage/parse"
 )
 
-var output = template.Must(template.New("").Funcs(map[string]interface{}{
+var output = template.Must(template.New("template.gotmpl").Funcs(map[string]interface{}{
 	"lower": strings.ToLower,
-}).Parse(tpl))
+}).ParseFiles("template.gotmpl"))
 
 const mainfile = "mage_output_file.go"
 
+var (
+	force, verbose, list, help bool
+	tags                       string
+)
+
+func init() {
+	flag.BoolVar(&force, "f", false, "force recreation of compiled magefile")
+	flag.BoolVar(&verbose, "v", false, "show verbose output when running mage targets")
+	flag.BoolVar(&list, "l", false, "list mage targets in this directory")
+	flag.BoolVar(&help, "h", false, "show this help")
+	flag.Usage = func() {
+		fmt.Println("mage [options] [target]")
+		fmt.Println("Options:")
+		flag.PrintDefaults()
+	}
+}
+
 func main() {
 	log.SetFlags(0)
-	force := false
-	flag.BoolVar(&force, "f", false, "force recreation of compiled magefile")
 	flag.Parse()
+	if help && len(flag.Args()) == 0 {
+		flag.Usage()
+		return
+	}
+
+	os.Remove(mainfile)
 
 	files := magefiles()
 
@@ -48,20 +69,48 @@ func main() {
 
 	if !force {
 		if _, err := os.Stat(out); err == nil {
-			run(out, os.Args[1:]...)
+			run(out, flag.Args()...)
 			return
 		}
 	}
 
 	fns, err := parse.Package(".", files)
 	if err != nil {
-		log.Fatalf("%+v", err)
+		log.Fatalf("%v", err)
 	}
+
+	names := map[string][]string{}
+	lowers := map[string]bool{}
+	hasDupes := false
+	for _, f := range fns {
+		low := strings.ToLower(f.Name)
+		if lowers[low] {
+			hasDupes = true
+		}
+		lowers[low] = true
+		names[low] = append(names[low], f.Name)
+	}
+	if hasDupes {
+		fmt.Println("Build targets must be case insensitive, thus the follow targets conflict:")
+		for _, v := range names {
+			if len(v) > 1 {
+				fmt.Println("  " + strings.Join(v, ", "))
+			}
+		}
+		os.Exit(1)
+	}
+
 	if err := compile(out, fns, files); err != nil {
 		log.Fatal(err)
 	}
 
 	os.Exit(run(out, flag.Args()...))
+}
+
+type data struct {
+	Funcs      []parse.Function
+	Default    parse.Function
+	HasDefault bool
 }
 
 func magefiles() []string {
@@ -88,7 +137,19 @@ func compile(out string, funcs []parse.Function, gofiles []string) error {
 	}
 	defer os.Remove(mainfile)
 	defer f.Close()
-	if err := output.Execute(f, funcs); err != nil {
+
+	data := data{
+		Funcs: funcs,
+	}
+
+	for _, f := range funcs {
+		if strings.ToLower(f.Name) == "build" {
+			data.Default = f
+			data.HasDefault = true
+		}
+	}
+
+	if err := output.Execute(f, data); err != nil {
 		return errors.WithMessage(err, "can't execute mainfile template")
 	}
 	// close is idenmpotent, so this is ok
@@ -148,53 +209,19 @@ func confDir() string {
 	}
 }
 
-var tpl = `
-// +build mage
-
-package main
-
-import (
-	"fmt"
-	"log"
-	"os"
-	"strings"
-	"text/tabwriter"
-)
-
-func main() {
-	log.SetFlags(0)
-
-	if len(os.Args) == 1 {
-		w := tabwriter.NewWriter(os.Stdout, 0, 4, 0, 0, 0)
-		log.Println("Targets: ")
-		{{- range .}}
-		fmt.Fprintln(w, "  {{.Name}}\t{{.Comment}}")
-		{{- end}}
-		if err := w.Flush(); err != nil {
-			log.Fatal(err)
-		}
-		return
-	}
-
-	switch strings.ToLower(os.Args[1]) {
-		{{range .}}case "{{lower .Name}}":
-			{{if .IsError}}if err := {{.Name}}(); err != nil {
-				log.Fatal(err)
-			}
-			{{else -}}
-			{{.Name}}()
-			{{- end}}
-		{{end}}
-		default:
-			log.Fatalf("unknown target %q", os.Args[1])
-	}
-}
-`
-
 func run(cmd string, args ...string) int {
 	c := exec.Command(cmd, args...)
 	c.Stderr = os.Stderr
 	c.Stdout = os.Stdout
+	if verbose {
+		c.Env = append(c.Env, "MAGEFILE_VERBOSE=1")
+	}
+	if list {
+		c.Env = append(c.Env, "MAGEFILE_LIST=1")
+	}
+	if help {
+		c.Env = append(c.Env, "MAGEFILE_HELP=1")
+	}
 	err := c.Run()
 	if err != nil {
 		if e, ok := err.(*exec.ExitError); ok {

@@ -1,12 +1,10 @@
 package testfiles
 
-func ReturnsError() error {
-	return nil
-}
+import "fmt"
 
-func nonexported() {}
-
+// comment for returnsstring
 func ReturnsString() string {
+	fmt.Println("more stuff")
 	return ""
 }
 

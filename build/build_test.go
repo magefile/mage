@@ -125,8 +125,8 @@ func TestLocalDirectory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if p.ImportPath != "github.com/magoofile/magoo/build" {
-		t.Fatalf("ImportPath=%q, want %q", p.ImportPath, "go/build")
+	if p.ImportPath != "github.com/magefile/mage/build" {
+		t.Fatalf("ImportPath=%q, want %q", p.ImportPath, "github.com/magefile/mage/build")
 	}
 }
 
