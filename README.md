@@ -70,7 +70,7 @@ func Install() error {
 // The first sentence in the comment will be the short help text shown with mage -l.
 // The rest of the comment is long help text that will be shown with mage -h <target>
 func Target() {
-    // by default, the log stdlib package will be set to discard outpout.
+    // by default, the log stdlib package will be set to discard output.
     // Running with mage -v will set the output to stdout.
     log.Printf("Hi!")
 }
