@@ -2,15 +2,9 @@
 
 Mage is a Makefile replacement for Go.
 
-## Usage
-```
-mage [options] [target]
-Options:
-  -f    force recreation of compiled magefile
-  -h    show this help
-  -l    list mage targets in this directory
-  -v    show verbose output when running mage targets
-```
+## Demo
+
+[![Mage Demo](https://img.youtube.com/vi/GOqbD0lF-iA/0.jpg)](https://www.youtube.com/watch?v=GOqbD0lF-iA)
 
 ## Magefiles
 
@@ -42,6 +36,16 @@ Comments on the target function will become documentation accessible by running
 `mage -l` which will list all the build targets in this directory with the first
 sentence from their docs, or `mage -h <target>` which will show the full comment
 from the docs on the function.
+
+## Usage
+```
+mage [options] [target]
+Options:
+  -f    force recreation of compiled magefile
+  -h    show this help
+  -l    list mage targets in this directory
+  -v    show verbose output when running mage targets
+```
 
 ## Full Example
 
