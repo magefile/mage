@@ -55,6 +55,7 @@ func main() {
 			if c, ok := err.(code); ok {
 				os.Exit(c.ExitCode())
 			}
+			os.Exit(1)
 		}
 	}()
 	if len(os.Args) < 2 {
