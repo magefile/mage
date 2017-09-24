@@ -128,6 +128,34 @@ Mage itself requires no dependencies to run. However, because it is compiling
 go code, you must have a valid go environment set up on your machine.  Mage is
 compatibile with any go 1.x environment. 
 
+# Zero install option with `go run` 
+
+Don't want to depend on another binary in your environment?  You can run mage
+directly out of your vendor directory (or GOPATH) with `go run`.  
+
+Just save a file like this (I'll call it `mage.go`, but it can be named
+anything) (note that the build tag is *not* `+build mage`).  Then you can `go
+run mage.go <target>` and it'll work just as if you ran `mage <target>`
+
+```go
+// +build ignore
+
+package main
+
+import (
+	"github.com/magefile/mage/mage"
+)
+
+func main() { mage.Main() }
+```
+
+Note that because of the peculiarities of `go run`, if you run this way, go run
+will only ever exit with an error code of 0 or 1.  If mage exits with error code
+99, for example, `go run` will print out `exit status 99" and then exit with
+error code 1.  Why?  Ask the go team.  I've tried to get them to fix it, and
+they won't.
+
+
 # Why?
 
 Makefiles suck.  Mostly because makefiles are just fancy bash scripts, and bash
