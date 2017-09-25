@@ -158,12 +158,12 @@ they won't.
 
 # Why?
 
-Makefiles suck.  Mostly because makefiles are just fancy bash scripts, and bash
-sucks.  Mage lets you have multiple magefiles, name your magefiles whatever you
+Makefiles are hard to read and hard to write.  Mostly because makefiles are essentially fancy bash scripts with significant white space and additional make-related syntax. 
+
+Mage lets you have multiple magefiles, name your magefiles whatever you
 want, and they're easy to customize for multiple operating systems.  Mage has no
-dependencies (aside from go) and runs just fine on all major operating systems.
-Go is obviously superior to bash for any non-trivial task, both in readability
-and error handling.  And if your project is written in Go, why introduce another
+dependencies (aside from go) and runs just fine on all major operating systems, whereas make generally uses bash which is not well supported on Windows.
+Go is superior to bash for any non-trivial task involving branching, looping, anything that's not just straight line execution of commands.  And if your project is written in Go, why introduce another
 language as idiosyncratic as bash?  Why not use the language your contributors
 are already comfortable with?
 
