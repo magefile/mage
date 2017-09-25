@@ -1,6 +1,6 @@
 # mage
 
-Mage is a Makefile replacement for Go.
+Mage is a make/rake-like build tool using Go.
 
 ## Demo
 
