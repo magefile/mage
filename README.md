@@ -223,8 +223,4 @@ are already comfortable with?
 
 # TODO
 
-Makefile-style dependenecies.  The plan is to allow a targets to register
-functions as dependencies that will form a dependency tree where each dependency
-will be run exactly once in a separate goroutine, from leaves upward through the
-tree.
-
+Helper libraries to make execution of external commands nicer than Go's usual os/exec.
