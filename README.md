@@ -223,4 +223,5 @@ are already comfortable with?
 
 # TODO
 
-Helper libraries to make execution of external commands nicer than Go's usual os/exec.
+* Helper libraries to make execution of external commands nicer than Go's usual os/exec.
+* File conversion tasks
