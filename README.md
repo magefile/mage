@@ -8,7 +8,7 @@ Mage is a make/rake-like build tool using Go.
 
 ## Discussion
 
-Join the `#mage` channel on gophers slack for discussion of usage, development, etc. 
+Join the `#mage` channel on [gophers slack](https://gophers.slack.com/messages/general/) for discussion of usage, development, etc. 
 
 ## Magefiles
 
