@@ -6,6 +6,10 @@ Mage is a Makefile replacement for Go.
 
 [![Mage Demo](https://img.youtube.com/vi/GOqbD0lF-iA/0.jpg)](https://www.youtube.com/watch?v=GOqbD0lF-iA)
 
+## Discussion
+
+Join the `#mage` channel on gophers slack for discussion of usage, development, etc. 
+
 ## Magefiles
 
 A mage file is any regular go file marked with a build target of "mage" and in
