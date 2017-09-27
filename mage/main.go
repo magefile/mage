@@ -21,6 +21,10 @@ import (
 	"github.com/magefile/mage/parse"
 )
 
+// mageVer is used when hashing the output binary to ensure that we get a new
+// binary if we use a differernt version of mage.
+const mageVer = "v0.2"
+
 var output = template.Must(template.New("").Funcs(map[string]interface{}{
 	"lower": strings.ToLower,
 }).Parse(tpl))
@@ -53,8 +57,7 @@ func Main() {
 	}
 
 	files := magefiles()
-
-	filename, err := hashStrings(files)
+	filename, err := exeName(files, mageVer)
 	if err != nil {
 		log.Fatalf("%+v", err)
 	}
@@ -71,7 +74,7 @@ func Main() {
 		}
 	}
 
-	fns, err := parse.Package(".", files)
+	info, err := parse.Package(".", files)
 	if err != nil {
 		log.Fatalf("%v", err)
 	}
@@ -79,7 +82,7 @@ func Main() {
 	names := map[string][]string{}
 	lowers := map[string]bool{}
 	hasDupes := false
-	for _, f := range fns {
+	for _, f := range info.Funcs {
 		low := strings.ToLower(f.Name)
 		if lowers[low] {
 			hasDupes = true
@@ -97,17 +100,16 @@ func Main() {
 		os.Exit(1)
 	}
 
-	if err := compile(out, fns, files); err != nil {
+	if err := compile(out, info, files); err != nil {
 		log.Fatal(err)
 	}
-
 	os.Exit(run(out, flag.Args()...))
 }
 
 type data struct {
-	Funcs      []parse.Function
-	Default    parse.Function
-	HasDefault bool
+	Funcs        []parse.Function
+	DefaultError bool
+	Default      string
 }
 
 func magefiles() []string {
@@ -124,7 +126,7 @@ func magefiles() []string {
 	return p.GoFiles
 }
 
-func compile(out string, funcs []parse.Function, gofiles []string) error {
+func compile(out string, info *parse.PkgInfo, gofiles []string) error {
 	if err := os.MkdirAll(filepath.Dir(out), 0700); err != nil {
 		return errors.WithMessage(err, "can't create cachedir")
 	}
@@ -132,19 +134,15 @@ func compile(out string, funcs []parse.Function, gofiles []string) error {
 	if err != nil {
 		return errors.WithMessage(err, "can't create mainfile")
 	}
-	defer os.Remove(mainfile)
+	//defer os.Remove(mainfile)
 	defer f.Close()
 
 	data := data{
-		Funcs: funcs,
+		Funcs:   info.Funcs,
+		Default: info.DefaultName,
 	}
 
-	for _, f := range funcs {
-		if strings.ToLower(f.Name) == "build" {
-			data.Default = f
-			data.HasDefault = true
-		}
-	}
+	data.DefaultError = info.DefaultIsError
 
 	if err := output.Execute(f, data); err != nil {
 		return errors.WithMessage(err, "can't execute mainfile template")
@@ -160,9 +158,9 @@ func compile(out string, funcs []parse.Function, gofiles []string) error {
 	return nil
 }
 
-func hashStrings(list []string) (string, error) {
+func exeName(files []string, ver string) (string, error) {
 	var hashes []string
-	for _, s := range list {
+	for _, s := range files {
 		h, err := hash(s)
 		if err != nil {
 			return "", err
@@ -170,7 +168,7 @@ func hashStrings(list []string) (string, error) {
 		hashes = append(hashes, h)
 	}
 	sort.Strings(hashes)
-	h := sha1.Sum([]byte(strings.Join(hashes, "")))
+	h := sha1.Sum([]byte(strings.Join(hashes, "") + ver))
 	return fmt.Sprintf("%x", h), nil
 }
 

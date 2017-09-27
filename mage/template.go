@@ -16,12 +16,7 @@ import (
 func main() {
 	log.SetFlags(0)
 	if os.Getenv("MAGEFILE_LIST") != "" {
-		w := tabwriter.NewWriter(os.Stdout, 0, 4, 4, ' ', 0)
-		log.Println("Targets: ")
-		{{- range .Funcs}}
-		fmt.Fprintln(w, "  {{lower .Name}}\t{{.Synopsis}}")
-		{{- end}}
-		if err := w.Flush(); err != nil {
+		if err := list(); err != nil {
 			fmt.Println(err)
 			os.Exit(1)
 		}
@@ -59,20 +54,23 @@ func main() {
 		}
 	}()
 	if len(os.Args) < 2 {
-	{{- if .HasDefault}}{{with .Default}}
-		{{- if .IsError}}
-		if err := {{.Name}}(); err != nil {
+	{{- if .Default}}
+		{{- if .DefaultIsError}}
+		if err := Default(); err != nil {
 			fmt.Println(err)
 			os.Exit(1)
 		}
 		return
 		{{- else}}
-		{{.Name}}()
-		{{- end}}{{end}}
+		Default()
+		{{- end}}
 		return
 	{{- else}}
-		fmt.Println("No default (Build) target exists")
-		os.Exit(1)
+		if err := list(); err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+		return
 	{{- end}}
 	}
 	switch strings.ToLower(os.Args[1]) {
@@ -91,4 +89,22 @@ func main() {
 		fmt.Printf("Unknown target: %q\n", os.Args[1])
 		os.Exit(1)
 	}
-}`
+}
+
+func list() error {
+	{{$default := .Default}}
+	w := tabwriter.NewWriter(os.Stdout, 0, 4, 4, ' ', 0)
+	log.Println("Targets: ")
+	{{- range .Funcs}}
+	fmt.Fprintln(w, "  {{lower .Name}}{{if eq .Name $default}}*{{end}}\t{{.Synopsis}}")
+	{{- end}}
+	err := w.Flush()
+	{{- if .Default}}
+	if err == nil {
+		fmt.Println("\n* default target")
+	}
+	{{- end}}
+	return err
+}
+
+`

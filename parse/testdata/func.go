@@ -1,4 +1,6 @@
-package testfiles
+// +build mage
+
+package main
 
 import "fmt"
 

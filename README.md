@@ -34,12 +34,17 @@ Any exported function that is either `func()` or `func() error` is considered a
 mage target.  If the function has an error return, errors returned from the
 function will print to stdout and cause the magefile to exit with an exit code
 of 1.  Any functions that do not fit this pattern are not considered targets by
-mage.
+mage.  
 
 Comments on the target function will become documentation accessible by running
 `mage -l` which will list all the build targets in this directory with the first
 sentence from their docs, or `mage -h <target>` which will show the full comment
 from the docs on the function.
+
+A target may be designated the default target, which is run when the user runs
+mage with no target specified. To denote the default, create a `var Default =
+<targetname>`  If no default target is specified, running `mage` with no target
+will print the list of targets, like `mage -l`.
 
 ## Dependencies
 
@@ -129,12 +134,8 @@ func Target() {
     log.Printf("Hi!")
 }
 
-// Any function that lowercases to "build" becomes the default target.  This 
-// target is used when no target is specified.
-func Build() { 
-    // using os.Exit will do what you expect.
-    os.Exit(99)
-}
+// A var named Default indicates which target is the default.
+var Default = Install
 
 
 // Because build targets are case insensitive, you may not have two build targets
@@ -148,17 +149,18 @@ func Build() {
 ```
 $ mage -l 
 Targets:
-  build     Any function that lowercases to "build" becomes the default target.
-  install   Build target is any exported function with zero args with no return or an error return.
-  target    The first sentence in the comment will be the short help text shown with mage -l.
+  install*   Build target is any exported function with zero args with no return or an error return.
+  target     The first sentence in the comment will be the short help text shown with mage -l.
+
+* default target
 ```
 
 ```
-$ mage -h build
-mage build:
+$ mage -h target
+mage target:
 
-Any function that lowercases to "build" becomes the default target.  This 
-target is used when no target is specified.
+The first sentence in the comment will be the short help text shown with mage -l.
+The rest of the comment is long help text that will be shown with mage -h <target>
 ```
 
 
