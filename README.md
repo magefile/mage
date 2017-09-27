@@ -59,6 +59,12 @@ continue until it has been run. Dependencies are run in their own goroutines, so
 they are parellelized as much as possible given the dependency tree
 ordering restrictions.
 
+## Plugins
+
+There are no plugins.  You don't need plugins.  It's just Go code.  You can
+import whatever libraries you want.  Every library in the go ecosystem is a mage
+plugin.  Every tool you use with Go can be used with Magefiles.
+
 ### Example Dependencies
 
 ```go
