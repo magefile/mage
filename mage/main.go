@@ -23,7 +23,7 @@ import (
 
 // mageVer is used when hashing the output binary to ensure that we get a new
 // binary if we use a differernt version of mage.
-const mageVer = "v0.2"
+const mageVer = "v0.3"
 
 var output = template.Must(template.New("").Funcs(map[string]interface{}{
 	"lower": strings.ToLower,

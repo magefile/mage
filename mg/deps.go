@@ -10,7 +10,27 @@ import (
 	"github.com/pkg/errors"
 )
 
-var onces = &sync.Map{}
+type onceMap struct {
+	mu *sync.Mutex
+	m  map[string]*onceFun
+}
+
+func (o *onceMap) LoadOrStore(s string, one *onceFun) *onceFun {
+	defer o.mu.Unlock()
+	o.mu.Lock()
+
+	existing, ok := o.m[s]
+	if ok {
+		return existing
+	}
+	o.m[s] = one
+	return one
+}
+
+var onces = &onceMap{
+	mu: &sync.Mutex{},
+	m:  map[string]*onceFun{},
+}
 
 // Deps runs the given functions as dependencies of the calling function.
 // Dependencies must only be func() or func() error.  The function calling Deps
@@ -35,12 +55,14 @@ func Deps(fns ...interface{}) {
 		wg.Add(1)
 		go func() {
 			defer func() {
-				if err := recover(); err != nil {
+				if v := recover(); v != nil {
 					mu.Lock()
-					if c, ok := err.(exitCoder); ok {
-						exit = changeExit(exit, c.ExitCode())
+					if err, ok := v.(error); ok {
+						exit = changeExit(exit, ExitStatus(err))
+					} else {
+						exit = changeExit(exit, 1)
 					}
-					errs = append(errs, fmt.Sprint(err))
+					errs = append(errs, fmt.Sprint(v))
 					mu.Unlock()
 				}
 				wg.Done()
@@ -48,7 +70,7 @@ func Deps(fns ...interface{}) {
 			if err := fn.run(); err != nil {
 				mu.Lock()
 				errs = append(errs, fmt.Sprint(err))
-				exit = 1
+				exit = changeExit(exit, ExitStatus(err))
 				mu.Unlock()
 			}
 		}()
@@ -56,10 +78,7 @@ func Deps(fns ...interface{}) {
 
 	wg.Wait()
 	if len(errs) > 0 {
-		panic(fatalErr{
-			msg:  strings.Join(errs, "\n"),
-			code: exit,
-		})
+		panic(Fatal(exit, strings.Join(errs, "\n")))
 	}
 }
 
@@ -88,10 +107,10 @@ func addDep(f interface{}) *onceFun {
 	}
 
 	n := name(f)
-	of, _ := onces.LoadOrStore(n, &onceFun{
+	of := onces.LoadOrStore(n, &onceFun{
 		fn: fn,
 	})
-	return of.(*onceFun)
+	return of
 }
 
 func name(i interface{}) string {
@@ -109,21 +128,4 @@ func (o *onceFun) run() error {
 		err = o.fn()
 	})
 	return err
-}
-
-type exitCoder interface {
-	ExitCode() int
-}
-
-type fatalErr struct {
-	msg  string
-	code int
-}
-
-func (f fatalErr) Error() string {
-	return f.msg
-}
-
-func (f fatalErr) ExitCode() int {
-	return f.code
 }
