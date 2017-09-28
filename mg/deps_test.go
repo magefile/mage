@@ -73,21 +73,57 @@ func TestDepError(t *testing.T) {
 }
 
 func TestDepFatal(t *testing.T) {
-	// TODO: this test is ugly and relies on implementation details. It should
-	// be recreated as a full-stack test.
-
 	f := func() error {
 		return mg.Fatal(99, "ouch!")
 	}
 	defer func() {
-		err := recover()
-		if err == nil {
+		v := recover()
+		if v == nil {
 			t.Fatal("expected panic, but didn't get one")
 		}
-		actual := fmt.Sprint(err)
+		actual := fmt.Sprint(v)
 		if "ouch!" != actual {
 			t.Fatalf(`expected to get "ouch!" but got "%s"`, actual)
 		}
+		err, ok := v.(error)
+		if !ok {
+			t.Fatalf("expected recovered val to be error but was %T", v)
+		}
+		code := mg.ExitStatus(err)
+		if code != 99 {
+			t.Fatalf("Expected exit status 99, but got %v", code)
+		}
 	}()
 	mg.Deps(f)
+}
+
+func TestDepTwoFatal(t *testing.T) {
+	f := func() error {
+		return mg.Fatal(99, "ouch!")
+	}
+	g := func() error {
+		return mg.Fatal(11, "bang!")
+	}
+	defer func() {
+		v := recover()
+		if v == nil {
+			t.Fatal("expected panic, but didn't get one")
+		}
+		actual := fmt.Sprint(v)
+		// order is non-deterministic, so check for both orders
+		if "ouch!\nbang!" != actual && "bang!\nouch!" != actual {
+			t.Fatalf(`expected to get "ouch!" and "bang!" but got "%s"`, actual)
+		}
+		err, ok := v.(error)
+		if !ok {
+			t.Fatalf("expected recovered val to be error but was %T", v)
+		}
+		code := mg.ExitStatus(err)
+		// two different error codes returns, so we give up and just use error
+		// code 1.
+		if code != 1 {
+			t.Fatalf("Expected exit status 1, but got %v", code)
+		}
+	}()
+	mg.Deps(f, g)
 }

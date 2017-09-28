@@ -55,12 +55,14 @@ func Deps(fns ...interface{}) {
 		wg.Add(1)
 		go func() {
 			defer func() {
-				if err := recover(); err != nil {
+				if v := recover(); v != nil {
 					mu.Lock()
-					if e, ok := err.(exitStatus); ok {
-						exit = changeExit(exit, e.ExitStatus())
+					if err, ok := v.(error); ok {
+						exit = changeExit(exit, ExitStatus(err))
+					} else {
+						exit = changeExit(exit, 1)
 					}
-					errs = append(errs, fmt.Sprint(err))
+					errs = append(errs, fmt.Sprint(v))
 					mu.Unlock()
 				}
 				wg.Done()
@@ -68,7 +70,7 @@ func Deps(fns ...interface{}) {
 			if err := fn.run(); err != nil {
 				mu.Lock()
 				errs = append(errs, fmt.Sprint(err))
-				exit = 1
+				exit = changeExit(exit, ExitStatus(err))
 				mu.Unlock()
 			}
 		}()
