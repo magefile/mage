@@ -28,12 +28,14 @@ const mageVer = "v0.3"
 var output = template.Must(template.New("").Funcs(map[string]interface{}{
 	"lower": strings.ToLower,
 }).Parse(tpl))
+var mageTemplateOutput = template.Must(template.New("").Parse(mageTpl))
 
 const mainfile = "mage_output_file.go"
+const mageTemplate = "magefile.go"
 
 var (
-	force, verbose, list, help bool
-	tags                       string
+	force, verbose, list, help, mageInit bool
+	tags                                 string
 )
 
 func init() {
@@ -41,6 +43,7 @@ func init() {
 	flag.BoolVar(&verbose, "v", false, "show verbose output when running mage targets")
 	flag.BoolVar(&list, "l", false, "list mage targets in this directory")
 	flag.BoolVar(&help, "h", false, "show this help")
+	flag.BoolVar(&mageInit, "init", false, "create a starting template if no mage files exist")
 	flag.Usage = func() {
 		fmt.Println("mage [options] [target]")
 		fmt.Println("Options:")
@@ -57,6 +60,15 @@ func Main() {
 	}
 
 	files := magefiles()
+	if len(files) == 0 && mageInit {
+		if err := generateInit(); err != nil {
+			log.Fatalf("%+v", err)
+		}
+		files = magefiles()
+	} else if len(files) == 0 {
+		log.Fatal("No files marked with the mage build tag in this directory.")
+	}
+
 	filename, err := exeName(files, mageVer)
 	if err != nil {
 		log.Fatalf("%+v", err)
@@ -119,7 +131,7 @@ func magefiles() []string {
 	p, err := ctx.ImportDir(".", 0)
 	if err != nil {
 		if _, ok := err.(*build.NoGoError); ok {
-			log.Fatal("No files marked with the mage build tag in this directory.")
+			return p.GoFiles
 		}
 		log.Fatalf("%+v", err)
 	}
@@ -202,6 +214,20 @@ func confDir() string {
 	default:
 		return filepath.Join(os.Getenv("HOME"), ".magefile")
 	}
+}
+
+func generateInit() error {
+	f, err := os.Create(mageTemplate)
+	if err != nil {
+		return errors.WithMessage(err, "could not create mage template")
+	}
+	defer f.Close()
+
+	if err := mageTemplateOutput.Execute(f, nil); err != nil {
+		return errors.WithMessage(err, "can't execute magefile template")
+	}
+
+	return nil
 }
 
 func run(cmd string, args ...string) int {

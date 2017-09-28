@@ -22,7 +22,7 @@ func main() {
 		}
 		return
 	}
-	
+
 	if os.Getenv("MAGEFILE_HELP") != "" {
 		if len(os.Args) < 2 {
 			fmt.Println("no target specified")
@@ -105,6 +105,26 @@ func list() error {
 	}
 	{{- end}}
 	return err
+}
+
+`
+
+var mageTpl = `// +build mage
+
+package main
+
+import (
+	"fmt"
+)
+
+func Build() error {
+	fmt.Println("Building...")
+	return nil
+}
+
+func Install() error {
+	fmt.Println("Installing...")
+	return nil
 }
 
 `
