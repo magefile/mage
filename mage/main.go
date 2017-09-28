@@ -134,7 +134,7 @@ func compile(out string, info *parse.PkgInfo, gofiles []string) error {
 	if err != nil {
 		return errors.WithMessage(err, "can't create mainfile")
 	}
-	//defer os.Remove(mainfile)
+	defer os.Remove(mainfile)
 	defer f.Close()
 
 	data := data{
