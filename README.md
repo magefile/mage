@@ -1,4 +1,4 @@
-# mage
+# mage [![Build Status](https://travis-ci.org/magefile/mage.svg?branch=master)](https://travis-ci.org/magefile/mage)
 
 Mage is a make/rake-like build tool using Go.
 
