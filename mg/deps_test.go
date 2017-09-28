@@ -71,3 +71,23 @@ func TestDepError(t *testing.T) {
 	}()
 	mg.Deps(f)
 }
+
+func TestDepFatal(t *testing.T) {
+	// TODO: this test is ugly and relies on implementation details. It should
+	// be recreated as a full-stack test.
+
+	f := func() error {
+		return mg.Fatal(99, "ouch!")
+	}
+	defer func() {
+		err := recover()
+		if err == nil {
+			t.Fatal("expected panic, but didn't get one")
+		}
+		actual := fmt.Sprint(err)
+		if "ouch!" != actual {
+			t.Fatalf(`expected to get "ouch!" but got "%s"`, actual)
+		}
+	}()
+	mg.Deps(f)
+}

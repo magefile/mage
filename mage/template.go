@@ -46,9 +46,9 @@ func main() {
 		err := recover()
 		if err != nil {
 			fmt.Println(err)
-			type code interface { ExitCode() int }
+			type code interface { ExitStatus() int }
 			if c, ok := err.(code); ok {
-				os.Exit(c.ExitCode())
+				os.Exit(c.ExitStatus())
 			}
 			os.Exit(1)
 		}
