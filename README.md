@@ -38,7 +38,7 @@ Any exported function that is either `func()` or `func() error` is considered a
 mage target.  If the function has an error return, errors returned from the
 function will print to stdout and cause the magefile to exit with an exit code
 of 1.  Any functions that do not fit this pattern are not considered targets by
-mage.  
+mage.
 
 Comments on the target function will become documentation accessible by running
 `mage -l` which will list all the build targets in this directory with the first
@@ -112,6 +112,8 @@ mage [options] [target]
 Options:
   -f    force recreation of compiled magefile
   -h    show this help
+  -init
+        create a starting template if no mage files exist
   -l    list mage targets in this directory
   -v    show verbose output when running mage targets
 ```
@@ -197,7 +199,7 @@ compatibile with any go 1.x environment.
 # Zero install option with `go run`
 
 Don't want to depend on another binary in your environment?  You can run mage
-directly out of your vendor directory (or GOPATH) with `go run`.  
+directly out of your vendor directory (or GOPATH) with `go run`.
 
 Just save a file like this (I'll call it `mage.go`, but it can be named
 anything) (note that the build tag is *not* `+build mage`).  Then you can `go
