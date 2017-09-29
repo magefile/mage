@@ -1,6 +1,7 @@
 package mage
 
-const tpl = `// +build ignore
+// var only for tests
+var tpl = `// +build ignore
 
 package main
 

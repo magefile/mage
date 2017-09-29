@@ -48,6 +48,9 @@ func init() {
 	}
 }
 
+// Main is the entrypoint for running mage.  It exists external to mage's main
+// function to allow it to be used from other programs, specifically so you can
+// go run a simple file that run's mage's Main.
 func Main() {
 	log.SetFlags(0)
 	flag.Parse()
@@ -57,15 +60,9 @@ func Main() {
 	}
 
 	files := magefiles()
-	filename, err := exeName(files, mageVer)
+	out, err := ExeName(files)
 	if err != nil {
 		log.Fatalf("%+v", err)
-	}
-
-	dir := confDir()
-	out := filepath.Join(dir, filename)
-	if runtime.GOOS == "windows" {
-		out += ".exe"
 	}
 
 	if !force {
@@ -158,21 +155,32 @@ func compile(out string, info *parse.PkgInfo, gofiles []string) error {
 	return nil
 }
 
-func exeName(files []string, ver string) (string, error) {
+// ExeName reports the executable filename that this version of Mage would
+// create for the given magefiles.
+func ExeName(files []string) (string, error) {
 	var hashes []string
 	for _, s := range files {
-		h, err := hash(s)
+		h, err := hashFile(s)
 		if err != nil {
 			return "", err
 		}
 		hashes = append(hashes, h)
 	}
+	// hash the mainfile template to ensure if it gets updated, we make a new
+	// binary.
+	hashes = append(hashes, fmt.Sprintf("%x", sha1.Sum([]byte(tpl))))
 	sort.Strings(hashes)
-	h := sha1.Sum([]byte(strings.Join(hashes, "") + ver))
-	return fmt.Sprintf("%x", h), nil
+	hash := sha1.Sum([]byte(strings.Join(hashes, "") + mageVer))
+	filename := fmt.Sprintf("%x", hash)
+	dir := confDir()
+	out := filepath.Join(dir, filename)
+	if runtime.GOOS == "windows" {
+		out += ".exe"
+	}
+	return out, nil
 }
 
-func hash(fn string) (string, error) {
+func hashFile(fn string) (string, error) {
 	f, err := os.Open(fn)
 	if err != nil {
 		return "", errors.WithMessage(err, "can't open input file")
