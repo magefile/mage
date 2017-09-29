@@ -10,6 +10,7 @@ import (
 	"go/types"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -136,6 +137,9 @@ func makeInfo(dir string, fset *token.FileSet, files map[string]*ast.File) (type
 		fs = append(fs, v)
 	}
 
+	if abs, err := filepath.Abs(dir); err == nil {
+		dir = abs
+	}
 	_, err := cfg.Check(dir, fset, fs, &info)
 	return info, errors.WithStack(err)
 }
