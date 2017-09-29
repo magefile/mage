@@ -8,18 +8,22 @@ Mage is a make/rake-like build tool using Go.
 
 ## Discussion
 
-Join the `#mage` channel on [gophers slack](https://gophers.slack.com/messages/general/) for discussion of usage, development, etc. 
+Join the `#mage` channel on [gophers slack](https://gophers.slack.com/messages/general/) for discussion of usage, development, etc.
 
 ## Magefiles
 
 A mage file is any regular go file marked with a build target of "mage" and in
-package main. 
+package main.
 
 ```go
 // +build mage
 
 package main
 ```
+
+You can quickly create a template mage file with the `-init` option.
+
+`mage -init`
 
 You may have any number of magefiles in the same directory.  Mage doesn't care
 what they're named aside from normal go filename rules.  All they need is to
@@ -34,7 +38,7 @@ Any exported function that is either `func()` or `func() error` is considered a
 mage target.  If the function has an error return, errors returned from the
 function will print to stdout and cause the magefile to exit with an exit code
 of 1.  Any functions that do not fit this pattern are not considered targets by
-mage.  
+mage.
 
 Comments on the target function will become documentation accessible by running
 `mage -l` which will list all the build targets in this directory with the first
@@ -108,6 +112,8 @@ mage [options] [target]
 Options:
   -f    force recreation of compiled magefile
   -h    show this help
+  -init
+        create a starting template if no mage files exist
   -l    list mage targets in this directory
   -v    show verbose output when running mage targets
 ```
@@ -125,7 +131,7 @@ import (
 )
 
 
-// Build target is any exported function with zero args with no return or an error return. 
+// Build target is any exported function with zero args with no return or an error return.
 // If a target has an error return and returns an non-nil error, mage will print
 // that error to stdout and return with an exit code of 1.
 func Install() error {
@@ -153,7 +159,7 @@ var Default = Install
 ```
 
 ```
-$ mage -l 
+$ mage -l
 Targets:
   install*   Build target is any exported function with zero args with no return or an error return.
   target     The first sentence in the comment will be the short help text shown with mage -l.
@@ -177,7 +183,7 @@ the normal go build rules for following build constraints (aside from requiring
 the mage tag).  It then parses those files to find the build targets, generates
 a main file for the command, and compiles a binary from those files.  The
 magefiles are hashed so that if they remain unchanged, the same compiled binary
-will be reused next time, to avoid the generation overhead. 
+will be reused next time, to avoid the generation overhead.
 
 ## Binary Cache
 
@@ -188,12 +194,12 @@ customized by setting the MAGEFILE_CACHE environment variable.
 
 Mage itself requires no dependencies to run. However, because it is compiling
 go code, you must have a valid go environment set up on your machine.  Mage is
-compatibile with any go 1.x environment. 
+compatibile with any go 1.x environment.
 
-# Zero install option with `go run` 
+# Zero install option with `go run`
 
 Don't want to depend on another binary in your environment?  You can run mage
-directly out of your vendor directory (or GOPATH) with `go run`.  
+directly out of your vendor directory (or GOPATH) with `go run`.
 
 Just save a file like this (I'll call it `mage.go`, but it can be named
 anything) (note that the build tag is *not* `+build mage`).  Then you can `go
@@ -220,7 +226,7 @@ they won't.
 
 # Why?
 
-Makefiles are hard to read and hard to write.  Mostly because makefiles are essentially fancy bash scripts with significant white space and additional make-related syntax. 
+Makefiles are hard to read and hard to write.  Mostly because makefiles are essentially fancy bash scripts with significant white space and additional make-related syntax.
 
 Mage lets you have multiple magefiles, name your magefiles whatever you
 want, and they're easy to customize for multiple operating systems.  Mage has no
