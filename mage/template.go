@@ -119,6 +119,9 @@ import (
 	"github.com/magefile/mage/mg" // mg contains helpful utility functions, like Deps
 )
 
+// Default target to run when none is specified
+// var Default = Build
+
 // A build step that requires additional params, or platform specific steps for example
 func Build() error {
 	mg.Deps(InstallDeps)
