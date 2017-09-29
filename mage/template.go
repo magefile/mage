@@ -114,17 +114,39 @@ var mageTpl = `// +build mage
 package main
 
 import (
+	"os/exec"
 	"fmt"
+	"github.com/magefile/mage/mg" // mg contains helpful utility functions, like Deps
 )
 
+// A build step that requires additional params, or platform specific steps for example
 func Build() error {
+	mg.Deps(InstallDeps)
 	fmt.Println("Building...")
-	return nil
+	cmd := exec.Command("go", "build", "-o", "MyApp", ".")
+	return cmd.Run()
 }
 
+// A custom install step if you need your bin someplace other than go/bin
 func Install() error {
+	mg.Deps(Build)
 	fmt.Println("Installing...")
-	return nil
+	cmd := exec.Command("echo", "Pretend to copy someplace else")
+	return cmd.Run()
+}
+
+// Manage your deps, or running package managers.
+func InstallDeps() error {
+	fmt.Println("Installing Deps...")
+	cmd := exec.Command("go", "get", "github.com/magefile/mage")
+	return cmd.Run()
+}
+
+// Clean up after yourself
+func Clean() {
+	fmt.Println("Cleaning...")
+	cmd := exec.Command("rm", "MyApp")
+	cmd.Run()
 }
 
 `
