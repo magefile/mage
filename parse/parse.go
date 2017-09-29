@@ -122,7 +122,7 @@ func getPackage(path string, files []string, fset *token.FileSet) (*ast.Package,
 
 func makeInfo(dir string, fset *token.FileSet, files map[string]*ast.File) (types.Info, error) {
 	cfg := types.Config{
-		Importer: importer.Default(),
+		Importer: importer.For("source", nil),
 	}
 
 	info := types.Info{
