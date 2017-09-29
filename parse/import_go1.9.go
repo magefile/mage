@@ -3,10 +3,11 @@
 package parse
 
 import (
-	"go/types"
 	"go/importer"
+	"go/token"
+	"go/types"
 )
 
-func getImporter() types.Importer {
-	return importer.For("source", nil),
+func getImporter(*token.FileSet) types.Importer {
+	return importer.For("source", nil)
 }
