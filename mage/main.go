@@ -28,10 +28,10 @@ const mageVer = "v0.3"
 var output = template.Must(template.New("").Funcs(map[string]interface{}{
 	"lower": strings.ToLower,
 }).Parse(tpl))
-var mageTemplateOutput = template.Must(template.New("").Parse(mageTpl))
+var initOutput = template.Must(template.New("").Parse(mageTpl))
 
 const mainfile = "mage_output_file.go"
-const mageTemplate = "magefile.go"
+const initFile = "magefile.go"
 
 var (
 	force, verbose, list, help, mageInit bool
@@ -54,39 +54,48 @@ func init() {
 // Main is the entrypoint for running mage.  It exists external to mage's main
 // function to allow it to be used from other programs, specifically so you can
 // go run a simple file that run's mage's Main.
-func Main() {
+func Main() int {
 	log.SetFlags(0)
 	flag.Parse()
 	if help && len(flag.Args()) == 0 {
 		flag.Usage()
-		return
+		return 0
 	}
 
-	files := magefiles()
+	files, err := magefiles()
+	if err != nil {
+		fmt.Println(err)
+		return 1
+	}
 	if len(files) == 0 && mageInit {
 		if err := generateInit(); err != nil {
-			log.Fatalf("%+v", err)
+			log.Printf("%+v", err)
+			return 1
 		}
-		files = magefiles()
+		log.Println(initFile, "created")
+		return 0
 	} else if len(files) == 0 {
-		log.Fatal("No files marked with the mage build tag in this directory.")
+		log.Print("No .go files marked with the mage build tag in this directory.")
+		return 1
 	}
 
 	out, err := ExeName(files)
 
 	if err != nil {
-		log.Fatalf("%+v", err)
+		log.Printf("%+v", err)
+		return 1
 	}
 
 	if !force {
 		if _, err := os.Stat(out); err == nil {
-			os.Exit(run(out, flag.Args()...))
+			return run(out, flag.Args()...)
 		}
 	}
 
 	info, err := parse.Package(".", files)
 	if err != nil {
-		log.Fatalf("%v", err)
+		log.Printf("%v", err)
+		return 1
 	}
 
 	names := map[string][]string{}
@@ -111,9 +120,10 @@ func Main() {
 	}
 
 	if err := compile(out, info, files); err != nil {
-		log.Fatal(err)
+		log.Print(err)
+		return 1
 	}
-	os.Exit(run(out, flag.Args()...))
+	return run(out, flag.Args()...)
 }
 
 type data struct {
@@ -122,18 +132,18 @@ type data struct {
 	Default      string
 }
 
-func magefiles() []string {
+func magefiles() ([]string, error) {
 	ctx := build.Default
 	ctx.RequiredTags = []string{"mage"}
 	ctx.BuildTags = []string{"mage"}
 	p, err := ctx.ImportDir(".", 0)
 	if err != nil {
 		if _, ok := err.(*build.NoGoError); ok {
-			return p.GoFiles
+			return []string{}, nil
 		}
-		log.Fatalf("%+v", err)
+		return nil, err
 	}
-	return p.GoFiles
+	return p.GoFiles, nil
 }
 
 func compile(out string, info *parse.PkgInfo, gofiles []string) error {
@@ -226,13 +236,13 @@ func confDir() string {
 }
 
 func generateInit() error {
-	f, err := os.Create(mageTemplate)
+	f, err := os.Create(initFile)
 	if err != nil {
 		return errors.WithMessage(err, "could not create mage template")
 	}
 	defer f.Close()
 
-	if err := mageTemplateOutput.Execute(f, nil); err != nil {
+	if err := initOutput.Execute(f, nil); err != nil {
 		return errors.WithMessage(err, "can't execute magefile template")
 	}
 
