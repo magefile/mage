@@ -211,10 +211,11 @@ run mage.go <target>` and it'll work just as if you ran `mage <target>`
 package main
 
 import (
+	"os"
 	"github.com/magefile/mage/mage"
 )
 
-func main() { mage.Main() }
+func main() { os.Exit(mage.Main()) }
 ```
 
 Note that because of the peculiarities of `go run`, if you run this way, go run

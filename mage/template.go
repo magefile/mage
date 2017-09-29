@@ -116,9 +116,10 @@ package main
 
 import (
 	"fmt"
-	"github.com/magefile/mage/mg" // mg contains helpful utility functions, like Deps
 	"os"
 	"os/exec"
+
+	"github.com/magefile/mage/mg" // mg contains helpful utility functions, like Deps
 )
 
 // Default target to run when none is specified
@@ -152,5 +153,4 @@ func Clean() {
 	fmt.Println("Cleaning...")
 	os.RemoveAll("MyApp")
 }
-
 `

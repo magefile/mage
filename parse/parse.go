@@ -63,12 +63,12 @@ func Package(path string, files []string) (*PkgInfo, error) {
 		}
 	}
 
-	getDefault(p, pi, info)
+	setDefault(p, pi, info)
 
 	return pi, nil
 }
 
-func getDefault(p *doc.Package, pi *PkgInfo, info types.Info) {
+func setDefault(p *doc.Package, pi *PkgInfo, info types.Info) {
 	for _, v := range p.Vars {
 		for x, name := range v.Names {
 			if name != "Default" {
@@ -92,7 +92,6 @@ func getDefault(p *doc.Package, pi *PkgInfo, info types.Info) {
 			log.Println("warning: default declaration does not reference a mage target")
 		}
 	}
-	log.Println("no default target found")
 }
 
 // getPackage returns the non-test package at the given path.

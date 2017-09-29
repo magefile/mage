@@ -1,7 +1,11 @@
 package main
 
-import "github.com/magefile/mage/mage"
+import (
+	"os"
+
+	"github.com/magefile/mage/mage"
+)
 
 func main() {
-	mage.Main()
+	os.Exit(mage.Main())
 }
