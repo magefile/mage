@@ -1,6 +1,7 @@
 package mage
 
-const tpl = `// +build ignore
+// var only for tests
+var tpl = `// +build ignore
 
 package main
 
@@ -55,7 +56,7 @@ func main() {
 	}()
 	if len(os.Args) < 2 {
 	{{- if .Default}}
-		{{- if .DefaultIsError}}
+		{{- if .DefaultError}}
 		if err := Default(); err != nil {
 			fmt.Println(err)
 			os.Exit(1)

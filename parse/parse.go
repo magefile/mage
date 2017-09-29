@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"go/ast"
 	"go/doc"
-	"go/importer"
 	"go/parser"
 	"go/token"
 	"go/types"
@@ -122,7 +121,7 @@ func getPackage(path string, files []string, fset *token.FileSet) (*ast.Package,
 
 func makeInfo(dir string, fset *token.FileSet, files map[string]*ast.File) (types.Info, error) {
 	cfg := types.Config{
-		Importer: importer.Default(),
+		Importer: getImporter(fset),
 	}
 
 	info := types.Info{
