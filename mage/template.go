@@ -114,12 +114,14 @@ var mageTpl = `// +build mage
 package main
 
 import (
-	"os/exec"
 	"fmt"
 	"github.com/magefile/mage/mg" // mg contains helpful utility functions, like Deps
+	"os"
+	"os/exec"
 )
 
 // Default target to run when none is specified
+// If not set, running mage will list available targets
 // var Default = Build
 
 // A build step that requires additional params, or platform specific steps for example
@@ -134,22 +136,20 @@ func Build() error {
 func Install() error {
 	mg.Deps(Build)
 	fmt.Println("Installing...")
-	cmd := exec.Command("echo", "Pretend to copy someplace else")
-	return cmd.Run()
+	return os.Rename("./MyApp", "/usr/bin/MyApp")
 }
 
 // Manage your deps, or running package managers.
 func InstallDeps() error {
 	fmt.Println("Installing Deps...")
-	cmd := exec.Command("go", "get", "github.com/magefile/mage")
+	cmd := exec.Command("go", "get", "github.com/stretchr/piglatin")
 	return cmd.Run()
 }
 
 // Clean up after yourself
 func Clean() {
 	fmt.Println("Cleaning...")
-	cmd := exec.Command("rm", "MyApp")
-	cmd.Run()
+	os.RemoveAll("MyApp")
 }
 
 `
