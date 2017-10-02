@@ -4,6 +4,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 
 	"github.com/magefile/mage/mg"
 )
@@ -15,6 +16,10 @@ var Default = ReturnsError
 func ReturnsString() string {
 	fmt.Println("more stuff")
 	return ""
+}
+
+func TestVerbose() {
+	log.Println("hi!")
 }
 
 func ReturnsVoid() {

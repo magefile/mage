@@ -237,7 +237,7 @@ func run(cmd string, args ...string) int {
 	c.Stdout = os.Stdout
 	c.Env = os.Environ()
 	if verbose {
-		c.Env = append(c.Env, "MAGEFILE_VERVOSE=1")
+		c.Env = append(c.Env, "MAGEFILE_VERBOSE=1")
 	}
 	if list {
 		c.Env = append(c.Env, "MAGEFILE_LIST=1")

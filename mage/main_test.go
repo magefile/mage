@@ -47,6 +47,33 @@ func TestGoRun(t *testing.T) {
 	}
 }
 
+func TestVerbose(t *testing.T) {
+	c := exec.Command("go", "run", "main.go", "testverbose")
+	c.Dir = "./testdata"
+	c.Env = os.Environ()
+	b, err := c.CombinedOutput()
+	if err != nil {
+		t.Error("error:", err)
+	}
+	actual := string(b)
+	expected := ""
+	if actual != expected {
+		t.Fatalf("expected %q, but got %q", expected, actual)
+	}
+	c = exec.Command("go", "run", "main.go", "-v", "testverbose")
+	c.Dir = "./testdata"
+	c.Env = os.Environ()
+	b, err = c.CombinedOutput()
+	if err != nil {
+		t.Error("error:", err)
+	}
+	actual = string(b)
+	expected = "hi!\n"
+	if actual != expected {
+		t.Fatalf("expected %q, but got %q", expected, actual)
+	}
+}
+
 // ensure we include the hash of the mainfile template in determining the
 // executable name to run, so we automatically create a new exe if the template
 // changes.
