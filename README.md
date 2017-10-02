@@ -1,6 +1,9 @@
-# mage [![Build Status](https://travis-ci.org/magefile/mage.svg?branch=master)](https://travis-ci.org/magefile/mage)
+<h1 align=center>mage</h1>
+<p align="center"><img src="https://user-images.githubusercontent.com/3185864/31061203-6f6743dc-a6ec-11e7-9469-b8d667d9bc3f.png"/></p>
 
-Mage is a make/rake-like build tool using Go.
+<p align="center">Mage is a make/rake-like build tool using Go.</p>
+
+[![Build Status](https://travis-ci.org/magefile/mage.svg?branch=master)](https://travis-ci.org/magefile/mage)
 
 ## Demo
 
