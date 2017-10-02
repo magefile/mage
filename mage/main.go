@@ -34,8 +34,8 @@ const mainfile = "mage_output_file.go"
 const initFile = "magefile.go"
 
 var (
-	force, verbose, list, help, mageInit bool
-	tags                                 string
+	force, verbose, list, help, mageInit, keep bool
+	tags                                       string
 )
 
 func init() {
@@ -44,6 +44,7 @@ func init() {
 	flag.BoolVar(&list, "l", false, "list mage targets in this directory")
 	flag.BoolVar(&help, "h", false, "show this help")
 	flag.BoolVar(&mageInit, "init", false, "create a starting template if no mage files exist")
+	flag.BoolVar(&keep, "keep", false, "keep intermediate mage files around after running")
 	flag.Usage = func() {
 		fmt.Println("mage [options] [target]")
 		fmt.Println("Options:")
@@ -154,7 +155,9 @@ func compile(out string, info *parse.PkgInfo, gofiles []string) error {
 	if err != nil {
 		return errors.WithMessage(err, "can't create mainfile")
 	}
-	defer os.Remove(mainfile)
+	if !keep {
+		defer os.Remove(mainfile)
+	}
 	defer f.Close()
 
 	data := data{
