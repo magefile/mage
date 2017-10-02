@@ -7,7 +7,7 @@
 
 ## Demo
 
-[![Mage Demo](https://img.youtube.com/vi/GOqbD0lF-iA/0.jpg)](https://www.youtube.com/watch?v=GOqbD0lF-iA)
+[![Mage Demo](https://img.youtube.com/vi/GOqbD0lF-iA/maxresdefault.jpg)](https://www.youtube.com/watch?v=GOqbD0lF-iA)
 
 ## Discussion
 
