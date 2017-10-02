@@ -6,6 +6,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"testing"
+
+	"github.com/magefile/mage/mg"
 )
 
 func TestMain(m *testing.M) {
@@ -20,7 +22,7 @@ func testmain(m *testing.M) int {
 	if err != nil {
 		log.Fatal(err)
 	}
-	if err := os.Setenv(CacheEnv, abs); err != nil {
+	if err := os.Setenv(mg.CacheEnv, abs); err != nil {
 		log.Fatal(err)
 	}
 	if err := os.Mkdir(dir, 0700); err != nil {

@@ -6,8 +6,6 @@ import (
 	"runtime"
 	"strings"
 	"sync"
-
-	"github.com/pkg/errors"
 )
 
 type onceMap struct {
@@ -43,7 +41,7 @@ func Deps(fns ...interface{}) {
 		case func(), func() error:
 			// ok
 		default:
-			panic(errors.Errorf("Invalid type for dependent function: %T. Dependencies must be func() or func() error", f))
+			panic(fmt.Errorf("Invalid type for dependent function: %T. Dependencies must be func() or func() error", f))
 		}
 	}
 	mu := &sync.Mutex{}

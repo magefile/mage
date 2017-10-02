@@ -1,12 +1,12 @@
 package mg_test
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 	"time"
 
 	"github.com/magefile/mage/mg"
-	"github.com/pkg/errors"
 )
 
 func TestDepsRunOnce(t *testing.T) {
