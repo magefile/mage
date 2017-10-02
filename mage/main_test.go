@@ -1,6 +1,7 @@
 package mage
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"os/exec"
@@ -60,4 +61,22 @@ func TestHashTemplate(t *testing.T) {
 	if changed == name {
 		t.Fatal("expected executable name to chage if template changed")
 	}
+}
+
+// Test if the -keep flag does keep the mainfile around after running
+func TestKeepFlag(t *testing.T) {
+	buildFile := fmt.Sprintf("./testdata/keep_flag/%s", mainfile)
+	os.Remove(buildFile)
+	c := exec.Command("go", "run", "main.go", "-keep")
+	c.Dir = "./testdata/keep_flag"
+	c.Env = os.Environ()
+	_, err := c.CombinedOutput()
+	if err != nil {
+		t.Error("error:", err)
+	}
+
+	if _, err := os.Stat(fmt.Sprintf(buildFile)); os.IsNotExist(err) {
+		t.Fatalf("expected file %q to exist but it did not", buildFile)
+	}
+	os.Remove(buildFile)
 }
