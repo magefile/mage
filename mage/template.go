@@ -54,30 +54,10 @@ func main() {
 			}
 			os.Exit(1)
 		}
-	}().Default
+	}()
 	if len(os.Args) < 2 {
 	{{- if .Default}}
-		{{- if .DefaultError}}
-			{{- if .DefaultContext}}
-				if err := Default(mg.Context); err != nil {
-					fmt.Println(err)
-					os.Exit(1)
-				}
-				return
-			{{- else}}
-				if err := Default(); err != nil {
-					fmt.Println(err)
-					os.Exit(1)
-				}
-				return
-			{{- end}}
-		{{- else}}
-			{{- if .DefaultContext}}
-				Default(mg.Context)
-			{{- else}}
-				Default()
-			{{- end}}
-		{{- end}}
+		{{- .TemplateString -}}
 		return
 	{{- else}}
 		if err := list(); err != nil {
@@ -90,25 +70,7 @@ func main() {
 	switch strings.ToLower(os.Args[1]) {
 	{{range .Funcs -}}
 	case "{{lower .Name}}":
-		{{if .IsError -}}
-			{{if .IsContext -}}
-				if err := {{.Name}}(mg.Context); err != nil {
-					fmt.Println(err)
-					os.Exit(1)
-				}
-			{{- else}}
-				if err := {{.Name}}(); err != nil {
-					fmt.Println(err)
-					os.Exit(1)
-				}
-			{{- end}}
-		{{else -}}
-			{{if .IsContext -}}
-				{{.Name}}(mg.Context)
-			{{- else -}}
-				{{.Name}}()
-			{{- end}}
-		{{- end}}
+		{{.TemplateString}}
 	{{end}}
 	default:
 		fmt.Printf("Unknown target: %q\n", os.Args[1])

@@ -18,14 +18,43 @@ type PkgInfo struct {
 	DefaultIsError   bool
 	DefaultIsContext bool
 	DefaultName      string
+	DefaultFunc      Function
 }
 
+// Function represented a job function from a mage file
 type Function struct {
 	Name      string
 	IsError   bool
 	IsContext bool
 	Synopsis  string
 	Comment   string
+}
+
+func (f Function) TemplateString() string {
+	if f.IsContext && f.IsError {
+		out := `if err := %s(mg.Context); err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}`
+		return fmt.Sprintf(out, f.Name)
+	}
+	if f.IsContext && !f.IsError {
+		out := `%s(mg.Context)`
+		return fmt.Sprintf(out, f.Name)
+	}
+	if !f.IsContext && f.IsError {
+		out := `if err := %s(); err != nil {
+			 fmt.Println(err)
+			 os.Exit(1)
+		}`
+		return fmt.Sprintf(out, f.Name)
+	}
+	if !f.IsContext && !f.IsError {
+		out := `%s()`
+		return fmt.Sprintf(out, f.Name)
+	}
+	return `fmt.Printf("Error formatting job code\n")
+	os.Exit(1)`
 }
 
 // Package parses a package
@@ -89,6 +118,7 @@ func setDefault(p *doc.Package, pi *PkgInfo, info types.Info) {
 					pi.DefaultName = f.Name
 					pi.DefaultIsError = f.IsError
 					pi.DefaultIsContext = f.IsContext
+					pi.DefaultFunc = f
 					return
 				}
 			}
