@@ -53,7 +53,7 @@ func Run(cmd string, args ...string) error {
 // printing stdout to stdout if mage was run with -v.  It adds adds env to the
 // environment variables for the command being run. Environment variables should
 // be in the format name=value.
-func RunWith(env []string, cmd string, args ...string) error {
+func RunWith(env map[string]string, cmd string, args ...string) error {
 	var output io.Writer
 	if mg.Verbose() {
 		output = os.Stdout
@@ -69,6 +69,13 @@ func Output(cmd string, args ...string) (string, error) {
 	return strings.TrimSuffix(buf.String(), "\n"), err
 }
 
+// OutputWith is like RunWith, ubt returns what is written to stdout.
+func OutputWith(env map[string]string, cmd string, args ...string) (string, error) {
+	buf := &bytes.Buffer{}
+	_, err := Exec(env, buf, cmd, args...)
+	return strings.TrimSuffix(buf.String(), "\n"), err
+}
+
 // Exec executes the command, piping its stderr to mage's stderr and
 // piping its stdout to the given writer. If the command fails, it will return
 // an error that, if returned from a target or mg.Deps call, will cause mage to
@@ -76,16 +83,22 @@ func Output(cmd string, args ...string) (string, error) {
 // environment variables to set when running the command, these override the
 // current environment variables set (which are also passed to the command). cmd
 // and args may include references to environment variables in $FOO format, in
-// which case these will be expanded before the command is run.  Note that
-// environment variables in env will *not* be used to expand cmd and args.
+// which case these will be expanded before the command is run.
 //
 // Ran reports if the command ran (rather than was not found or not executable).
 // Code reports the exit code the command returned if it ran. If err == nil, ran
 // is always true and code is always 0.
-func Exec(env []string, stdout io.Writer, cmd string, args ...string) (ran bool, err error) {
-	cmd = os.ExpandEnv(cmd)
+func Exec(env map[string]string, stdout io.Writer, cmd string, args ...string) (ran bool, err error) {
+	expand := func(s string) string {
+		s2, ok := env[s]
+		if ok {
+			return s2
+		}
+		return os.Getenv(s)
+	}
+	cmd = os.Expand(cmd, expand)
 	for i := range args {
-		args[i] = os.ExpandEnv(args[i])
+		args[i] = os.Expand(args[i], expand)
 	}
 	ran, code, err := run(env, stdout, cmd, args...)
 	if err == nil {
@@ -97,9 +110,12 @@ func Exec(env []string, stdout io.Writer, cmd string, args ...string) (ran bool,
 	return ran, fmt.Errorf(`failed to run "%s %s: %v"`, cmd, strings.Join(args, " "), err)
 }
 
-func run(env []string, stdout io.Writer, cmd string, args ...string) (ran bool, code int, err error) {
+func run(env map[string]string, stdout io.Writer, cmd string, args ...string) (ran bool, code int, err error) {
 	c := exec.Command(cmd, args...)
-	c.Env = append(os.Environ(), env...)
+	c.Env = os.Environ()
+	for k, v := range env {
+		c.Env = append(c.Env, k+"="+v)
+	}
 	c.Stderr = os.Stderr
 	c.Stdout = stdout
 	err = c.Run()

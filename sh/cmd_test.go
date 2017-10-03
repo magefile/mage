@@ -35,7 +35,7 @@ func TestExitCode(t *testing.T) {
 func TestEnv(t *testing.T) {
 	env := "SOME_REALLY_LONG_MAGEFILE_SPECIFIC_THING"
 	out := &bytes.Buffer{}
-	ran, err := Exec([]string{env + "=foobar"}, out, os.Args[0], "-printVar", env)
+	ran, err := Exec(map[string]string{env: "foobar"}, out, os.Args[0], "-printVar", env)
 	if err != nil {
 		t.Fatalf("unexpected error from runner: %#v", err)
 	}
@@ -69,4 +69,11 @@ func TestAutoExpand(t *testing.T) {
 		t.Fatalf(`Expected "baz" but got %q`, s)
 	}
 
+	s, err = OutputWith(map[string]string{"MAGE_FOOBAR": "hi!"}, "echo", "$MAGE_FOOBAR")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s != "hi!" {
+		t.Fatalf(`Expected "hi!" but got %q`, s)
+	}
 }
