@@ -57,7 +57,7 @@ func main() {
 	}()
 	if len(os.Args) < 2 {
 	{{- if .Default}}
-		{{- .TemplateString -}}
+		{{.DefaultFunc.TemplateString}}
 		return
 	{{- else}}
 		if err := list(); err != nil {

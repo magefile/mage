@@ -138,6 +138,7 @@ type data struct {
 	Funcs        []parse.Function
 	DefaultError bool
 	Default      string
+	DefaultFunc  parse.Function
 }
 
 func magefiles() ([]string, error) {
@@ -170,6 +171,7 @@ func compile(out string, info *parse.PkgInfo, gofiles []string) error {
 	data := data{
 		Funcs:   info.Funcs,
 		Default: info.DefaultName,
+		DefaultFunc: info.DefaultFunc,
 	}
 
 	data.DefaultError = info.DefaultIsError
