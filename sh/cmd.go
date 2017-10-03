@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"os/exec"
 	"strings"
@@ -118,6 +119,7 @@ func run(env map[string]string, stdout io.Writer, cmd string, args ...string) (r
 	}
 	c.Stderr = os.Stderr
 	c.Stdout = stdout
+	log.Println("exec:", cmd, strings.Join(args, " "))
 	err = c.Run()
 	return cmdRan(err), ExitStatus(err), err
 }
