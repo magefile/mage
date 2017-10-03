@@ -7,6 +7,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"testing"
+
+	"github.com/magefile/mage/mg"
 )
 
 func TestMain(m *testing.M) {
@@ -21,7 +23,7 @@ func testmain(m *testing.M) int {
 	if err != nil {
 		log.Fatal(err)
 	}
-	if err := os.Setenv(CacheEnv, abs); err != nil {
+	if err := os.Setenv(mg.CacheEnv, abs); err != nil {
 		log.Fatal(err)
 	}
 	if err := os.Mkdir(dir, 0700); err != nil {
@@ -41,6 +43,33 @@ func TestGoRun(t *testing.T) {
 	}
 	actual := string(b)
 	expected := "stuff\n"
+	if actual != expected {
+		t.Fatalf("expected %q, but got %q", expected, actual)
+	}
+}
+
+func TestVerbose(t *testing.T) {
+	c := exec.Command("go", "run", "main.go", "testverbose")
+	c.Dir = "./testdata"
+	c.Env = os.Environ()
+	b, err := c.CombinedOutput()
+	if err != nil {
+		t.Error("error:", err)
+	}
+	actual := string(b)
+	expected := ""
+	if actual != expected {
+		t.Fatalf("expected %q, but got %q", expected, actual)
+	}
+	c = exec.Command("go", "run", "main.go", "-v", "testverbose")
+	c.Dir = "./testdata"
+	c.Env = os.Environ()
+	b, err = c.CombinedOutput()
+	if err != nil {
+		t.Error("error:", err)
+	}
+	actual = string(b)
+	expected = "hi!\n"
 	if actual != expected {
 		t.Fatalf("expected %q, but got %q", expected, actual)
 	}

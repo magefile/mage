@@ -2,6 +2,7 @@ package mage
 
 import (
 	"crypto/sha1"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -15,9 +16,8 @@ import (
 	"syscall"
 	"text/template"
 
-	"github.com/pkg/errors"
-
 	"github.com/magefile/mage/build"
+	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/parse"
 )
 
@@ -149,11 +149,11 @@ func magefiles() ([]string, error) {
 
 func compile(out string, info *parse.PkgInfo, gofiles []string) error {
 	if err := os.MkdirAll(filepath.Dir(out), 0700); err != nil {
-		return errors.WithMessage(err, "can't create cachedir")
+		return fmt.Errorf("can't create cachedir: %v", err)
 	}
 	f, err := os.Create(mainfile)
 	if err != nil {
-		return errors.WithMessage(err, "can't create mainfile")
+		return fmt.Errorf("can't create mainfile: %v", err)
 	}
 	if !keep {
 		defer os.Remove(mainfile)
@@ -168,7 +168,7 @@ func compile(out string, info *parse.PkgInfo, gofiles []string) error {
 	data.DefaultError = info.DefaultIsError
 
 	if err := output.Execute(f, data); err != nil {
-		return errors.WithMessage(err, "can't execute mainfile template")
+		return fmt.Errorf("can't execute mainfile template: %v", err)
 	}
 	// close is idenmpotent, so this is ok
 	f.Close()
@@ -198,8 +198,8 @@ func ExeName(files []string) (string, error) {
 	sort.Strings(hashes)
 	hash := sha1.Sum([]byte(strings.Join(hashes, "") + mageVer))
 	filename := fmt.Sprintf("%x", hash)
-	dir := confDir()
-	out := filepath.Join(dir, filename)
+
+	out := filepath.Join(mg.CacheDir(), filename)
 	if runtime.GOOS == "windows" {
 		out += ".exe"
 	}
@@ -209,44 +209,26 @@ func ExeName(files []string) (string, error) {
 func hashFile(fn string) (string, error) {
 	f, err := os.Open(fn)
 	if err != nil {
-		return "", errors.WithMessage(err, "can't open input file")
+		return "", fmt.Errorf("can't open input file: %v", err)
 	}
 	defer f.Close()
 
 	h := sha1.New()
 	if _, err := io.Copy(h, f); err != nil {
-		return "", errors.WithMessage(err, "can't write data to hash")
+		return "", fmt.Errorf("can't write data to hash: %v", err)
 	}
 	return fmt.Sprintf("%x", h.Sum(nil)), nil
-}
-
-// CacheEnv is the environment variable that users may set to change the
-// location where mage stores its compiled binaries.
-const CacheEnv = "MAGEFILE_CACHE"
-
-// confDir returns the default gorram configuration directory.
-func confDir() string {
-	d := os.Getenv(CacheEnv)
-	if d != "" {
-		return d
-	}
-	switch runtime.GOOS {
-	case "windows":
-		return filepath.Join(os.Getenv("HOMEDRIVE"), os.Getenv("HOMEPATH"), "magoo")
-	default:
-		return filepath.Join(os.Getenv("HOME"), ".magefile")
-	}
 }
 
 func generateInit() error {
 	f, err := os.Create(initFile)
 	if err != nil {
-		return errors.WithMessage(err, "could not create mage template")
+		return fmt.Errorf("could not create mage template: %v", err)
 	}
 	defer f.Close()
 
 	if err := initOutput.Execute(f, nil); err != nil {
-		return errors.WithMessage(err, "can't execute magefile template")
+		return fmt.Errorf("can't execute magefile template: %v", err)
 	}
 
 	return nil

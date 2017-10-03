@@ -1,9 +1,8 @@
 package parse
 
 import (
+	"reflect"
 	"testing"
-
-	"github.com/google/go-cmp/cmp"
 )
 
 func TestParse(t *testing.T) {
@@ -27,8 +26,9 @@ func TestParse(t *testing.T) {
 		DefaultIsError: true,
 		DefaultName:    "ReturnsError",
 	}
-	diff := cmp.Diff(expected, *info)
-	if diff != "" {
-		t.Error(diff)
+
+	// TODO: Don't use DeepEqual, you lazy git!
+	if !reflect.DeepEqual(expected, *info) {
+		t.Fatalf("expected:\n%#v\n\ngot:\n%#v", expected, *info)
 	}
 }
