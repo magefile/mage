@@ -19,10 +19,11 @@ type PkgInfo struct {
 }
 
 type Function struct {
-	Name     string
-	IsError  bool
-	Synopsis string
-	Comment  string
+	Name      string
+	IsError   bool
+	IsContext bool
+	Synopsis  string
+	Comment   string
 }
 
 // Package parses a package
@@ -53,10 +54,11 @@ func Package(path string, files []string) (*PkgInfo, error) {
 		}
 		if typ := voidOrError(f.Decl.Type, info); typ != InvalidType {
 			pi.Funcs = append(pi.Funcs, Function{
-				Name:     f.Name,
-				Comment:  f.Doc,
-				Synopsis: doc.Synopsis(f.Doc),
-				IsError:  voidOrError(f.Decl.Type, info) == ErrorType,
+				Name:      f.Name,
+				Comment:   f.Doc,
+				Synopsis:  doc.Synopsis(f.Doc),
+				IsError:   typ == ErrorType || typ == ContextErrorType,
+				IsContext: typ == ContextVoidType || typ == ContextErrorType,
 			})
 		}
 	}
@@ -157,33 +159,60 @@ const (
 	InvalidType FuncType = iota
 	VoidType
 	ErrorType
+	ContextVoidType
+	ContextErrorType
 )
 
-func voidOrError(ft *ast.FuncType, info types.Info) FuncType {
-	// look for functions with no params
-	if ft.Params.NumFields() > 0 {
-		return InvalidType
+func hasContextParam(ft *ast.FuncType, info types.Info) bool {
+	if ft.Params.NumFields() == 1 {
+		ret := ft.Params.List[0]
+		t := info.TypeOf(ret.Type)
+		if t != nil && t.String() == "context.Context" {
+			return true
+		}
 	}
+	return false
+}
 
-	// look for functions with 0 or 1 return values
+func hasVoidReturn(ft *ast.FuncType, info types.Info) bool {
 	res := ft.Results
-	if res.NumFields() > 1 {
-		return InvalidType
-	}
-	// 0 return value is ok
 	if res.NumFields() == 0 {
-		return VoidType
+		return true
 	}
-	// if 1 return value, look for those that return an error
-	ret := res.List[0]
+	return false
+}
 
-	// handle (a, b, c int)
-	if len(ret.Names) > 1 {
-		return InvalidType
+func hasErrorReturn(ft *ast.FuncType, info types.Info) bool {
+	res := ft.Results
+	if res.NumFields() == 1 {
+		ret := res.List[0]
+		if len(ret.Names) > 1 {
+			return false
+		}
+		t := info.TypeOf(ret.Type)
+		if t != nil && t.String() == "error" {
+			return true
+		}
 	}
-	t := info.TypeOf(ret.Type)
-	if t != nil && t.String() == "error" {
-		return ErrorType
+	return false
+}
+
+func voidOrError(ft *ast.FuncType, info types.Info) FuncType {
+	if hasContextParam(ft, info) {
+		if hasVoidReturn(ft, info) {
+			return ContextVoidType
+		}
+		if hasErrorReturn(ft, info) {
+			return ContextErrorType
+		}
+	}
+	if ft.Params.NumFields() == 0 {
+		if hasVoidReturn(ft, info) {
+			return VoidType
+		}
+		if hasErrorReturn(ft, info) {
+			return ErrorType
+		}
 	}
 	return InvalidType
 }

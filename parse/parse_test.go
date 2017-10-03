@@ -22,6 +22,16 @@ func TestParse(t *testing.T) {
 			{
 				Name: "ReturnsVoid",
 			},
+			{
+				Name:      "TakesContextReturnsError",
+				IsError:   true,
+				IsContext: true,
+			},
+			{
+				Name:      "TakesContextReturnsVoid",
+				IsError:   false,
+				IsContext: true,
+			},
 		},
 		DefaultIsError: true,
 		DefaultName:    "ReturnsError",
