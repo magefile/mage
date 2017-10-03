@@ -121,6 +121,8 @@ Options:
         keep intermediate mage files around after running
   -l    list mage targets in this directory
   -v    show verbose output when running mage targets
+  -version
+        show version info for the mage binary
 ```
 
 ## Full Example
@@ -229,6 +231,15 @@ will only ever exit with an error code of 0 or 1.  If mage exits with error code
 error code 1.  Why?  Ask the go team.  I've tried to get them to fix it, and
 they won't.
 
+# Helper Libraries
+
+There are two libraries bundled with mage,
+[mg](https://godoc.org/github.com/magefile/mage/mg) and
+[sh](https://godoc.org/github.com/magefile/mage/sh).  Package mg contains
+mage-specific helpers, such as Deps for declaring dependent functions, and
+functions for returning errors with specific error codes that mage understands.
+Package sh contains helpers for running shell-like commands with an API that's
+easier on the eyes and more helpful than os/exec.
 
 # Why?
 

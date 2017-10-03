@@ -59,21 +59,21 @@ func RunWith(env map[string]string, cmd string, args ...string) error {
 	if mg.Verbose() {
 		output = os.Stdout
 	}
-	_, err := Exec(env, output, cmd, args...)
+	_, err := Exec(env, output, os.Stderr, cmd, args...)
 	return err
 }
 
 // Output runs the command and returns the text from stdout.
 func Output(cmd string, args ...string) (string, error) {
 	buf := &bytes.Buffer{}
-	_, err := Exec(nil, buf, cmd, args...)
+	_, err := Exec(nil, buf, os.Stderr, cmd, args...)
 	return strings.TrimSuffix(buf.String(), "\n"), err
 }
 
 // OutputWith is like RunWith, ubt returns what is written to stdout.
 func OutputWith(env map[string]string, cmd string, args ...string) (string, error) {
 	buf := &bytes.Buffer{}
-	_, err := Exec(env, buf, cmd, args...)
+	_, err := Exec(env, buf, os.Stderr, cmd, args...)
 	return strings.TrimSuffix(buf.String(), "\n"), err
 }
 
@@ -89,7 +89,7 @@ func OutputWith(env map[string]string, cmd string, args ...string) (string, erro
 // Ran reports if the command ran (rather than was not found or not executable).
 // Code reports the exit code the command returned if it ran. If err == nil, ran
 // is always true and code is always 0.
-func Exec(env map[string]string, stdout io.Writer, cmd string, args ...string) (ran bool, err error) {
+func Exec(env map[string]string, stdout, stderr io.Writer, cmd string, args ...string) (ran bool, err error) {
 	expand := func(s string) string {
 		s2, ok := env[s]
 		if ok {
@@ -101,7 +101,7 @@ func Exec(env map[string]string, stdout io.Writer, cmd string, args ...string) (
 	for i := range args {
 		args[i] = os.Expand(args[i], expand)
 	}
-	ran, code, err := run(env, stdout, cmd, args...)
+	ran, code, err := run(env, stdout, stderr, cmd, args...)
 	if err == nil {
 		return true, nil
 	}
@@ -111,13 +111,13 @@ func Exec(env map[string]string, stdout io.Writer, cmd string, args ...string) (
 	return ran, fmt.Errorf(`failed to run "%s %s: %v"`, cmd, strings.Join(args, " "), err)
 }
 
-func run(env map[string]string, stdout io.Writer, cmd string, args ...string) (ran bool, code int, err error) {
+func run(env map[string]string, stdout, stderr io.Writer, cmd string, args ...string) (ran bool, code int, err error) {
 	c := exec.Command(cmd, args...)
 	c.Env = os.Environ()
 	for k, v := range env {
 		c.Env = append(c.Env, k+"="+v)
 	}
-	c.Stderr = os.Stderr
+	c.Stderr = stderr
 	c.Stdout = stdout
 	log.Println("exec:", cmd, strings.Join(args, " "))
 	err = c.Run()

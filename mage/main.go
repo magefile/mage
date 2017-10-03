@@ -34,8 +34,9 @@ const mainfile = "mage_output_file.go"
 const initFile = "magefile.go"
 
 var (
-	force, verbose, list, help, mageInit, keep bool
-	tags                                       string
+	force, verbose, list, help, mageInit, keep, showVersion bool
+
+	timestamp, commitHash, gitTag string
 )
 
 func init() {
@@ -45,6 +46,7 @@ func init() {
 	flag.BoolVar(&help, "h", false, "show this help")
 	flag.BoolVar(&mageInit, "init", false, "create a starting template if no mage files exist")
 	flag.BoolVar(&keep, "keep", false, "keep intermediate mage files around after running")
+	flag.BoolVar(&showVersion, "version", false, "show version info for the mage binary")
 	flag.Usage = func() {
 		fmt.Println("mage [options] [target]")
 		fmt.Println("Options:")
@@ -62,7 +64,12 @@ func Main() int {
 		flag.Usage()
 		return 0
 	}
-
+	if showVersion {
+		fmt.Println("Mage Build Tool", gitTag)
+		fmt.Println("Build Date:", timestamp)
+		fmt.Println("Commit:", commitHash)
+		return 0
+	}
 	files, err := magefiles()
 	if err != nil {
 		fmt.Println(err)
