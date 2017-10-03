@@ -22,14 +22,9 @@ or other trivial change.
 
 ## Dependency Management
 
-Mage uses the official dep tool for managing dependencies.
-
-`go get -u github.com/golang/dep/cmd/dep`
-
-If you add a dependency to the binary, make sure to update the vendor directory
-by running `dep ensure` and adding the resulting files to the repo.
-
-Please try not to add dependencies, though :)
+Currently mage has no dependencies(!).  Let's try to keep it that way.  Since
+it's likely that mage will be vendored into a project, adding dependencies to
+mage adds dependencies to every project that uses mage.
 
 ## Versions
 

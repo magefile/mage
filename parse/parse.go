@@ -10,8 +10,6 @@ import (
 	"log"
 	"os"
 	"strings"
-
-	"github.com/pkg/errors"
 )
 
 type PkgInfo struct {
@@ -107,7 +105,7 @@ func getPackage(path string, files []string, fset *token.FileSet) (*ast.Package,
 
 	pkgs, err := parser.ParseDir(fset, path, filter, parser.ParseComments)
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return nil, err
 	}
 
 	for name, pkg := range pkgs {
@@ -135,7 +133,7 @@ func makeInfo(dir string, fset *token.FileSet, files map[string]*ast.File) (type
 	}
 
 	_, err := cfg.Check(dir, fset, fs, &info)
-	return info, errors.WithStack(err)
+	return info, err
 }
 
 // errorOrVoid filters the list of functions to only those that return only an

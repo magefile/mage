@@ -1,9 +1,8 @@
 package mg
 
 import (
+	"errors"
 	"fmt"
-
-	"github.com/pkg/errors"
 )
 
 type fatalErr struct {
@@ -33,7 +32,7 @@ func Fatal(code int, args ...interface{}) error {
 func Fatalf(code int, format string, args ...interface{}) error {
 	return fatalErr{
 		code:  code,
-		error: errors.Errorf(format, args...),
+		error: fmt.Errorf(format, args...),
 	}
 }
 
