@@ -117,6 +117,8 @@ Options:
   -h    show this help
   -init
         create a starting template if no mage files exist
+  -keep
+        keep intermediate mage files around after running
   -l    list mage targets in this directory
   -v    show verbose output when running mage targets
 ```
