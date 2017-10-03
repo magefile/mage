@@ -13,9 +13,10 @@ import (
 )
 
 type PkgInfo struct {
-	Funcs          []Function
-	DefaultIsError bool
-	DefaultName    string
+	Funcs            []Function
+	DefaultIsError   bool
+	DefaultIsContext bool
+	DefaultName      string
 }
 
 type Function struct {
@@ -86,6 +87,7 @@ func setDefault(p *doc.Package, pi *PkgInfo, info types.Info) {
 				if f.Name == id.Name {
 					pi.DefaultName = f.Name
 					pi.DefaultIsError = f.IsError
+					pi.DefaultIsContext = f.IsContext
 					return
 				}
 			}

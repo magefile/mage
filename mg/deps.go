@@ -1,6 +1,7 @@
 package mg
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"runtime"
@@ -38,7 +39,7 @@ var onces = &onceMap{
 func Deps(fns ...interface{}) {
 	for _, f := range fns {
 		switch f.(type) {
-		case func(), func() error:
+		case func(), func() error, func(context.Context), func(context.Context) error:
 			// ok
 		default:
 			panic(fmt.Errorf("Invalid type for dependent function: %T. Dependencies must be func() or func() error", f))
@@ -96,11 +97,15 @@ func changeExit(old, new int) int {
 }
 
 func addDep(f interface{}) *onceFun {
-	var fn func() error
+	var fn func(context.Context) error
 	switch f := f.(type) {
 	case func():
-		fn = func() error { f(); return nil }
+		fn = func(ctx context.Context) error { f(); return nil }
 	case func() error:
+		fn = func(ctx context.Context) error { return f() }
+	case func(context.Context):
+		fn = func(ctx context.Context) error { f(ctx); return nil }
+	case func(context.Context) error:
 		fn = f
 	}
 
@@ -117,13 +122,13 @@ func name(i interface{}) string {
 
 type onceFun struct {
 	once sync.Once
-	fn   func() error
+	fn   func(context.Context) error
 }
 
 func (o *onceFun) run() error {
 	var err error
 	o.once.Do(func() {
-		err = o.fn()
+		err = o.fn(Context)
 	})
 	return err
 }

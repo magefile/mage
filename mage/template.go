@@ -7,6 +7,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/magefile/mage/mg"
 	"io/ioutil"
 	"log"
 	"os"
@@ -57,13 +58,25 @@ func main() {
 	if len(os.Args) < 2 {
 	{{- if .Default}}
 		{{- if .DefaultError}}
-		if err := Default(); err != nil {
-			fmt.Println(err)
-			os.Exit(1)
-		}
-		return
+			{{- if .DefaultContext}}
+				if err := Default(mg.Context); err != nil {
+					fmt.Println(err)
+					os.Exit(1)
+				}
+				return
+			{{- else}}
+				if err := Default(); err != nil {
+					fmt.Println(err)
+					os.Exit(1)
+				}
+				return
+			{{- end}}
 		{{- else}}
-		Default()
+			{{- if .DefaultContext}}
+				Default(mg.Context)
+			{{- else}}
+				Default()
+			{{- end}}
 		{{- end}}
 		return
 	{{- else}}
@@ -78,12 +91,23 @@ func main() {
 	{{range .Funcs -}}
 	case "{{lower .Name}}":
 		{{if .IsError -}}
-			if err := {{.Name}}(); err != nil {
-				fmt.Println(err)
-				os.Exit(1)
-			}
+			{{if .IsContext -}}
+				if err := {{.Name}}(mg.Context); err != nil {
+					fmt.Println(err)
+					os.Exit(1)
+				}
+			{{- else}}
+				if err := {{.Name}}(); err != nil {
+					fmt.Println(err)
+					os.Exit(1)
+				}
+			{{- end}}
 		{{else -}}
-			{{.Name}}()
+			{{if .IsContext -}}
+				{{.Name}}(mg.Context)
+			{{- else -}}
+				{{.Name}}()
+			{{- end}}
 		{{- end}}
 	{{end}}
 	default:

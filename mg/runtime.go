@@ -1,6 +1,7 @@
 package mg
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -34,3 +35,5 @@ func CacheDir() string {
 		return filepath.Join(os.Getenv("HOME"), ".magefile")
 	}
 }
+
+var Context = context.Background()
