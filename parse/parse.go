@@ -2,6 +2,7 @@ package parse
 
 import (
 	"fmt"
+	mgTypes "github.com/magefile/mage/types"
 	"go/ast"
 	"go/doc"
 	"go/parser"
@@ -53,13 +54,13 @@ func Package(path string, files []string) (*PkgInfo, error) {
 			// skip non-exported functions
 			continue
 		}
-		if typ := voidOrError(f.Decl.Type, info); typ != InvalidType {
+		if typ := voidOrError(f.Decl.Type, info); typ != mgTypes.InvalidType {
 			pi.Funcs = append(pi.Funcs, Function{
 				Name:      f.Name,
 				Comment:   f.Doc,
 				Synopsis:  doc.Synopsis(f.Doc),
-				IsError:   typ == ErrorType || typ == ContextErrorType,
-				IsContext: typ == ContextVoidType || typ == ContextErrorType,
+				IsError:   typ == mgTypes.ErrorType || typ == mgTypes.ContextErrorType,
+				IsContext: typ == mgTypes.ContextVoidType || typ == mgTypes.ContextErrorType,
 			})
 		}
 	}
@@ -146,7 +147,7 @@ func errorOrVoid(fns []*ast.FuncDecl, info types.Info) []*ast.FuncDecl {
 	fds := []*ast.FuncDecl{}
 
 	for _, fn := range fns {
-		if voidOrError(fn.Type, info) != InvalidType {
+		if voidOrError(fn.Type, info) != mgTypes.InvalidType {
 			fds = append(fds, fn)
 		}
 	}
@@ -199,22 +200,22 @@ func hasErrorReturn(ft *ast.FuncType, info types.Info) bool {
 	return false
 }
 
-func voidOrError(ft *ast.FuncType, info types.Info) FuncType {
+func voidOrError(ft *ast.FuncType, info types.Info) mgTypes.FuncType {
 	if hasContextParam(ft, info) {
 		if hasVoidReturn(ft, info) {
-			return ContextVoidType
+			return mgTypes.ContextVoidType
 		}
 		if hasErrorReturn(ft, info) {
-			return ContextErrorType
+			return mgTypes.ContextErrorType
 		}
 	}
 	if ft.Params.NumFields() == 0 {
 		if hasVoidReturn(ft, info) {
-			return VoidType
+			return mgTypes.VoidType
 		}
 		if hasErrorReturn(ft, info) {
-			return ErrorType
+			return mgTypes.ErrorType
 		}
 	}
-	return InvalidType
+	return mgTypes.InvalidType
 }
