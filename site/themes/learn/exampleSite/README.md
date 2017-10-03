@@ -1,0 +1,39 @@
+- récriture doc -> TODO
+    - créer une section Showcase
+- Menus déroulants icone -> TODO
+
+- créer des jolis thèmes de base (avec des noms ou au moins de meilleures couleurs) -> DOING
+    - Thème blue : OK
+    - Thème red: OK
+    - Theme green: OK
+- Passer a Wercker -> OK
+- corriger le multilangue pour la recherche et les autres ressources statiques : OK
+- Section "MORE" -> OK
+- ajouter les childs -> OK
+- ajouter les attachments -> OK
+- refaire la possibilité d'overrider le style/script/etc -> OK
+- sticky bar -> OK
+- ajouter Travis pour tester le thème quotidiennement avec les nouvelles versions de Hugo -> OK
+- #54 -> OK
+- corriger slider menu qui ne fonctionne plus -> OK
+- Update font awesome -> OK
+- internationalisation -> OK
+    - Messages: OK
+    - Ajouter un bouton pour changer de langue : OK
+- netlify -> OK
+- home page -> OK
+- réintégrer la doc dans le même repo -> OK
+- récupérer les shortcodes utiles -> OK
+    - expand : OK
+    - mermaid : OK
+- chapter -> OK
+- recherche (avec pointage à la première occurence sur la page) -> OK
+- visited links -> OK
+- disable Search -> OK
+- vérifier que ça fonctionne avec une base url -> OK
+- tester les affichages de page enfant -> OK
+- comprendre l'histoire de pagination -> OK
+- améliorer les couleurs de surlignement de highlightjs -> OK
+- créer les archetypes -> OK
+    -> créé ceux de base -> OK
+    -> vérifier la possibilité de générer automatiquement le bon weight -> OK
