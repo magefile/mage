@@ -75,6 +75,57 @@ func TestVerbose(t *testing.T) {
 	}
 }
 
+func TestGoRunError(t *testing.T) {
+	c := exec.Command("go", "run", "main.go", "returnsnonnilerror")
+	c.Dir = "./testdata"
+	c.Env = os.Environ()
+	b, err := c.CombinedOutput()
+	actualErr := err.Error()
+	expectedErr := "exit status 1"
+	if actualErr != expectedErr {
+		t.Fatalf("expected %q, but got %q", expectedErr, actualErr)
+	}
+	actual := string(b)
+	expected := "Error: bang!\nexit status 1\n"
+	if actual != expected {
+		t.Fatalf("expected %q, but got %q", expected, actual)
+	}
+}
+
+func TestGoRunPanics(t *testing.T) {
+	c := exec.Command("go", "run", "main.go", "panics")
+	c.Dir = "./testdata"
+	c.Env = os.Environ()
+	b, err := c.CombinedOutput()
+	actualErr := err.Error()
+	expectedErr := "exit status 1"
+	if actualErr != expectedErr {
+		t.Fatalf("expected %q, but got %q", expectedErr, actualErr)
+	}
+	actual := string(b)
+	expected := "Error: boom!\nexit status 1\n"
+	if actual != expected {
+		t.Fatalf("expected %q, but got %q", expected, actual)
+	}
+}
+
+func TestGoRunPanicsErr(t *testing.T) {
+	c := exec.Command("go", "run", "main.go", "panicserr")
+	c.Dir = "./testdata"
+	c.Env = os.Environ()
+	b, err := c.CombinedOutput()
+	actualErr := err.Error()
+	expectedErr := "exit status 1"
+	if actualErr != expectedErr {
+		t.Fatalf("expected %q, but got %q", expectedErr, actualErr)
+	}
+	actual := string(b)
+	expected := "Error: kaboom!\nexit status 1\n"
+	if actual != expected {
+		t.Fatalf("expected %q, but got %q", expected, actual)
+	}
+}
+
 // ensure we include the hash of the mainfile template in determining the
 // executable name to run, so we automatically create a new exe if the template
 // changes.
