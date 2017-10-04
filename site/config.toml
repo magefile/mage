@@ -7,7 +7,7 @@ theme = "learn"
 defaultContentLanguageInSubdir= true
 
 [params]
-  editURL = "https://github.com/matcornic/hugo-theme-learn/edit/master/exampleSite/content/"
+  editURL = "https://github.com/github.com/magefile/mage/edit/master/site/content/"
   description = "Documentation for Mage"
   author = "Nate Finch"
   showVisitedLinks = true
