@@ -322,7 +322,7 @@ textarea:focus, input[type="email"]:focus, input[type="number"]:focus, input[typ
     margin-left: 300px;
     min-height: 100%;
 }
-#body img, #body .video-container {
+#body .video-container {
     margin: 3rem auto;
     display: block;
     text-align: center;

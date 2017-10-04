@@ -4,7 +4,6 @@ defaultContentLanguage = "en"
 
 title = "Mage Documentation"
 theme = "learn"
-# themesdir = "../.."
 defaultContentLanguageInSubdir= true
 
 [params]
@@ -22,7 +21,7 @@ title = "Documentation for Mage"
 weight = 1
 languageName = "English"
 
-[[Languages.en.menu.shortcuts]]
-name = "<i class='fa fa-bullhorn'></i> Credits"
-url = "/credits"
-weight = 30
+# [[Languages.en.menu.shortcuts]]
+# name = "<i class='fa fa-bullhorn'></i> Credits"
+# url = "/credits"
+# weight = 30

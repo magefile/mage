@@ -3,7 +3,7 @@ title = "Learn Theme for Hugo"
 +++
 
 <h1 align=center>mage</h1>
-<p align="center"><img src="https://user-images.githubusercontent.com/3185864/31061203-6f6743dc-a6ec-11e7-9469-b8d667d9bc3f.png"/></p>
+<p align="center"><img width=300 src="/images/gary.svg"/></p>
 
 <p align="center">Mage is a make/rake-like build tool using Go.</p>
 
@@ -263,4 +263,8 @@ are already comfortable with?
 
 ## Code
 
-[github.com/magefile/mage](https://github.com/magefile/mage)
+[https://github.com/magefile/mage](https://github.com/magefile/mage)
+
+## Projects that build with Mage
+
+[![Hugo](/images/hugo.png)](https://github.com/gohugoio/hugo) [![Gnorm](/images/gnorm.png)](https://github.com/gnormal/gnorm)
