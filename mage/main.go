@@ -15,6 +15,7 @@ import (
 	"strings"
 	"syscall"
 	"text/template"
+	"unicode"
 
 	"github.com/magefile/mage/build"
 	"github.com/magefile/mage/mg"
@@ -27,6 +28,10 @@ const mageVer = "v0.3"
 
 var output = template.Must(template.New("").Funcs(map[string]interface{}{
 	"lower": strings.ToLower,
+	"lowerfirst": func(s string) string {
+		r := []rune(s)
+		return string(unicode.ToLower(r[0])) + string(r[1:])
+	},
 }).Parse(tpl))
 var initOutput = template.Must(template.New("").Parse(mageTpl))
 
