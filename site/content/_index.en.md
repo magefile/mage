@@ -1,5 +1,5 @@
 +++
-title = "Learn Theme for Hugo"
+title = "Mage Build Tool"
 +++
 
 <h1 align=center>mage</h1>
