@@ -33,7 +33,7 @@ type Function struct {
 func (f Function) TemplateString() string {
 	if f.IsContext && f.IsError {
 		out := `if err := %s(mg.Context); err != nil {
-			fmt.Println(err)
+			fmt.Printf("Error: %v\n", err)
 			os.Exit(1)
 		}`
 		return fmt.Sprintf(out, f.Name)
@@ -44,7 +44,7 @@ func (f Function) TemplateString() string {
 	}
 	if !f.IsContext && f.IsError {
 		out := `if err := %s(); err != nil {
-			 fmt.Println(err)
+			 fmt.Printf("Error: %v\n", err)
 			 os.Exit(1)
 		}`
 		return fmt.Sprintf(out, f.Name)

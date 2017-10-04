@@ -47,7 +47,7 @@ func main() {
 	defer func() {
 		err := recover()
 		if err != nil {
-			fmt.Println(err)
+			fmt.Printf("Error: %v\n", err)
 			type code interface { ExitStatus() int }
 			if c, ok := err.(code); ok {
 				os.Exit(c.ExitStatus())

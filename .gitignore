@@ -16,3 +16,5 @@
 # Magefile output
 mage_output_file.go
 
+# stupid osx
+.DS_Store
