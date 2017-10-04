@@ -12,13 +12,11 @@ title = "Learn Theme for Hugo"
 Mage has no dependencies outside the Go standard library, and builds with Go 1.7
 and above (possibly even lower versions, but they're not regularly tested). To install, just use `go get`:
 
-```
-go get github.com/magefile/mage
-```
+`go get github.com/magefile/mage`
 
 ## Demo
 
-[![Mage Demo](https://img.youtube.com/vi/GOqbD0lF-iA/maxresdefault.jpg)](https://www.youtube.com/watch?v=GOqbD0lF-iA)
+{{< youtube GOqbD0lF-iA >}}
 
 ## Discussion
 
@@ -194,7 +192,7 @@ The rest of the comment is long help text that will be shown with mage -h <targe
 ```
 
 
-# How it works
+## How it works
 
 Mage scans the current directory for go files with the `mage` build tag, using
 the normal go build rules for following build constraints (aside from requiring
@@ -214,7 +212,7 @@ Mage itself requires no dependencies to run. However, because it is compiling
 go code, you must have a valid go environment set up on your machine.  Mage is
 compatibile with any go 1.x environment.
 
-# Zero install option with `go run`
+## Zero install option with `go run`
 
 Don't want to depend on another binary in your environment?  You can run mage
 directly out of your vendor directory (or GOPATH) with `go run`.
@@ -242,7 +240,7 @@ will only ever exit with an error code of 0 or 1.  If mage exits with error code
 error code 1.  Why?  Ask the go team.  I've tried to get them to fix it, and
 they won't.
 
-# Helper Libraries
+## Helper Libraries
 
 There are two libraries bundled with mage,
 [mg](https://godoc.org/github.com/magefile/mage/mg) and
@@ -252,7 +250,7 @@ functions for returning errors with specific error codes that mage understands.
 Package sh contains helpers for running shell-like commands with an API that's
 easier on the eyes and more helpful than os/exec.
 
-# Why?
+## Why?
 
 Makefiles are hard to read and hard to write.  Mostly because makefiles are essentially fancy bash scripts with significant white space and additional make-related syntax.
 
@@ -263,6 +261,6 @@ Go is superior to bash for any non-trivial task involving branching, looping, an
 language as idiosyncratic as bash?  Why not use the language your contributors
 are already comfortable with?
 
-# Code
+## Code
 
 [github.com/magefile/mage](https://github.com/magefile/mage)
