@@ -271,5 +271,8 @@ func TestParse(t *testing.T) {
 	if len(inv.Args) != 1 && inv.Args[0] != "build" {
 		t.Fatalf("expected args to be %q but got %q", []string{"build"}, inv.Args)
 	}
+	if s := buf.String(); s != "" {
+		t.Fatalf("expected no stdout output but got %q", s)
+	}
 
 }
