@@ -235,3 +235,41 @@ func TestKeepFlag(t *testing.T) {
 		t.Fatalf("expected file %q to exist but got err, %v", buildFile, err)
 	}
 }
+
+func TestStopMultipleTargets(t *testing.T) {
+	stderr := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:    "./testdata",
+		Stdout: ioutil.Discard,
+		Stderr: stderr,
+		Args:   []string{"panicserr", "testVerbose"},
+	}
+	code := Invoke(inv)
+	if code != 2 {
+		t.Fatalf("expected 1, but got %v", code)
+	}
+	actual := stderr.String()
+	expected := "Error: args after the target (panicserr) are not allowed: testVerbose\n"
+	if actual != expected {
+		t.Fatalf("expected %q, but got %q", expected, actual)
+	}
+
+}
+
+func TestParse(t *testing.T) {
+	buf := &bytes.Buffer{}
+	inv, init, showVer, err := Parse(buf, []string{"-v", "build"})
+	if err != nil {
+		t.Fatal("unexpected error", err)
+	}
+	if init {
+		t.Fatal("init should be false but was true")
+	}
+	if showVer {
+		t.Fatal("showVersion should be false but was true")
+	}
+	if len(inv.Args) != 1 && inv.Args[0] != "build" {
+		t.Fatalf("expected args to be %q but got %q", []string{"build"}, inv.Args)
+	}
+
+}

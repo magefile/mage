@@ -124,20 +124,23 @@ func Parse(stderr io.Writer, args []string) (inv Invocation, mageInit, showVersi
 		fs.Usage()
 		return inv, mageInit, showVersion, err
 	}
-	if err != nil {
-		inv.Args = fs.Args()
-		if inv.Help && len(inv.Args) == 0 {
-			fs.Usage()
-			// tell upstream, to just exit
-			return inv, mageInit, showVersion, flag.ErrHelp
-		}
+	if err == nil && inv.Help && len(fs.Args()) == 0 {
+		fs.Usage()
+		// tell upstream, to just exit
+		return inv, mageInit, showVersion, flag.ErrHelp
 	}
+	inv.Args = fs.Args()
 	return inv, mageInit, showVersion, err
 }
 
 // Invoke runs Mage with the given arguments.
 func Invoke(inv Invocation) int {
 	log := log.New(inv.Stderr, "", 0)
+
+	if len(inv.Args) > 1 {
+		log.Printf("Error: args after the target (%s) are not allowed: %v", inv.Args[0], strings.Join(inv.Args[1:], " "))
+		return 2
+	}
 
 	files, err := Magefiles(inv.Dir)
 	if err != nil {

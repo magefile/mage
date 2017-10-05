@@ -53,6 +53,9 @@ mage with no target specified. To denote the default, create a `var Default =
 <targetname>`  If no default target is specified, running `mage` with no target
 will print the list of targets, like `mage -l`.
 
+Currently only a single target being run at a time is supported.  Running
+multiple targets with a single evocation may be supported later.
+
 ## Dependencies
 
 Mage supports a makefile-style tree of dependencies.  The helper function
