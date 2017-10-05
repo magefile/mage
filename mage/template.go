@@ -19,7 +19,7 @@ func main() {
 	if os.Getenv("MAGEFILE_VERBOSE") == "" {
 		log.SetOutput(ioutil.Discard)
 	}
-	log := log.New(os.Stderr, "", 0)
+	logger := log.New(os.Stderr, "", 0)
 	if os.Getenv("MAGEFILE_LIST") != "" {
 		if err := list(); err != nil {
 			log.Println(err)
@@ -30,7 +30,7 @@ func main() {
 
 	if os.Getenv("MAGEFILE_HELP") != "" {
 		if len(os.Args) < 2 {
-			log.Println("no target specified")
+			logger.Println("no target specified")
 			os.Exit(1)
 		}
 		switch strings.ToLower(os.Args[1]) {
@@ -40,7 +40,7 @@ func main() {
 				return
 			{{end}}
 			default:
-				log.Printf("Unknown target: %q\n", os.Args[1])
+				logger.Printf("Unknown target: %q\n", os.Args[1])
 				os.Exit(1)
 		}	}
 
@@ -48,7 +48,7 @@ func main() {
 	defer func() {
 		err := recover()
 		if err != nil {
-			log.Printf("Error: %v\n", err)
+			logger.Printf("Error: %v\n", err)
 			type code interface { ExitStatus() int }
 			if c, ok := err.(code); ok {
 				os.Exit(c.ExitStatus())
@@ -60,7 +60,7 @@ func main() {
 	{{- if .Default}}
 		{{- if .DefaultError}}
 		if err := Default(); err != nil {
-			log.Println(err)
+			logger.Println(err)
 			os.Exit(1)
 		}
 		return
@@ -70,7 +70,7 @@ func main() {
 		return
 	{{- else}}
 		if err := list(); err != nil {
-			log.Println("Error:", err)
+			logger.Println("Error:", err)
 			os.Exit(1)
 		}
 		return
@@ -81,7 +81,7 @@ func main() {
 	case "{{lower .Name}}":
 		{{if .IsError -}}
 			if err := {{.Name}}(); err != nil {
-				log.Printf("Error: %v\n", err)
+				logger.Printf("Error: %v\n", err)
 				os.Exit(1)
 			}
 		{{else -}}
@@ -89,7 +89,7 @@ func main() {
 		{{- end}}
 	{{end}}
 	default:
-		log.Printf("Unknown target: %q\n", os.Args[1])
+		logger.Printf("Unknown target: %q\n", os.Args[1])
 		os.Exit(1)
 	}
 }
@@ -97,7 +97,7 @@ func main() {
 func list() error {
 	{{$default := .Default}}
 	w := tabwriter.NewWriter(os.Stdout, 0, 4, 4, ' ', 0)
-	log.Println("Targets: ")
+	fmt.Println("Targets:")
 	{{- range .Funcs}}
 	fmt.Fprintln(w, "  {{lowerfirst .Name}}{{if eq .Name $default}}*{{end}}\t{{.Synopsis}}")
 	{{- end}}

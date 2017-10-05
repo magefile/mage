@@ -84,16 +84,22 @@ func TestVerbose(t *testing.T) {
 	}
 }
 
-func TestGoRunList(t *testing.T) {
-	c := exec.Command("go", "run", "main.go", "-l")
-	c.Dir = "./testdata"
-	c.Env = os.Environ()
-	b, err := c.CombinedOutput()
-	if err != nil {
-		t.Error("error:", err)
+func TestList(t *testing.T) {
+	stdout := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:    "./testdata",
+		Stdout: stdout,
+		Stderr: ioutil.Discard,
+		List:   true,
 	}
-	actual := string(b)
-	expected := `Targets: 
+
+	code := Invoke(inv)
+	if code != 0 {
+		t.Errorf("expected to exit with code 0, but got %v", code)
+	}
+	actual := stdout.String()
+	expected := `
+Targets:
   panics                Function that panics.
   panicsErr             Error function that panics.
   returnsError*         Synopsis for returns error.
@@ -102,30 +108,39 @@ func TestGoRunList(t *testing.T) {
   testVerbose           
 
 * default target
-`
+`[1:]
 	if actual != expected {
-		t.Fatalf("expected %q, but got %q", expected, actual)
+		t.Fatalf("expected:\n%s\n\ngot:\n%s", expected, actual)
 	}
 }
 
-func TestGoRunListNoDefault(t *testing.T) {
-	c := exec.Command("go", "run", "main.go")
-	c.Dir = "./testdata/no_default"
-	c.Env = os.Environ()
-	b, err := c.CombinedOutput()
-	if err != nil {
-		t.Error("error:", err)
+func TestNoArgNoDefaultList(t *testing.T) {
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:    "testdata/no_default",
+		Stdout: stdout,
+		Stderr: stderr,
 	}
-	actual := string(b)
-	expected := `  bazBuz    Prints out 'BazBuz'.
+	code := Invoke(inv)
+	if code != 0 {
+		t.Errorf("expected to exit with code 0, but got %v", code)
+	}
+	if err := stderr.String(); err != "" {
+		t.Errorf("unexpected stderr output:\n%s", err)
+	}
+	actual := stdout.String()
+	expected := `
+Targets:
+  bazBuz    Prints out 'BazBuz'.
   fooBar    Prints out 'FooBar'.
-`
+`[1:]
 	if actual != expected {
-		t.Fatalf("expected %q, but got %q", expected, actual)
+		t.Fatalf("expected:\n%q\n\ngot:\n%q", expected, actual)
 	}
 }
 
-func TestGoRunError(t *testing.T) {
+func TestTargetError(t *testing.T) {
 	stderr := &bytes.Buffer{}
 	inv := Invocation{
 		Dir:    "./testdata",
@@ -144,7 +159,7 @@ func TestGoRunError(t *testing.T) {
 	}
 }
 
-func TestGoRunPanics(t *testing.T) {
+func TestTargetPanics(t *testing.T) {
 	stderr := &bytes.Buffer{}
 	inv := Invocation{
 		Dir:    "./testdata",
@@ -163,7 +178,7 @@ func TestGoRunPanics(t *testing.T) {
 	}
 }
 
-func TestGoRunPanicsErr(t *testing.T) {
+func TestPanicsErr(t *testing.T) {
 	stderr := &bytes.Buffer{}
 	inv := Invocation{
 		Dir:    "./testdata",
