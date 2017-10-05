@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 	"syscall"
 	"text/template"
@@ -65,21 +66,34 @@ func init() {
 func Main() int {
 	log.SetFlags(0)
 	flag.Parse()
+
 	if help && len(flag.Args()) == 0 {
 		flag.Usage()
 		return 0
 	}
+
+	// If verbose is still false, we're going to peek at the environment variable to see if
+	// MAGE_VERBOSE has been set. If so, we're going to use it for the value of MAGE_VERBOSE.
+	if verbose == false {
+		envVerbose, err := strconv.ParseBool(os.Getenv("MAGE_VERBOSE"))
+		if err == nil {
+			verbose = envVerbose
+		}
+	}
+
 	if showVersion {
 		fmt.Println("Mage Build Tool", gitTag)
 		fmt.Println("Build Date:", timestamp)
 		fmt.Println("Commit:", commitHash)
 		return 0
 	}
+
 	files, err := magefiles()
 	if err != nil {
 		fmt.Println(err)
 		return 1
 	}
+
 	if len(files) == 0 && mageInit {
 		if err := generateInit(); err != nil {
 			log.Printf("%+v", err)
