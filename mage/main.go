@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 	"text/template"
 	"unicode"
@@ -129,6 +130,16 @@ func Parse(stdout io.Writer, args []string) (inv Invocation, mageInit, showVersi
 		// tell upstream, to just exit
 		return inv, mageInit, showVersion, flag.ErrHelp
 	}
+
+	// If verbose is still false, we're going to peek at the environment variable to see if
+	// MAGE_VERBOSE has been set. If so, we're going to use it for the value of MAGE_VERBOSE.
+	if inv.Verbose == false {
+		envVerbose, err := strconv.ParseBool(os.Getenv("MAGE_VERBOSE"))
+		if err == nil {
+			inv.Verbose = envVerbose
+		}
+	}
+
 	inv.Args = fs.Args()
 	return inv, mageInit, showVersion, err
 }

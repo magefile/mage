@@ -13,5 +13,8 @@
 # Project-local glide cache, RE: https://github.com/Masterminds/glide/issues/736
 .glide/
 
+# VScode
+.vscode
+
 # stupid osx
 .DS_Store
