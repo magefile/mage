@@ -254,6 +254,14 @@ functions for returning errors with specific error codes that mage understands.
 Package sh contains helpers for running shell-like commands with an API that's
 easier on the eyes and more helpful than os/exec.
 
+## Use Mage as a library
+
+All of mage's functionality is accessible as a compile-in library.  Checkout
+[godoc.org/github.com/magefile/mage/mage](https://godoc.org/github.com/mage/mage)
+for full details.
+
+Fair warning, the API of mage/mage may change, so be sure to use vendoring.
+
 ## Why?
 
 Makefiles are hard to read and hard to write.  Mostly because makefiles are essentially fancy bash scripts with significant white space and additional make-related syntax.

@@ -13,8 +13,11 @@
 
 Join the `#mage` channel on [gophers slack](https://gophers.slack.com/messages/general/) for discussion of usage, development, etc.
 
+# Documentation
 
 see [magefile.org](https://magefile.org) for full docs
+
+see [godoc.org/github.com/magefile/mage/mage](https://godoc.org/github.com/mage/mage) for how to use mage as a library.
 
 # Why?
 
