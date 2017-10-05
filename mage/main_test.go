@@ -87,26 +87,16 @@ func TestVerbose(t *testing.T) {
 func TestVerboseEnv(t *testing.T) {
 	os.Setenv("MAGE_VERBOSE", "true")
 
-	stderr := &bytes.Buffer{}
 	stdout := &bytes.Buffer{}
-	inv := Invocation{
-		Dir:    "./testdata",
-		Stdout: stdout,
-		Stderr: stderr,
-		Args:   []string{"testverbose"},
+	inv, _, _, err := Parse(stdout, []string{})
+	if err != nil {
+		t.Fatal("unexpected error", err)
 	}
 
-	code := Invoke(inv)
-	if code != 0 {
-		t.Errorf("expected to exit with code 0, but got %v", code)
-	}
+	expected := true
 
-	whatever := stdout.String()
-	actual := stderr.String()
-	fmt.Println("HERE====>", whatever, actual)
-	expected := "hi!\n"
-	if actual != expected {
-		t.Fatalf("expected %q, but got %q", expected, actual)
+	if inv.Verbose != true {
+		t.Fatalf("expected %t, but got %t", expected, inv.Verbose)
 	}
 
 	os.Unsetenv("MAGE_VERBOSE")

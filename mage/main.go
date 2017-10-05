@@ -130,13 +130,6 @@ func Parse(stdout io.Writer, args []string) (inv Invocation, mageInit, showVersi
 		// tell upstream, to just exit
 		return inv, mageInit, showVersion, flag.ErrHelp
 	}
-	inv.Args = fs.Args()
-	return inv, mageInit, showVersion, err
-}
-
-// Invoke runs Mage with the given arguments.
-func Invoke(inv Invocation) int {
-	log := log.New(inv.Stderr, "", 0)
 
 	// If verbose is still false, we're going to peek at the environment variable to see if
 	// MAGE_VERBOSE has been set. If so, we're going to use it for the value of MAGE_VERBOSE.
@@ -146,6 +139,14 @@ func Invoke(inv Invocation) int {
 			inv.Verbose = envVerbose
 		}
 	}
+
+	inv.Args = fs.Args()
+	return inv, mageInit, showVersion, err
+}
+
+// Invoke runs Mage with the given arguments.
+func Invoke(inv Invocation) int {
+	log := log.New(inv.Stderr, "", 0)
 
 	if len(inv.Args) > 1 {
 		log.Printf("Error: args after the target (%s) are not allowed: %v", inv.Args[0], strings.Join(inv.Args[1:], " "))
