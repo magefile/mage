@@ -1,0 +1,27 @@
+baseURL = "https://magefile.org"
+languageCode = "en-US"
+defaultContentLanguage = "en"
+
+title = "Mage Documentation"
+theme = "learn"
+defaultContentLanguageInSubdir= true
+
+[params]
+  editURL = "https://github.com/github.com/magefile/mage/edit/master/site/content/"
+  description = "Documentation for Mage"
+  author = "Nate Finch"
+  showVisitedLinks = true
+
+[outputs]
+home = [ "HTML", "RSS", "JSON"]
+
+[Languages]
+[Languages.en]
+title = "Documentation for Mage"
+weight = 1
+languageName = "English"
+
+# [[Languages.en.menu.shortcuts]]
+# name = "<i class='fa fa-bullhorn'></i> Credits"
+# url = "/credits"
+# weight = 30
