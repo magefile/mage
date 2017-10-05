@@ -84,6 +84,47 @@ func TestVerbose(t *testing.T) {
 	}
 }
 
+func TestGoRunList(t *testing.T) {
+	c := exec.Command("go", "run", "main.go", "-l")
+	c.Dir = "./testdata"
+	c.Env = os.Environ()
+	b, err := c.CombinedOutput()
+	if err != nil {
+		t.Error("error:", err)
+	}
+	actual := string(b)
+	expected := `Targets: 
+  panics                Function that panics.
+  panicsErr             Error function that panics.
+  returnsError*         Synopsis for returns error.
+  returnsNonNilError    Returns a non-nil error.
+  returnsVoid           
+  testVerbose           
+
+* default target
+`
+	if actual != expected {
+		t.Fatalf("expected %q, but got %q", expected, actual)
+	}
+}
+
+func TestGoRunListNoDefault(t *testing.T) {
+	c := exec.Command("go", "run", "main.go")
+	c.Dir = "./testdata/no_default"
+	c.Env = os.Environ()
+	b, err := c.CombinedOutput()
+	if err != nil {
+		t.Error("error:", err)
+	}
+	actual := string(b)
+	expected := `  bazBuz    Prints out 'BazBuz'.
+  fooBar    Prints out 'FooBar'.
+`
+	if actual != expected {
+		t.Fatalf("expected %q, but got %q", expected, actual)
+	}
+}
+
 func TestGoRunError(t *testing.T) {
 	stderr := &bytes.Buffer{}
 	inv := Invocation{
