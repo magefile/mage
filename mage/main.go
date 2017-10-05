@@ -68,9 +68,9 @@ type Invocation struct {
 // name in the args).
 func ParseAndRun(dir string, stdout, stderr io.Writer, args []string) int {
 	log := log.New(stderr, "", 0)
-	inv, mageInit, showVersion, err := Parse(stderr, args)
+	inv, mageInit, showVersion, err := Parse(stdout, args)
 	inv.Dir = dir
-	inv.Stdout = stdout
+	inv.Stderr = stderr
 	if err == flag.ErrHelp {
 		return 0
 	}
@@ -104,10 +104,10 @@ func ParseAndRun(dir string, stdout, stderr io.Writer, args []string) int {
 
 // Parse parses the given args and returns structured data.  If parse returns
 // flag.ErrHelp, the calling process should exit with code 0.
-func Parse(stderr io.Writer, args []string) (inv Invocation, mageInit, showVersion bool, err error) {
-	inv.Stderr = stderr
+func Parse(stdout io.Writer, args []string) (inv Invocation, mageInit, showVersion bool, err error) {
+	inv.Stdout = stdout
 	fs := flag.FlagSet{}
-	fs.SetOutput(stderr)
+	fs.SetOutput(stdout)
 	fs.BoolVar(&inv.Force, "f", false, "force recreation of compiled magefile")
 	fs.BoolVar(&inv.Verbose, "v", false, "show verbose output when running mage targets")
 	fs.BoolVar(&inv.List, "l", false, "list mage targets in this directory")
@@ -116,8 +116,8 @@ func Parse(stderr io.Writer, args []string) (inv Invocation, mageInit, showVersi
 	fs.BoolVar(&inv.Keep, "keep", false, "keep intermediate mage files around after running")
 	fs.BoolVar(&showVersion, "version", false, "show version info for the mage binary")
 	fs.Usage = func() {
-		fmt.Fprintln(stderr, "mage [options] [target]")
-		fmt.Fprintln(stderr, "Options:")
+		fmt.Fprintln(stdout, "mage [options] [target]")
+		fmt.Fprintln(stdout, "Options:")
 		fs.PrintDefaults()
 	}
 	err = fs.Parse(args)
@@ -125,14 +125,12 @@ func Parse(stderr io.Writer, args []string) (inv Invocation, mageInit, showVersi
 		fs.Usage()
 		return inv, mageInit, showVersion, err
 	}
-	if err != nil {
-		inv.Args = fs.Args()
-		if inv.Help && len(inv.Args) == 0 {
-			fs.Usage()
-			// tell upstream, to just exit
-			return inv, mageInit, showVersion, flag.ErrHelp
-		}
+	if err == nil && inv.Help && len(fs.Args()) == 0 {
+		fs.Usage()
+		// tell upstream, to just exit
+		return inv, mageInit, showVersion, flag.ErrHelp
 	}
+	inv.Args = fs.Args()
 	return inv, mageInit, showVersion, err
 }
 
@@ -147,6 +145,11 @@ func Invoke(inv Invocation) int {
 		if err == nil {
 			inv.Verbose = envVerbose
 		}
+	}
+
+	if len(inv.Args) > 1 {
+		log.Printf("Error: args after the target (%s) are not allowed: %v", inv.Args[0], strings.Join(inv.Args[1:], " "))
+		return 2
 	}
 
 	files, err := Magefiles(inv.Dir)
