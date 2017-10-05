@@ -2,6 +2,8 @@
 
 package main
 
+import "errors"
+
 // Function that panics.
 func Panics() {
 	panic("boom!")
@@ -9,5 +11,5 @@ func Panics() {
 
 // Error function that panics.
 func PanicsErr() error {
-	panic("kaboom!")
+	panic(errors.New("kaboom!"))
 }
