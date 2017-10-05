@@ -97,7 +97,7 @@ func list() error {
 	w := tabwriter.NewWriter(os.Stdout, 0, 4, 4, ' ', 0)
 	log.Println("Targets: ")
 	{{- range .Funcs}}
-	fmt.Fprintln(w, "  {{lower .Name}}{{if eq .Name $default}}*{{end}}\t{{.Synopsis}}")
+	fmt.Fprintln(w, "  {{lowerfirst .Name}}{{if eq .Name $default}}*{{end}}\t{{.Synopsis}}")
 	{{- end}}
 	err := w.Flush()
 	{{- if .Default}}
