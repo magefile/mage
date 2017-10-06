@@ -54,9 +54,10 @@ func GetContext() (context.Context, func()) {
 			os.Exit(1)
 		}
 
-		ctx, ctxCancel = context.WithTimeout(context.Background(), time.Duration(timeout)*time.Millisecond)
+		ctx, ctxCancel = context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
 	} else {
 		ctx = context.Background()
+		ctxCancel = func() {}
 	}
 	return ctx, ctxCancel
 }

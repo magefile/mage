@@ -34,17 +34,23 @@ func (f Function) TemplateString() string {
 	if f.IsContext && f.IsError {
 		out := `ctx, _ := mg.GetContext()
 		if err := %s(ctx); err != nil {
-			fmt.Printf("Error: %v\n", err)
+			fmt.Printf("Error: %%v\n", err)
 			os.Exit(1)
 		}`
 		return fmt.Sprintf(out, f.Name)
 	}
 	if f.IsContext && !f.IsError {
 		out := `ctx, cancel := mg.GetContext()
-		%s(ctx)
+		d := make(chan struct{})
+		go func() {
+			%s(ctx)
+			d<-struct{}{}
+		}()
 		select {
 		case <-ctx.Done():
-			fmt.Printf("context is done")
+			fmt.Printf("Error: %%v\n", ctx.Err())
+			cancel()
+		case <-d:
 			cancel()
 		}
 		`
@@ -52,7 +58,7 @@ func (f Function) TemplateString() string {
 	}
 	if !f.IsContext && f.IsError {
 		out := `if err := %s(); err != nil {
-			 fmt.Printf("Error: %v\n", err)
+			 fmt.Printf("Error: %%v\n", err)
 			 os.Exit(1)
 		}`
 		return fmt.Sprintf(out, f.Name)
