@@ -7,8 +7,6 @@ import (
 	"runtime"
 	"strings"
 	"sync"
-
-	"github.com/magefile/mage/types"
 )
 
 type onceMap struct {
@@ -107,19 +105,21 @@ func changeExit(old, new int) int {
 func addDep(ctx context.Context, f interface{}) *onceFun {
 	var fn func(context.Context) error
 	switch f := f.(type) {
-	case types.FuncVoid:
+	case func():
 		fn = func(ctx context.Context) error { f(); return nil }
-	case types.FuncError:
+	case func() error:
 		fn = func(ctx context.Context) error { return f() }
-	case types.FuncContext:
+	case func(context.Context):
 		fn = func(ctx context.Context) error { f(ctx); return nil }
-	case types.FuncContextError:
+	case func(context.Context) error:
 		fn = f
+	default:
+		panic("attempted to add a dep that did not match required type")
 	}
 
 	n := name(f)
 	of := onces.LoadOrStore(n, &onceFun{
-		fn: fn,
+		fn:  fn,
 		ctx: ctx,
 	})
 	return of
