@@ -2,8 +2,8 @@ package parse
 
 import (
 	"reflect"
-	"testing"
 	"strings"
+	"testing"
 )
 
 func TestParse(t *testing.T) {
@@ -34,7 +34,6 @@ func TestParse(t *testing.T) {
 		},
 	}
 
-
 	// DefaultIsError
 	if info.DefaultIsError != true {
 		t.Fatalf("expected DefaultIsError to be true")
@@ -45,11 +44,9 @@ func TestParse(t *testing.T) {
 		t.Fatalf("expected DefaultName to be ReturnsError")
 	}
 
-	for fnIndex := range(expected) {
-		fn := expected[fnIndex]
+	for _, fn := range expected {
 		found := false
-		for infoFnIndex := range(info.Funcs) {
-			infoFn := info.Funcs[infoFnIndex]
+		for _, infoFn := range info.Funcs {
 			if reflect.DeepEqual(fn, infoFn) {
 				found = true
 				break

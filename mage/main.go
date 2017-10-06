@@ -169,8 +169,8 @@ func compile(out string, info *parse.PkgInfo, gofiles []string) error {
 	defer f.Close()
 
 	data := data{
-		Funcs:   info.Funcs,
-		Default: info.DefaultName,
+		Funcs:       info.Funcs,
+		Default:     info.DefaultName,
 		DefaultFunc: info.DefaultFunc,
 	}
 

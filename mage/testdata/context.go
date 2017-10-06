@@ -2,17 +2,24 @@
 
 package main
 
-import "context"
+import (
+	"context"
+	"errors"
+	"fmt"
+
+	"github.com/magefile/mage/mg"
+)
 
 // Returns a non-nil error.
-func TakesContextNoError(ctx context.Context)  {
-	fmt.Printf("Context timeout: %v\n", ctx.Timeout)
+func TakesContextNoError(ctx context.Context) {
+	deadline, _ := ctx.Deadline()
+	fmt.Printf("Context timeout: %v\n", deadline)
 }
 
 func TakesContextWithError(ctx context.Context) error {
-  return errors.New("Something went sideways")
+	return errors.New("Something went sideways")
 }
 
-func DepWithContext(ctx context.Context) {
-  mg.DepWithContext(ctx, TakesContextNoError)
+func DepsWithContext(ctx context.Context) {
+	mg.DepsWithContext(ctx, TakesContextNoError)
 }

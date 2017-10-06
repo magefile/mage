@@ -7,12 +7,13 @@ package main
 
 import (
 	"fmt"
-	"github.com/magefile/mage/mg"
 	"io/ioutil"
 	"log"
 	"os"
 	"strings"
 	"text/tabwriter"
+
+	"github.com/magefile/mage/mg"
 )
 
 func main() {
