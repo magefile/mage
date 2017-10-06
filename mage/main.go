@@ -35,8 +35,8 @@ const initFile = "magefile.go"
 
 var (
 	force, verbose, list, help, mageInit, keep, showVersion bool
-
-	timestamp, commitHash, gitTag string
+	timeout                                                 int
+	timestamp, commitHash, gitTag                           string
 )
 
 func init() {
@@ -46,6 +46,7 @@ func init() {
 	flag.BoolVar(&help, "h", false, "show this help")
 	flag.BoolVar(&mageInit, "init", false, "create a starting template if no mage files exist")
 	flag.BoolVar(&keep, "keep", false, "keep intermediate mage files around after running")
+	flag.IntVar(&timeout, "t", 0, "timeout in seconds, Default (0) no timeout")
 	flag.BoolVar(&showVersion, "version", false, "show version info for the mage binary")
 	flag.Usage = func() {
 		fmt.Println("mage [options] [target]")
@@ -256,6 +257,9 @@ func run(cmd string, args ...string) int {
 	}
 	if help {
 		c.Env = append(c.Env, "MAGEFILE_HELP=1")
+	}
+	if timeout > 0 {
+		c.Env = append(c.Env, fmt.Sprintf("MAGEFILE_TIMEOUT=%d", timeout))
 	}
 	err := c.Run()
 	if err != nil {

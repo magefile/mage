@@ -160,3 +160,21 @@ func TestKeepFlag(t *testing.T) {
 	}
 	os.Remove(buildFile)
 }
+
+// Test the timeout option
+func TestTimeout(t *testing.T) {
+	c := exec.Command("go", "run", "main.go", "-t", "1", "timeout")
+	c.Dir = "./testdata"
+	c.Env = os.Environ()
+	b, err := c.CombinedOutput()
+	actualErr := err.Error()
+	expectedErr := "exit status 1"
+	if actualErr != expectedErr {
+		t.Fatalf("expected %q, but got %q", expectedErr, actualErr)
+	}
+	actual := string(b)
+	expected := "Error: boom!\nexit status 1\n"
+	if actual != expected {
+		t.Fatalf("expected %q, but got %q", expected, actual)
+	}
+}

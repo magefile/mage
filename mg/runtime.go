@@ -2,9 +2,12 @@ package mg
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
+	"time"
 )
 
 // CacheEnv is the environment variable that users may set to change the
@@ -36,4 +39,24 @@ func CacheDir() string {
 	}
 }
 
-var Context = context.Background()
+var ctx context.Context
+var ctxCancel func()
+
+func GetContext() (context.Context, func()) {
+	if ctx != nil {
+		return ctx, ctxCancel
+	}
+
+	if os.Getenv("MAGEFILE_TIMEOUT") != "" {
+		timeout, err := strconv.Atoi(os.Getenv("MAGEFILE_TIMEOUT"))
+		if err != nil {
+			fmt.Println("timeout must be a number >= 0")
+			os.Exit(1)
+		}
+
+		ctx, ctxCancel = context.WithTimeout(context.Background(), time.Duration(timeout)*time.Millisecond)
+	} else {
+		ctx = context.Background()
+	}
+	return ctx, ctxCancel
+}

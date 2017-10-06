@@ -6,11 +6,14 @@ var tpl = `// +build ignore
 package main
 
 import (
+
 	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
+
 	"strings"
+
 	"text/tabwriter"
 
 	"github.com/magefile/mage/mg"

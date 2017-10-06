@@ -32,14 +32,22 @@ type Function struct {
 
 func (f Function) TemplateString() string {
 	if f.IsContext && f.IsError {
-		out := `if err := %s(mg.Context); err != nil {
+		out := `ctx, _ := mg.GetContext()
+		if err := %s(ctx); err != nil {
 			fmt.Printf("Error: %v\n", err)
 			os.Exit(1)
 		}`
 		return fmt.Sprintf(out, f.Name)
 	}
 	if f.IsContext && !f.IsError {
-		out := `%s(mg.Context)`
+		out := `ctx, cancel := mg.GetContext()
+		%s(ctx)
+		select {
+		case <-ctx.Done():
+			fmt.Printf("context is done")
+			cancel()
+		}
+		`
 		return fmt.Sprintf(out, f.Name)
 	}
 	if !f.IsContext && f.IsError {

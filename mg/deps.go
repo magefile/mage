@@ -84,7 +84,8 @@ func DepsWithContext(ctx context.Context, fns ...interface{}) {
 
 // Deps runs the given functions with the default runtime context
 func Deps(fns ...interface{}) {
-	DepsWithContext(Context, fns...)
+	ctx, _ := GetContext()
+	DepsWithContext(ctx, fns...)
 }
 
 func changeExit(old, new int) int {
