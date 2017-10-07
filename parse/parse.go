@@ -2,7 +2,6 @@ package parse
 
 import (
 	"fmt"
-	mgTypes "github.com/magefile/mage/types"
 	"go/ast"
 	"go/doc"
 	"go/parser"
@@ -11,6 +10,8 @@ import (
 	"log"
 	"os"
 	"strings"
+
+	mgTypes "github.com/magefile/mage/types"
 )
 
 type PkgInfo struct {
@@ -32,11 +33,24 @@ type Function struct {
 
 func (f Function) TemplateString() string {
 	if f.IsContext && f.IsError {
-		out := `ctx, _ := mg.GetContext()
-		if err := %s(ctx); err != nil {
-			fmt.Printf("Error: %%v\n", err)
+		out := `ctx, cancel := mg.GetContext()
+		d := make(chan struct{})
+		go func() {
+			if err := %s(ctx); err != nil {
+				fmt.Printf("Error: %%v\n", err)
+				os.Exit(1)
+			}
+			d<-struct{}{}
+		}()
+		select {
+		case <-ctx.Done():
+			fmt.Printf("Error: %%v\n", ctx.Err())
+			cancel()
 			os.Exit(1)
-		}`
+		case <-d:
+			cancel()
+		}
+		`
 		return fmt.Sprintf(out, f.Name)
 	}
 	if f.IsContext && !f.IsError {
@@ -50,6 +64,7 @@ func (f Function) TemplateString() string {
 		case <-ctx.Done():
 			fmt.Printf("Error: %%v\n", ctx.Err())
 			cancel()
+			os.Exit(1)
 		case <-d:
 			cancel()
 		}

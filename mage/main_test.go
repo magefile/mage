@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/magefile/mage/mg"
@@ -27,7 +28,11 @@ func testmain(m *testing.M) int {
 		log.Fatal(err)
 	}
 	if err := os.Mkdir(dir, 0700); err != nil {
-		log.Fatal(err)
+		if os.IsExist(err) {
+			os.RemoveAll(fmt.Sprintf("%s/*"))
+		} else {
+			log.Fatal(err)
+		}
 	}
 	defer os.RemoveAll(dir)
 	return m.Run()
@@ -147,15 +152,15 @@ func TestHashTemplate(t *testing.T) {
 func TestKeepFlag(t *testing.T) {
 	buildFile := fmt.Sprintf("./testdata/keep_flag/%s", mainfile)
 	os.Remove(buildFile)
-	c := exec.Command("go", "run", "main.go", "-keep")
+	c := exec.Command("go", "run", "main.go", "-keep", "noop")
 	c.Dir = "./testdata/keep_flag"
 	c.Env = os.Environ()
 	_, err := c.CombinedOutput()
-	if err != nil {
-		t.Error("error:", err)
+	if err != nil && strings.Compare(err.Error(), "exit status 1") != 0 {
+		t.Error("unexpected error:", err)
 	}
 
-	if _, err := os.Stat(fmt.Sprintf(buildFile)); os.IsNotExist(err) {
+	if _, err := os.Stat(buildFile); os.IsNotExist(err) {
 		t.Fatalf("expected file %q to exist but it did not", buildFile)
 	}
 	os.Remove(buildFile)
@@ -167,13 +172,16 @@ func TestTimeout(t *testing.T) {
 	c.Dir = "./testdata"
 	c.Env = os.Environ()
 	b, err := c.CombinedOutput()
+	if err == nil {
+		t.Fatalf("expected error but got nil")
+	}
 	actualErr := err.Error()
 	expectedErr := "exit status 1"
 	if actualErr != expectedErr {
 		t.Fatalf("expected %q, but got %q", expectedErr, actualErr)
 	}
 	actual := string(b)
-	expected := "Error: boom!\nexit status 1\n"
+	expected := "Error: context deadline exceeded\nexit status 1\n"
 	if actual != expected {
 		t.Fatalf("expected %q, but got %q", expected, actual)
 	}
