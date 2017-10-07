@@ -45,6 +45,11 @@ Options:
         show version info for the mage binary
 ```
 
+## Environment Variables
+
+You may set MAGE_VERBOSE=1 to always enable verbose logging in your magefiles,
+without having to remember to pass -v every time.
+
 ## Why?
 
 Makefiles are hard to read and hard to write.  Mostly because makefiles are essentially fancy bash scripts with significant white space and additional make-related syntax.
