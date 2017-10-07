@@ -7,8 +7,8 @@ theme = "learn"
 defaultContentLanguageInSubdir= true
 
 [params]
-  editURL = "https://github.com/github.com/magefile/mage/edit/master/site/content/"
-  description = "Documentation for Mage"
+  editURL = "https://github.com/magefile/mage/edit/master/site/content/"
+  description = "Mage"
   author = "Nate Finch"
   showVisitedLinks = true
 
@@ -17,11 +17,18 @@ home = [ "HTML", "RSS", "JSON"]
 
 [Languages]
 [Languages.en]
-title = "Documentation for Mage"
+title = "Mage"
 weight = 1
 languageName = "English"
 
-# [[Languages.en.menu.shortcuts]]
-# name = "<i class='fa fa-bullhorn'></i> Credits"
-# url = "/credits"
-# weight = 30
+[[Languages.en.menu.shortcuts]] 
+name = "<i class='fa fa-github'></i> Github repo"
+# identifier = "ds"
+url = "https://github.com/magefile/mage"
+weight = 10
+
+[[Languages.en.menu.shortcuts]] 
+name = "<i class='fa fa-twitter'></i> Twitter Account"
+# identifier = "ds"
+url = "https://twitter.com/MagefileDotOrg"
+weight = 20
