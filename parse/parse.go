@@ -72,14 +72,41 @@ func (f Function) TemplateString() string {
 		return fmt.Sprintf(out, f.Name)
 	}
 	if !f.IsContext && f.IsError {
-		out := `if err := %s(); err != nil {
-			 fmt.Printf("Error: %%v\n", err)
-			 os.Exit(1)
-		}`
+		out := `ctx, cancel := mg.GetContext()
+		d := make(chan struct{})
+		go func() {
+			if err := %s(); err != nil {
+				fmt.Printf("Error: %%v\n", err)
+				os.Exit(1)
+			}
+			d<-struct{}{}
+		}()
+		select {
+		case <-ctx.Done():
+			fmt.Printf("Error: %%v\n", ctx.Err())
+			cancel()
+			os.Exit(1)
+		case <-d:
+			cancel()
+		}
+		`
 		return fmt.Sprintf(out, f.Name)
 	}
 	if !f.IsContext && !f.IsError {
-		out := `%s()`
+		out := `ctx, cancel := mg.GetContext()
+		d := make(chan struct{})
+		go func() {
+			%s()
+			d<-struct{}{}
+		}()
+		select {
+		case <-ctx.Done():
+			fmt.Printf("Error: %%v\n", ctx.Err())
+			cancel()
+			os.Exit(1)
+		case <-d:
+			cancel()
+		}`
 		return fmt.Sprintf(out, f.Name)
 	}
 	return `fmt.Printf("Error formatting job code\n")
