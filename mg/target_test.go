@@ -1,8 +1,40 @@
 package mg
 
-import "testing"
+import (
+	"io/ioutil"
+	"os"
+	"testing"
+	"time"
+)
 
 func TestTarget(t *testing.T) {
+	t.Parallel()
+	dirs := []string{"testdata/src_dir", "testdata/target_dir"}
+	for _, d := range dirs {
+		os.MkdirAll(d, 0777)
+		time.Sleep(time.Second)
+	}
+	files := []string{
+		"testdata/src_dir/some_file",
+		"testdata/src_dir/some_",
+		"testdata/src_file",
+		"testdata/target_dir/some_file",
+		"testdata/target_file",
+	}
+	for _, v := range files {
+		err := ioutil.WriteFile(v, []byte(v), 0600)
+		if err != nil {
+			t.Fatal(err)
+		}
+		time.Sleep(time.Second)
+	}
+	defer func() {
+		err := os.RemoveAll("testdata")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
 	table := []struct {
 		desc      string
 		src       string
