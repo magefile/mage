@@ -120,6 +120,8 @@ Options:
   -keep
         keep intermediate mage files around after running
   -l    list mage targets in this directory
+  -t int
+        timeout in seconds, Default (0) no timeout
   -v    show verbose output when running mage targets
   -version
         show version info for the mage binary
