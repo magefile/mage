@@ -16,5 +16,8 @@
 # Magefile output
 mage_output_file.go
 
+# VScode
+.vscode
+
 # stupid osx
 .DS_Store

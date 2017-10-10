@@ -21,9 +21,13 @@ import (
 
 func main() {
 	log.SetFlags(0)
+	if os.Getenv("MAGEFILE_VERBOSE") == "" {
+		log.SetOutput(ioutil.Discard)
+	}
+	logger := log.New(os.Stderr, "", 0)
 	if os.Getenv("MAGEFILE_LIST") != "" {
 		if err := list(); err != nil {
-			fmt.Println(err)
+			log.Println(err)
 			os.Exit(1)
 		}
 		return
@@ -31,7 +35,7 @@ func main() {
 
 	if os.Getenv("MAGEFILE_HELP") != "" {
 		if len(os.Args) < 2 {
-			fmt.Println("no target specified")
+			logger.Println("no target specified")
 			os.Exit(1)
 		}
 		switch strings.ToLower(os.Args[1]) {
@@ -41,17 +45,15 @@ func main() {
 				return
 			{{end}}
 			default:
-				fmt.Printf("Unknown target: %q\n", os.Args[1])
+				logger.Printf("Unknown target: %q\n", os.Args[1])
 				os.Exit(1)
 		}	}
 
-	if os.Getenv("MAGEFILE_VERBOSE") == "" {
-		log.SetOutput(ioutil.Discard)
-	}
+
 	defer func() {
 		err := recover()
 		if err != nil {
-			fmt.Printf("Error: %v\n", err)
+			logger.Printf("Error: %v\n", err)
 			type code interface { ExitStatus() int }
 			if c, ok := err.(code); ok {
 				os.Exit(c.ExitStatus())
@@ -65,7 +67,7 @@ func main() {
 		return
 	{{- else}}
 		if err := list(); err != nil {
-			fmt.Println(err)
+			logger.Println("Error:", err)
 			os.Exit(1)
 		}
 		return
@@ -77,7 +79,7 @@ func main() {
 		{{.TemplateString}}
 	{{end}}
 	default:
-		fmt.Printf("Unknown target: %q\n", os.Args[1])
+		logger.Printf("Unknown target: %q\n", os.Args[1])
 		os.Exit(1)
 	}
 }
@@ -85,9 +87,9 @@ func main() {
 func list() error {
 	{{$default := .Default}}
 	w := tabwriter.NewWriter(os.Stdout, 0, 4, 4, ' ', 0)
-	log.Println("Targets: ")
+	fmt.Println("Targets:")
 	{{- range .Funcs}}
-	fmt.Fprintln(w, "  {{lower .Name}}{{if eq .Name $default}}*{{end}}\t{{.Synopsis}}")
+	fmt.Fprintln(w, "  {{lowerfirst .Name}}{{if eq .Name $default}}*{{end}}\t{{.Synopsis}}")
 	{{- end}}
 	err := w.Flush()
 	{{- if .Default}}

@@ -1,7 +1,9 @@
 package mage
 
 import (
+	"bytes"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -54,78 +56,165 @@ func TestGoRun(t *testing.T) {
 }
 
 func TestVerbose(t *testing.T) {
-	c := exec.Command("go", "run", "main.go", "testverbose")
-	c.Dir = "./testdata"
-	c.Env = os.Environ()
-	b, err := c.CombinedOutput()
-	if err != nil {
-		t.Error("error:", err)
+	stderr := &bytes.Buffer{}
+	stdout := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:    "./testdata",
+		Stdout: stdout,
+		Stderr: stderr,
+		Args:   []string{"testverbose"},
 	}
-	actual := string(b)
+
+	code := Invoke(inv)
+	if code != 0 {
+		t.Errorf("expected to exit with code 0, but got %v", code)
+	}
+	actual := stdout.String()
 	expected := ""
 	if actual != expected {
 		t.Fatalf("expected %q, but got %q", expected, actual)
 	}
-	c = exec.Command("go", "run", "main.go", "-v", "testverbose")
-	c.Dir = "./testdata"
-	c.Env = os.Environ()
-	b, err = c.CombinedOutput()
-	if err != nil {
-		t.Error("error:", err)
+	stderr.Reset()
+	stdout.Reset()
+	inv.Verbose = true
+	code = Invoke(inv)
+	if code != 0 {
+		t.Errorf("expected to exit with code 0, but got %v", code)
 	}
-	actual = string(b)
+
+	actual = stderr.String()
 	expected = "hi!\n"
 	if actual != expected {
 		t.Fatalf("expected %q, but got %q", expected, actual)
 	}
 }
 
-func TestGoRunError(t *testing.T) {
-	c := exec.Command("go", "run", "main.go", "returnsnonnilerror")
-	c.Dir = "./testdata"
-	c.Env = os.Environ()
-	b, err := c.CombinedOutput()
-	actualErr := err.Error()
-	expectedErr := "exit status 1"
-	if actualErr != expectedErr {
-		t.Fatalf("expected %q, but got %q", expectedErr, actualErr)
+func TestVerboseEnv(t *testing.T) {
+	os.Setenv("MAGE_VERBOSE", "true")
+
+	stdout := &bytes.Buffer{}
+	inv, _, _, err := Parse(stdout, []string{})
+	if err != nil {
+		t.Fatal("unexpected error", err)
 	}
-	actual := string(b)
-	expected := "Error: bang!\nexit status 1\n"
+
+	expected := true
+
+	if inv.Verbose != true {
+		t.Fatalf("expected %t, but got %t", expected, inv.Verbose)
+	}
+
+	os.Unsetenv("MAGE_VERBOSE")
+}
+
+func TestList(t *testing.T) {
+	stdout := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:    "./testdata",
+		Stdout: stdout,
+		Stderr: ioutil.Discard,
+		List:   true,
+	}
+
+	code := Invoke(inv)
+	if code != 0 {
+		t.Errorf("expected to exit with code 0, but got %v", code)
+	}
+	actual := stdout.String()
+	expected := `
+Targets:
+  panics                Function that panics.
+  panicsErr             Error function that panics.
+  returnsError*         Synopsis for returns error.
+  returnsNonNilError    Returns a non-nil error.
+  returnsVoid
+  testVerbose
+
+* default target
+`[1:]
+	if actual != expected {
+		t.Fatalf("expected:\n%s\n\ngot:\n%s", expected, actual)
+	}
+}
+
+func TestNoArgNoDefaultList(t *testing.T) {
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:    "testdata/no_default",
+		Stdout: stdout,
+		Stderr: stderr,
+	}
+	code := Invoke(inv)
+	if code != 0 {
+		t.Errorf("expected to exit with code 0, but got %v", code)
+	}
+	if err := stderr.String(); err != "" {
+		t.Errorf("unexpected stderr output:\n%s", err)
+	}
+	actual := stdout.String()
+	expected := `
+Targets:
+  bazBuz    Prints out 'BazBuz'.
+  fooBar    Prints out 'FooBar'.
+`[1:]
+	if actual != expected {
+		t.Fatalf("expected:\n%q\n\ngot:\n%q", expected, actual)
+	}
+}
+
+func TestTargetError(t *testing.T) {
+	stderr := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:    "./testdata",
+		Stdout: ioutil.Discard,
+		Stderr: stderr,
+		Args:   []string{"returnsnonnilerror"},
+	}
+	code := Invoke(inv)
+	if code != 1 {
+		t.Fatalf("expected 1, but got %v", code)
+	}
+	actual := stderr.String()
+	expected := "Error: bang!\n"
 	if actual != expected {
 		t.Fatalf("expected %q, but got %q", expected, actual)
 	}
 }
 
-func TestGoRunPanics(t *testing.T) {
-	c := exec.Command("go", "run", "main.go", "panics")
-	c.Dir = "./testdata"
-	c.Env = os.Environ()
-	b, err := c.CombinedOutput()
-	actualErr := err.Error()
-	expectedErr := "exit status 1"
-	if actualErr != expectedErr {
-		t.Fatalf("expected %q, but got %q", expectedErr, actualErr)
+func TestTargetPanics(t *testing.T) {
+	stderr := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:    "./testdata",
+		Stdout: ioutil.Discard,
+		Stderr: stderr,
+		Args:   []string{"panics"},
 	}
-	actual := string(b)
-	expected := "Error: boom!\nexit status 1\n"
+	code := Invoke(inv)
+	if code != 1 {
+		t.Fatalf("expected 1, but got %v", code)
+	}
+	actual := stderr.String()
+	expected := "Error: boom!\n"
 	if actual != expected {
 		t.Fatalf("expected %q, but got %q", expected, actual)
 	}
 }
 
-func TestGoRunPanicsErr(t *testing.T) {
-	c := exec.Command("go", "run", "main.go", "panicserr")
-	c.Dir = "./testdata"
-	c.Env = os.Environ()
-	b, err := c.CombinedOutput()
-	actualErr := err.Error()
-	expectedErr := "exit status 1"
-	if actualErr != expectedErr {
-		t.Fatalf("expected %q, but got %q", expectedErr, actualErr)
+func TestPanicsErr(t *testing.T) {
+	stderr := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:    "./testdata",
+		Stdout: ioutil.Discard,
+		Stderr: stderr,
+		Args:   []string{"panicserr"},
 	}
-	actual := string(b)
-	expected := "Error: kaboom!\nexit status 1\n"
+	code := Invoke(inv)
+	if code != 1 {
+		t.Fatalf("expected 1, but got %v", code)
+	}
+	actual := stderr.String()
+	expected := "Error: kaboom!\n"
 	if actual != expected {
 		t.Fatalf("expected %q, but got %q", expected, actual)
 	}
@@ -152,18 +241,63 @@ func TestHashTemplate(t *testing.T) {
 func TestKeepFlag(t *testing.T) {
 	buildFile := fmt.Sprintf("./testdata/keep_flag/%s", mainfile)
 	os.Remove(buildFile)
-	c := exec.Command("go", "run", "main.go", "-keep", "noop")
-	c.Dir = "./testdata/keep_flag"
-	c.Env = os.Environ()
-	_, err := c.CombinedOutput()
-	if err != nil && strings.Compare(err.Error(), "exit status 1") != 0 {
-		t.Error("unexpected error:", err)
+	defer os.Remove(buildFile)
+	inv := Invocation{
+		Dir:    "./testdata/keep_flag",
+		Stdout: ioutil.Discard,
+		Stderr: ioutil.Discard,
+		Args:   []string{"noop"},
+		Keep:   true,
+	}
+	code := Invoke(inv)
+	if code != 0 {
+		t.Fatalf("expected code 0, but got %v", code)
 	}
 
-	if _, err := os.Stat(buildFile); os.IsNotExist(err) {
-		t.Fatalf("expected file %q to exist but it did not", buildFile)
+	if _, err := os.Stat(buildFile); err != nil {
+		t.Fatalf("expected file %q to exist but got err, %v", buildFile, err)
 	}
-	os.Remove(buildFile)
+}
+
+func TestStopMultipleTargets(t *testing.T) {
+	stderr := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:    "./testdata",
+		Stdout: ioutil.Discard,
+		Stderr: stderr,
+		Args:   []string{"panicserr", "testVerbose"},
+	}
+	code := Invoke(inv)
+	if code != 2 {
+		t.Fatalf("expected 1, but got %v", code)
+	}
+	actual := stderr.String()
+	expected := "Error: args after the target (panicserr) are not allowed: testVerbose\n"
+	if actual != expected {
+		t.Fatalf("expected %q, but got %q", expected, actual)
+	}
+
+}
+
+func TestParse(t *testing.T) {
+	buf := &bytes.Buffer{}
+	inv, init, showVer, err := Parse(buf, []string{"-v", "build"})
+	if err != nil {
+		t.Fatal("unexpected error", err)
+	}
+	if init {
+		t.Fatal("init should be false but was true")
+	}
+	if showVer {
+		t.Fatal("showVersion should be false but was true")
+	}
+	if len(inv.Args) != 1 && inv.Args[0] != "build" {
+		t.Fatalf("expected args to be %q but got %q", []string{"build"}, inv.Args)
+	}
+	if s := buf.String(); s != "" {
+		t.Fatalf("expected no stdout output but got %q", s)
+	}
+
 }
 
 // Test the timeout option

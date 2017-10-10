@@ -37,14 +37,14 @@ func (f Function) TemplateString() string {
 		d := make(chan struct{})
 		go func() {
 			if err := %s(ctx); err != nil {
-				fmt.Printf("Error: %%v\n", err)
+				logger.Println(err)
 				os.Exit(1)
 			}
 			d<-struct{}{}
 		}()
 		select {
 		case <-ctx.Done():
-			fmt.Printf("Error: %%v\n", ctx.Err())
+			logger.Println(ctx.Err())
 			cancel()
 			os.Exit(1)
 		case <-d:
@@ -62,7 +62,7 @@ func (f Function) TemplateString() string {
 		}()
 		select {
 		case <-ctx.Done():
-			fmt.Printf("Error: %%v\n", ctx.Err())
+			logger.Println(ctx.Err())
 			cancel()
 			os.Exit(1)
 		case <-d:
@@ -76,14 +76,14 @@ func (f Function) TemplateString() string {
 		d := make(chan struct{})
 		go func() {
 			if err := %s(); err != nil {
-				fmt.Printf("Error: %%v\n", err)
+				logger.Println(err)
 				os.Exit(1)
 			}
 			d<-struct{}{}
 		}()
 		select {
 		case <-ctx.Done():
-			fmt.Printf("Error: %%v\n", ctx.Err())
+			logger.Println(ctx.Err())
 			cancel()
 			os.Exit(1)
 		case <-d:
@@ -101,7 +101,7 @@ func (f Function) TemplateString() string {
 		}()
 		select {
 		case <-ctx.Done():
-			fmt.Printf("Error: %%v\n", ctx.Err())
+			logger.Println(ctx.Err())
 			cancel()
 			os.Exit(1)
 		case <-d:
