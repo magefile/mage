@@ -42,7 +42,6 @@ const initFile = "magefile.go"
 var (
 	force, verbose, list, help, mageInit, keep, showVersion bool
 
-	timeout                       int
 	timestamp, commitHash, gitTag string // set by ldflags when you "mage build"
 )
 
@@ -61,6 +60,7 @@ type Invocation struct {
 	List    bool      // tells the magefile to print out a list of targets
 	Help    bool      // tells the magefile to print out help for a specific target
 	Keep    bool      // tells mage to keep the generated main file after compiling
+	Timeout int       // tells mage to set a timeout to running the targets
 	Stdout  io.Writer // writer to write stdout messages to
 	Stderr  io.Writer // writer to write stderr messages to
 	Args    []string  // args to pass to the compiled binary
@@ -116,7 +116,7 @@ func Parse(stdout io.Writer, args []string) (inv Invocation, mageInit, showVersi
 	fs.BoolVar(&inv.List, "l", false, "list mage targets in this directory")
 	fs.BoolVar(&inv.Help, "h", false, "show this help")
 	fs.BoolVar(&mageInit, "init", false, "create a starting template if no mage files exist")
-	flag.IntVar(&timeout, "t", 0, "timeout in seconds, Default (0) no timeout")
+	fs.IntVar(&inv.Timeout, "t", 0, "timeout in seconds, Default (0) no timeout")
 	fs.BoolVar(&inv.Keep, "keep", false, "keep intermediate mage files around after running")
 	fs.BoolVar(&showVersion, "version", false, "show version info for the mage binary")
 	fs.Usage = func() {
@@ -365,15 +365,8 @@ func RunCompiled(inv Invocation, exePath string) int {
 	if inv.Help {
 		c.Env = append(c.Env, "MAGEFILE_HELP=1")
 	}
-	if timeout > 0 {
-		c.Env = append(c.Env, fmt.Sprintf("MAGEFILE_TIMEOUT=%d", timeout))
-	}
-	err := c.Run()
-	if err != nil {
-		if e, ok := err.(*exec.ExitError); ok {
-			return e.ProcessState.Sys().(syscall.WaitStatus).ExitStatus()
-		}
-		return 1
+	if inv.Timeout > 0 {
+		c.Env = append(c.Env, fmt.Sprintf("MAGEFILE_TIMEOUT=%d", inv.Timeout))
 	}
 	return sh.ExitStatus(c.Run())
 }

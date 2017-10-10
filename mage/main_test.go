@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/magefile/mage/mg"
@@ -123,12 +122,16 @@ func TestList(t *testing.T) {
 	actual := stdout.String()
 	expected := `
 Targets:
-  panics                Function that panics.
-  panicsErr             Error function that panics.
-  returnsError*         Synopsis for returns error.
-  returnsNonNilError    Returns a non-nil error.
+  depsWithContext
+  panics                   Function that panics.
+  panicsErr                Error function that panics.
+  returnsError*            Synopsis for returns error.
+  returnsNonNilError       Returns a non-nil error.
   returnsVoid
+  takesContextNoError      Returns a non-nil error.
+  takesContextWithError
   testVerbose
+  timeout
 
 * default target
 `[1:]
@@ -176,7 +179,7 @@ func TestTargetError(t *testing.T) {
 		t.Fatalf("expected 1, but got %v", code)
 	}
 	actual := stderr.String()
-	expected := "Error: bang!\n"
+	expected := "bang!\n"
 	if actual != expected {
 		t.Fatalf("expected %q, but got %q", expected, actual)
 	}
@@ -302,20 +305,21 @@ func TestParse(t *testing.T) {
 
 // Test the timeout option
 func TestTimeout(t *testing.T) {
-	c := exec.Command("go", "run", "main.go", "-t", "1", "timeout")
-	c.Dir = "./testdata"
-	c.Env = os.Environ()
-	b, err := c.CombinedOutput()
-	if err == nil {
-		t.Fatalf("expected error but got nil")
+	stderr := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:     "./testdata/context",
+		Stdout:  ioutil.Discard,
+		Stderr:  stderr,
+		Args:    []string{"timeout"},
+		Timeout: 1,
 	}
-	actualErr := err.Error()
-	expectedErr := "exit status 1"
-	if actualErr != expectedErr {
-		t.Fatalf("expected %q, but got %q", expectedErr, actualErr)
+	code := Invoke(inv)
+	if code != 1 {
+		t.Fatalf("expected 1, but got %v", code)
 	}
-	actual := string(b)
-	expected := "Error: context deadline exceeded\nexit status 1\n"
+	actual := stderr.String()
+	expected := "context deadline exceeded\n"
+
 	if actual != expected {
 		t.Fatalf("expected %q, but got %q", expected, actual)
 	}
