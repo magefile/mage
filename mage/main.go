@@ -35,8 +35,9 @@ const initFile = "magefile.go"
 
 var (
 	force, verbose, list, help, mageInit, keep, showVersion bool
-	timeout                                                 int
-	timestamp, commitHash, gitTag                           string
+
+	timeout                       int
+	timestamp, commitHash, gitTag string
 )
 
 func init() {
