@@ -30,7 +30,7 @@ func testmain(m *testing.M) int {
 	}
 	if err := os.Mkdir(dir, 0700); err != nil {
 		if os.IsExist(err) {
-			os.RemoveAll(fmt.Sprintf("%s/*"))
+			os.RemoveAll(fmt.Sprintf("%s/*", dir))
 		} else {
 			log.Fatal(err)
 		}
@@ -120,21 +120,18 @@ func TestList(t *testing.T) {
 		t.Errorf("expected to exit with code 0, but got %v", code)
 	}
 	actual := stdout.String()
+	fmt.Printf("###\n%s\n###", actual)
 	expected := `
 Targets:
-  depsWithContext
-  panics                   Function that panics.
-  panicsErr                Error function that panics.
-  returnsError*            Synopsis for returns error.
-  returnsNonNilError       Returns a non-nil error.
+  panics                Function that panics.
+  panicsErr             Error function that panics.
+  returnsError*         Synopsis for returns error.
+  returnsNonNilError    Returns a non-nil error.
   returnsVoid
-  takesContextNoError      Returns a non-nil error.
-  takesContextWithError
   testVerbose
-  timeout
 
 * default target
-`[1:]
+`
 	if actual != expected {
 		t.Fatalf("expected:\n%s\n\ngot:\n%s", expected, actual)
 	}

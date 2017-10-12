@@ -6,7 +6,7 @@ var tpl = `// +build ignore
 package main
 
 import (
-
+	"context"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -64,6 +64,7 @@ func main() {
 	if len(os.Args) < 2 {
 	{{- if .Default}}
 		{{.DefaultFunc.TemplateString}}
+		handleError(err)
 		return
 	{{- else}}
 		if err := list(); err != nil {
@@ -77,6 +78,7 @@ func main() {
 	{{range .Funcs -}}
 	case "{{lower .Name}}":
 		{{.TemplateString}}
+		handleError(err)
 	{{end}}
 	default:
 		logger.Printf("Unknown target: %q\n", os.Args[1])
@@ -100,4 +102,39 @@ func list() error {
 	return err
 }
 
+func handleError(err interface{}) {
+	fmt.Printf("eeee: %v\n", err)
+	if err != nil {
+		log.Printf("Error: %v\n", err)
+		type code interface { ExitStatus() int }
+		if c, ok := err.(code); ok {
+			os.Exit(c.ExitStatus())
+		}
+		os.Exit(1)
+	}
+}
+
+func runTarget(fn func(context.Context) (error)) interface{} {
+	var err interface{}
+	ctx, cancel := mg.GetContext()
+	d := make(chan interface{})
+	go func() {
+		defer func() {
+			err := recover()
+			d<-err
+		}()
+		err := fn(ctx)
+		d<-err
+	}()
+	select {
+	case <-ctx.Done():
+		cancel()
+		e := ctx.Err()
+		fmt.Printf("ctx err: %v\n", e)
+		return e
+	case err = <-d:
+		cancel()
+		return err
+	}
+}
 `

@@ -33,80 +33,36 @@ type Function struct {
 
 func (f Function) TemplateString() string {
 	if f.IsContext && f.IsError {
-		out := `ctx, cancel := mg.GetContext()
-		d := make(chan struct{})
-		go func() {
-			if err := %s(ctx); err != nil {
-				logger.Println(err)
-				os.Exit(1)
-			}
-			d<-struct{}{}
-		}()
-		select {
-		case <-ctx.Done():
-			logger.Println(ctx.Err())
-			cancel()
-			os.Exit(1)
-		case <-d:
-			cancel()
+		out := `wrapFn := func(ctx context.Context) error {
+			return %s(ctx)
 		}
 		`
 		return fmt.Sprintf(out, f.Name)
 	}
 	if f.IsContext && !f.IsError {
-		out := `ctx, cancel := mg.GetContext()
-		d := make(chan struct{})
-		go func() {
+		out := `wrapFn := func(ctx context.Context) error {
 			%s(ctx)
-			d<-struct{}{}
-		}()
-		select {
-		case <-ctx.Done():
-			logger.Println(ctx.Err())
-			cancel()
-			os.Exit(1)
-		case <-d:
-			cancel()
+			return nil
 		}
+		err := runTarget(wrapFn)
 		`
 		return fmt.Sprintf(out, f.Name)
 	}
 	if !f.IsContext && f.IsError {
-		out := `ctx, cancel := mg.GetContext()
-		d := make(chan struct{})
-		go func() {
-			if err := %s(); err != nil {
-				logger.Println(err)
-				os.Exit(1)
-			}
-			d<-struct{}{}
-		}()
-		select {
-		case <-ctx.Done():
-			logger.Println(ctx.Err())
-			cancel()
-			os.Exit(1)
-		case <-d:
-			cancel()
+		out := `wrapFn := func(ctx context.Context) error {
+			return %s()
 		}
+		err := runTarget(wrapFn)
 		`
 		return fmt.Sprintf(out, f.Name)
 	}
 	if !f.IsContext && !f.IsError {
-		out := `ctx, cancel := mg.GetContext()
-		d := make(chan struct{})
-		go func() {
+		out := `wrapFn := func(ctx context.Context) error {
 			%s()
-			d<-struct{}{}
-		}()
-		select {
-		case <-ctx.Done():
-			logger.Println(ctx.Err())
-			cancel()
-			os.Exit(1)
-		case <-d:
-			cancel()
-		}`
+			return nil
+		}
+		err := runTarget(wrapFn)
+		`
 		return fmt.Sprintf(out, f.Name)
 	}
 	return `fmt.Printf("Error formatting job code\n")
