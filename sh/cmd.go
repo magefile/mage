@@ -119,6 +119,7 @@ func run(env map[string]string, stdout, stderr io.Writer, cmd string, args ...st
 	}
 	c.Stderr = stderr
 	c.Stdout = stdout
+	c.Stdin = os.Stdin
 	log.Println("exec:", cmd, strings.Join(args, " "))
 	err = c.Run()
 	return cmdRan(err), ExitStatus(err), err
