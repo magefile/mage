@@ -50,6 +50,12 @@ func Run(cmd string, args ...string) error {
 	return RunWith(nil, cmd, args...)
 }
 
+// RunV is like Run, but always sends the command's stdout to os.Stdout.
+func RunV(cmd string, args ...string) error {
+	_, err := Exec(nil, os.Stdout, os.Stderr, cmd, args...)
+	return err
+}
+
 // RunWith runs the given command, directing stderr to this program's stderr and
 // printing stdout to stdout if mage was run with -v.  It adds adds env to the
 // environment variables for the command being run. Environment variables should
@@ -119,6 +125,7 @@ func run(env map[string]string, stdout, stderr io.Writer, cmd string, args ...st
 	}
 	c.Stderr = stderr
 	c.Stdout = stdout
+	c.Stdin = os.Stdin
 	log.Println("exec:", cmd, strings.Join(args, " "))
 	err = c.Run()
 	return cmdRan(err), ExitStatus(err), err

@@ -47,7 +47,7 @@ var (
 // function to allow it to be used from other programs, specifically so you can
 // go run a simple file that run's mage's Main.
 func Main() int {
-	return ParseAndRun(".", os.Stdout, os.Stderr, os.Args[1:])
+	return ParseAndRun(".", os.Stdout, os.Stderr, os.Stdin, os.Args[1:])
 }
 
 // Invocation contains the args for invoking a run of Mage.
@@ -60,17 +60,19 @@ type Invocation struct {
 	Keep    bool      // tells mage to keep the generated main file after compiling
 	Stdout  io.Writer // writer to write stdout messages to
 	Stderr  io.Writer // writer to write stderr messages to
+	Stdin   io.Reader // reader to read stdin from
 	Args    []string  // args to pass to the compiled binary
 }
 
 // ParseAndRun parses the command line, and then compiles and runs the mage
 // files in the given directory with the given args (do not include the command
 // name in the args).
-func ParseAndRun(dir string, stdout, stderr io.Writer, args []string) int {
+func ParseAndRun(dir string, stdout, stderr io.Writer, stdin io.Reader, args []string) int {
 	log := log.New(stderr, "", 0)
 	inv, mageInit, showVersion, err := Parse(stdout, args)
 	inv.Dir = dir
 	inv.Stderr = stderr
+	inv.Stdin = stdin
 	if err == flag.ErrHelp {
 		return 0
 	}
@@ -147,7 +149,6 @@ func Parse(stdout io.Writer, args []string) (inv Invocation, mageInit, showVersi
 // Invoke runs Mage with the given arguments.
 func Invoke(inv Invocation) int {
 	log := log.New(inv.Stderr, "", 0)
-
 	if len(inv.Args) > 1 {
 		log.Printf("Error: args after the target (%s) are not allowed: %v", inv.Args[0], strings.Join(inv.Args[1:], " "))
 		return 2
@@ -349,6 +350,7 @@ func RunCompiled(inv Invocation, exePath string) int {
 	c := exec.Command(exePath, inv.Args...)
 	c.Stderr = inv.Stderr
 	c.Stdout = inv.Stdout
+	c.Stdin = inv.Stdin
 	c.Env = os.Environ()
 	if inv.Verbose {
 		c.Env = append(c.Env, "MAGEFILE_VERBOSE=1")

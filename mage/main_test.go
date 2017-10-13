@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/magefile/mage/mg"
@@ -119,6 +120,7 @@ func TestList(t *testing.T) {
 	actual := stdout.String()
 	expected := `
 Targets:
+  copyStdin             
   panics                Function that panics.
   panicsErr             Error function that panics.
   returnsError*         Synopsis for returns error.
@@ -173,6 +175,27 @@ func TestTargetError(t *testing.T) {
 	}
 	actual := stderr.String()
 	expected := "Error: bang!\n"
+	if actual != expected {
+		t.Fatalf("expected %q, but got %q", expected, actual)
+	}
+}
+
+func TestStdinCopy(t *testing.T) {
+	stdout := &bytes.Buffer{}
+	stdin := strings.NewReader("hi!")
+	inv := Invocation{
+		Dir:    "./testdata",
+		Stderr: ioutil.Discard,
+		Stdout: stdout,
+		Stdin:  stdin,
+		Args:   []string{"CopyStdin"},
+	}
+	code := Invoke(inv)
+	if code != 0 {
+		t.Fatalf("expected 0, but got %v", code)
+	}
+	actual := stdout.String()
+	expected := "hi!"
 	if actual != expected {
 		t.Fatalf("expected %q, but got %q", expected, actual)
 	}
