@@ -4,7 +4,7 @@ weight = 10
 +++
 Any exported function that is either `func()` or `func() error` is considered a
 mage target.  A target is effectively a subcommand of mage while running mage in
-ths directory.  i.e. you can run a target by running `mage <target>`
+this directory.  i.e. you can run a target by running `mage <target>`
 
 If the function has an error return, errors returned from the function will
 print to stdout and cause the magefile to exit with an exit code of 1.  Any
