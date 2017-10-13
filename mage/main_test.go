@@ -2,6 +2,7 @@ package mage
 
 import (
 	"bytes"
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -291,6 +292,25 @@ func TestParse(t *testing.T) {
 	}
 	if s := buf.String(); s != "" {
 		t.Fatalf("expected no stdout output but got %q", s)
+	}
+
+}
+
+func TestParseHelp(t *testing.T) {
+	buf := &bytes.Buffer{}
+	_, _, _, err := Parse(buf, []string{"-h"})
+	if err != flag.ErrHelp {
+		t.Fatal("unexpected error", err)
+	}
+	buf2 := &bytes.Buffer{}
+	_, _, _, err = Parse(buf2, []string{"--help"})
+	if err != flag.ErrHelp {
+		t.Fatal("unexpected error", err)
+	}
+	s := buf.String()
+	s2 := buf2.String()
+	if s != s2 {
+		t.Fatalf("expected -h and --help to produce same output, but got different.\n\n-h:\n%s\n\n--help:\n%s", s, s2)
 	}
 
 }
