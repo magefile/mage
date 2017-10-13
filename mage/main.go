@@ -122,7 +122,7 @@ func Parse(stdout io.Writer, args []string) (inv Invocation, mageInit, showVersi
 	}
 	err = fs.Parse(args)
 	if err == flag.ErrHelp {
-		fs.Usage()
+		// parse will have already called fs.Usage()
 		return inv, mageInit, showVersion, err
 	}
 	if err == nil && inv.Help && len(fs.Args()) == 0 {
