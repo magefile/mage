@@ -2,12 +2,14 @@ package mage
 
 import (
 	"bytes"
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/magefile/mage/mg"
@@ -82,7 +84,7 @@ func TestVerbose(t *testing.T) {
 	}
 
 	actual = stderr.String()
-	expected = "hi!\n"
+	expected = "Running target: TestVerbose\nhi!\n"
 	if actual != expected {
 		t.Fatalf("expected %q, but got %q", expected, actual)
 	}
@@ -120,9 +122,8 @@ func TestList(t *testing.T) {
 		t.Errorf("expected to exit with code 0, but got %v", code)
 	}
 	actual := stdout.String()
-	fmt.Printf("###\n%s\n###", actual)
-	expected := `
-Targets:
+	expected := `Targets:
+  copyStdin             
   panics                Function that panics.
   panicsErr             Error function that panics.
   returnsError*         Synopsis for returns error.
@@ -130,8 +131,7 @@ Targets:
   returnsVoid
   testVerbose
 
-* default target
-`
+* default target`
 	if actual != expected {
 		t.Fatalf("expected:\n%s\n\ngot:\n%s", expected, actual)
 	}
@@ -177,6 +177,27 @@ func TestTargetError(t *testing.T) {
 	}
 	actual := stderr.String()
 	expected := "Error: bang!\n"
+	if actual != expected {
+		t.Fatalf("expected %q, but got %q", expected, actual)
+	}
+}
+
+func TestStdinCopy(t *testing.T) {
+	stdout := &bytes.Buffer{}
+	stdin := strings.NewReader("hi!")
+	inv := Invocation{
+		Dir:    "./testdata",
+		Stderr: ioutil.Discard,
+		Stdout: stdout,
+		Stdin:  stdin,
+		Args:   []string{"CopyStdin"},
+	}
+	code := Invoke(inv)
+	if code != 0 {
+		t.Fatalf("expected 0, but got %v", code)
+	}
+	actual := stdout.String()
+	expected := "hi!"
 	if actual != expected {
 		t.Fatalf("expected %q, but got %q", expected, actual)
 	}
@@ -319,5 +340,22 @@ func TestTimeout(t *testing.T) {
 
 	if actual != expected {
 		t.Fatalf("expected %q, but got %q", expected, actual)
+	}
+}
+func TestParseHelp(t *testing.T) {
+	buf := &bytes.Buffer{}
+	_, _, _, err := Parse(buf, []string{"-h"})
+	if err != flag.ErrHelp {
+		t.Fatal("unexpected error", err)
+	}
+	buf2 := &bytes.Buffer{}
+	_, _, _, err = Parse(buf2, []string{"--help"})
+	if err != flag.ErrHelp {
+		t.Fatal("unexpected error", err)
+	}
+	s := buf.String()
+	s2 := buf2.String()
+	if s != s2 {
+		t.Fatalf("expected -h and --help to produce same output, but got different.\n\n-h:\n%s\n\n--help:\n%s", s, s2)
 	}
 }
