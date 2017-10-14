@@ -122,19 +122,23 @@ func TestList(t *testing.T) {
 		t.Errorf("expected to exit with code 0, but got %v", code)
 	}
 	actual := stdout.String()
-	expected := `Targets:
-  copyStdin             
-  panics                Function that panics.
-  panicsErr             Error function that panics.
-  returnsError*         Synopsis for returns error.
-  returnsNonNilError    Returns a non-nil error.
-  returnsVoid
-  testVerbose
-
-* default target`
-	if actual != expected {
-		t.Fatalf("expected:\n%s\n\ngot:\n%s", expected, actual)
+	expecteds := []string{
+		"Targets:",
+		"copyStdin",
+		"panics                Function that panics.",
+		"panicsErr             Error function that panics.",
+		"returnsError*         Synopsis for returns error.",
+		"returnsNonNilError    Returns a non-nil error.",
+		"returnsVoid",
+		"testVerbose",
+		"* default target",
 	}
+	for _, expected := range expecteds {
+		if strings.Contains(actual, expected) == false {
+			t.Fatalf("expected:\n%s\n\nto be in:\n%s", expected, actual)
+		}
+	}
+
 }
 
 func TestNoArgNoDefaultList(t *testing.T) {
