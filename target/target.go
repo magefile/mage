@@ -6,33 +6,45 @@ import (
 	"time"
 )
 
-// Target checks whether the target files/directories have been more recently
-// modified than src.
-//
-// When recursive is set to true, if src is a directory it will be walked
-// recursively to deermine modified time.
-func Target(src string, recursive bool, targets ...string) (bool, error) {
-	if len(targets) == 0 {
-		return true, nil
-	}
+// Path compares the ModTime for src with targets and returns true if any
+// target received most recent changes than src.
+func Path(src string, targets ...string) (bool, error) {
 	stat, err := os.Stat(src)
 	if err != nil {
 		return false, err
 	}
 	srcTime := stat.ModTime()
-	if stat.IsDir() && recursive {
+	dt, err := loadTargets(targets)
+	if err != nil {
+		return false, err
+	}
+	t := dt.modTime()
+	if t.After(srcTime) {
+		return true, nil
+	}
+	return false, nil
+}
+
+// Dir compares the ModTime for src with targets and returns true if any
+// target received most recent changes than src.
+//
+// For directories this checks files recursively.
+func Dir(src string, targets ...string) (bool, error) {
+	stat, err := os.Stat(src)
+	if err != nil {
+		return false, err
+	}
+	srcTime := stat.ModTime()
+	if stat.IsDir() {
 		srcTime = calDirModTimeRecursive(stat)
 	}
 	dt, err := loadTargets(targets)
 	if err != nil {
 		return false, err
 	}
-	t := dt.modTime(false)
+	t := dt.modTimeDir()
 	if t.After(srcTime) {
 		return true, nil
-	}
-	if dt.hasdir {
-		return dt.modTime(true).After(srcTime), nil
 	}
 	return false, nil
 }
@@ -75,8 +87,12 @@ func loadTargets(targets []string) (*depTargets, error) {
 	return d, nil
 }
 
-func (d *depTargets) modTime(recursive bool) time.Time {
-	if !recursive || !d.hasdir {
+func (d *depTargets) modTime() time.Time {
+	return d.latest
+}
+
+func (d *depTargets) modTimeDir() time.Time {
+	if !d.hasdir {
 		return d.latest
 	}
 	for _, i := range d.src {
