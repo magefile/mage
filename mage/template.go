@@ -50,21 +50,10 @@ func main() {
 		}	}
 
 
-	defer func() {
-		err := recover()
-		if err != nil {
-			logger.Printf("Error: %v\n", err)
-			type code interface { ExitStatus() int }
-			if c, ok := err.(code); ok {
-				os.Exit(c.ExitStatus())
-			}
-			os.Exit(1)
-		}
-	}()
 	if len(os.Args) < 2 {
 	{{- if .Default}}
 		{{.DefaultFunc.TemplateString}}
-		handleError(err)
+		handleError(logger, err)
 		return
 	{{- else}}
 		if err := list(); err != nil {
@@ -78,8 +67,8 @@ func main() {
 	{{range .Funcs -}}
 	case "{{lower .Name}}":
 		{{.TemplateString}}
-		handleError(err)
-	{{end}}
+		handleError(logger, err)
+	{{end -}}
 	default:
 		logger.Printf("Unknown target: %q\n", os.Args[1])
 		os.Exit(1)
@@ -87,7 +76,7 @@ func main() {
 }
 
 func list() error {
-	{{$default := .Default}}
+	{{- $default := .Default}}
 	w := tabwriter.NewWriter(os.Stdout, 0, 4, 4, ' ', 0)
 	fmt.Println("Targets:")
 	{{- range .Funcs}}
@@ -102,11 +91,12 @@ func list() error {
 	return err
 }
 
-func handleError(err interface{}) {
-	fmt.Printf("eeee: %v\n", err)
+func handleError(logger *log.Logger, err interface{}) {
 	if err != nil {
-		log.Printf("Error: %v\n", err)
-		type code interface { ExitStatus() int }
+		logger.Printf("Error: %v\n", err)
+		type code interface {
+			ExitStatus() int
+		}
 		if c, ok := err.(code); ok {
 			os.Exit(c.ExitStatus())
 		}
@@ -114,17 +104,17 @@ func handleError(err interface{}) {
 	}
 }
 
-func runTarget(fn func(context.Context) (error)) interface{} {
+func runTarget(fn func(context.Context) error) interface{} {
 	var err interface{}
 	ctx, cancel := mg.GetContext()
 	d := make(chan interface{})
 	go func() {
 		defer func() {
 			err := recover()
-			d<-err
+			d <- err
 		}()
 		err := fn(ctx)
-		d<-err
+		d <- err
 	}()
 	select {
 	case <-ctx.Done():

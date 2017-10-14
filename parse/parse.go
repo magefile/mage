@@ -36,6 +36,7 @@ func (f Function) TemplateString() string {
 		out := `wrapFn := func(ctx context.Context) error {
 			return %s(ctx)
 		}
+		err := runTarget(wrapFn)
 		`
 		return fmt.Sprintf(out, f.Name)
 	}

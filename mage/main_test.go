@@ -176,7 +176,7 @@ func TestTargetError(t *testing.T) {
 		t.Fatalf("expected 1, but got %v", code)
 	}
 	actual := stderr.String()
-	expected := "bang!\n"
+	expected := "Error: bang!\n"
 	if actual != expected {
 		t.Fatalf("expected %q, but got %q", expected, actual)
 	}
@@ -315,7 +315,7 @@ func TestTimeout(t *testing.T) {
 		t.Fatalf("expected 1, but got %v", code)
 	}
 	actual := stderr.String()
-	expected := "context deadline exceeded\n"
+	expected := "Error: context deadline exceeded\n"
 
 	if actual != expected {
 		t.Fatalf("expected %q, but got %q", expected, actual)
