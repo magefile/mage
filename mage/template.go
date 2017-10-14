@@ -79,6 +79,9 @@ func main() {
 	switch strings.ToLower(os.Args[1]) {
 	{{range .Funcs -}}
 	case "{{lower .Name}}":
+		if os.Getenv("MAGEFILE_VERBOSE") != "" {
+			logger.Println("Running target:", "{{.Name}}")
+		}
 		{{if .IsError -}}
 			if err := {{.Name}}(); err != nil {
 				logger.Printf("Error: %v\n", err)

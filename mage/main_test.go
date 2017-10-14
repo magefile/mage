@@ -80,7 +80,7 @@ func TestVerbose(t *testing.T) {
 	}
 
 	actual = stderr.String()
-	expected = "hi!\n"
+	expected = "Running target: TestVerbose\nhi!\n"
 	if actual != expected {
 		t.Fatalf("expected %q, but got %q", expected, actual)
 	}
