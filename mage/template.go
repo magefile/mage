@@ -31,6 +31,26 @@ func main() {
 		return
 	}
 
+	targets := map[string]bool {
+		{{range .Funcs}}"{{lower .Name}}": true,
+		{{end}}
+	}
+
+	var unknown []string
+	for _, arg := range os.Args[1:] {
+		if !targets[strings.ToLower(arg)] {
+			unknown = append(unknown, arg)
+		}
+	}
+	if len(unknown) == 1 {
+		logger.Println("Unknown target specified:", unknown[0])
+		os.Exit(2)
+	}
+	if len(unknown) > 1 {
+		logger.Println("Unknown targets specified:", strings.Join(unknown, ", "))
+		os.Exit(2)
+	}
+
 	if os.Getenv("MAGEFILE_HELP") != "" {
 		if len(os.Args) < 2 {
 			logger.Println("no target specified")
@@ -45,7 +65,8 @@ func main() {
 			default:
 				logger.Printf("Unknown target: %q\n", os.Args[1])
 				os.Exit(1)
-		}	}
+		}	
+	}
 
 
 	if len(os.Args) < 2 {
@@ -61,19 +82,28 @@ func main() {
 		return
 	{{- end}}
 	}
-	switch strings.ToLower(os.Args[1]) {
-	{{range .Funcs -}}
-	case "{{lower .Name}}":
-
-		if os.Getenv("MAGEFILE_VERBOSE") != "" {
-			logger.Println("Running target:", "{{.Name}}")
+	for _, target := range os.Args[1:] {
+		switch strings.ToLower(target) {
+			{{range .Funcs -}}
+			case "{{lower .Name}}":
+				if os.Getenv("MAGEFILE_VERBOSE") != "" {
+					logger.Println("Running target:", "{{.Name}}")
+				}
+			{{if .IsError -}}
+				if err := {{.Name}}(); err != nil {
+					logger.Printf("Error: %v\n", err)
+					os.Exit(1)
+				}
+			{{else -}}
+				{{.Name}}()
+			{{- end}}
+		{{end}}
+			default:
+				// should be impossible since we check this above.
+				logger.Printf("Unknown target: %q\n", os.Args[1])
+				os.Exit(1)
+			}
 		}
-		{{.TemplateString}}
-		handleError(logger, err)
-	{{end -}}
-	default:
-		logger.Printf("Unknown target: %q\n", os.Args[1])
-		os.Exit(1)
 	}
 }
 

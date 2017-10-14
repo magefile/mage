@@ -285,24 +285,53 @@ func TestKeepFlag(t *testing.T) {
 	}
 }
 
-func TestStopMultipleTargets(t *testing.T) {
-	stderr := &bytes.Buffer{}
+func TestMultipleTargets(t *testing.T) {
+	var stderr, stdout bytes.Buffer
+	inv := Invocation{
+		Dir:     "./testdata",
+		Stdout:  &stdout,
+		Stderr:  &stderr,
+		Args:    []string{"TestVerbose", "ReturnsError"},
+		Verbose: true,
+	}
+	code := Invoke(inv)
+	if code != 0 {
+		t.Errorf("expected 0, but got %v", code)
+	}
+	actual := stderr.String()
+	expected := "Running target: TestVerbose\nhi!\nRunning target: ReturnsError\n"
+	if actual != expected {
+		t.Errorf("expected %q, but got %q", expected, actual)
+	}
+	actual = stdout.String()
+	expected = "stuff\n"
+	if actual != expected {
+		t.Errorf("expected %q, but got %q", expected, actual)
+	}
+}
+
+func TestBadSecondTargets(t *testing.T) {
+	var stderr, stdout bytes.Buffer
 	inv := Invocation{
 		Dir:    "./testdata",
-		Stdout: ioutil.Discard,
-		Stderr: stderr,
-		Args:   []string{"panicserr", "testVerbose"},
+		Stdout: &stdout,
+		Stderr: &stderr,
+		Args:   []string{"TestVerbose", "NotGonnaWork"},
 	}
 	code := Invoke(inv)
 	if code != 2 {
-		t.Fatalf("expected 1, but got %v", code)
+		t.Errorf("expected 0, but got %v", code)
 	}
 	actual := stderr.String()
-	expected := "Error: args after the target (panicserr) are not allowed: testVerbose\n"
+	expected := "Unknown target specified: NotGonnaWork\n"
 	if actual != expected {
-		t.Fatalf("expected %q, but got %q", expected, actual)
+		t.Errorf("expected %q, but got %q", expected, actual)
 	}
-
+	actual = stdout.String()
+	expected = ""
+	if actual != expected {
+		t.Errorf("expected %q, but got %q", expected, actual)
+	}
 }
 
 func TestParse(t *testing.T) {

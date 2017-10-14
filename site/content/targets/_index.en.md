@@ -20,6 +20,11 @@ A target may be designated the default target, which is run when the user runs
 <targetname>`  If no default target is specified, running `mage` with no target
 will print the list of targets, like `mage -l`.
 
-Currently only a single target may be run at a single time.  Attempting to run
-multiple targets from a single invocation of mage will result in an error.  This
-may change in the future.
+## Multiple Targets
+
+Multiple targets can be specified as args to Mage, for example `mage foo bar
+baz`.  Targets will be run serially, from left to right (so in thise case, foo,
+then once foo is done, bar, then once bar is done, baz).  Dependencies run using
+mg.Deps will still only run once per mage execution, so if each of the targets
+depend on the same function, that function will only be run once for all
+targets.
