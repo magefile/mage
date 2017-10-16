@@ -127,3 +127,21 @@ func TestDepTwoFatal(t *testing.T) {
 	}()
 	mg.Deps(f, g)
 }
+
+func TestDepWithUnhandledFunc(t *testing.T) {
+	defer func() {
+		err := recover()
+		expected := "Invalid type for dependent function: func(string) string. Dependencies must be func(), func() error, func(context.Context) or func(context.Context) error"
+		actual, ok := err.(error)
+		if !ok {
+			t.Fatalf("Expected type string from panic")
+		}
+		if actual.Error() != expected {
+			t.Fatalf("Expected panic %v but got %v", expected, err)
+		}
+	}()
+	var NotValid func(string) string = func(a string) string {
+		return a
+	}
+	mg.Deps(NotValid)
+}
