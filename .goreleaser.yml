@@ -3,7 +3,7 @@ release:
   github:
     owner: magefile
     name: mage
-  draft: false
+  draft: true
 build:
   binary: mage
   main: .
@@ -41,6 +41,10 @@ archive:
     netbsd: NetBSD
     freebsd: FreeBSD
     dragonfly: DragonFlyBSD
+  format: tar.gz
+  format_overrides:
+    - goos: windows
+      format: zip
   files:
   - LICENSE
 snapshot:
