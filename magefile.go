@@ -4,8 +4,9 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
-	"log"
+	"os"
 	"time"
 
 	"github.com/magefile/mage/sh"
@@ -22,31 +23,26 @@ func Build() error {
 	return sh.Run("go", "install", "-ldflags="+ldf, "github.com/magefile/mage")
 }
 
-// Generates binaries for all supported platforms.  Currently that means a
-// combination of windows, linux, and OSX in 32 bit and 64 bit formats.  The
-// files will be dumped in the local directory with names according to their
-// supported platform.
-func BuildAll() error {
-	ldf, err := flags()
-	if err != nil {
+// Generates a new release.  Expects the TAG environment variable to be set,
+// which will create a new tag with that name. Expects the MSG environment
+// variable to be set, which will be the message of the tag.
+func Release() (err error) {
+	if os.Getenv("TAG") == "" || os.Getenv("MSG") == "" {
+		return errors.New("MSG and TAG environment variables are required")
+	}
+	if err := sh.RunV("git", "tag", "-a", "$TAG", "-m", "$MSG"); err != nil {
 		return err
 	}
-	var ext string
-	for _, OS := range []string{"windows", "darwin", "linux"} {
-		if OS == "windows" {
-			ext = ".exe"
-		} else {
-			ext = ""
-		}
-		for _, ARCH := range []string{"amd64", "386"} {
-			log.Printf("running go build for GOOS=%s GOARCH=%s", OS, ARCH)
-			env := map[string]string{"GOOS": OS, "GOARCH": ARCH}
-			if err := sh.RunWith(env, "go", "build", "-o", "mage_"+OS+"_"+ARCH+ext, "--ldflags="+ldf); err != nil {
-				return err
-			}
-		}
+	if err := sh.RunV("git", "push", "origin", "$TAG"); err != nil {
+		return err
 	}
-	return err
+	defer func() {
+		if err != nil {
+			sh.RunV("git", "tag", "--delete", "$TAG")
+			sh.RunV("git", "push", "--delete", "origin", "$TAG")
+		}
+	}()
+	return sh.RunV("goreleaser")
 }
 
 func flags() (string, error) {
