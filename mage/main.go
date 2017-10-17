@@ -101,6 +101,7 @@ func ParseAndRun(dir string, stdout, stderr io.Writer, stdin io.Reader, args []s
 		log.Println(initFile, "created")
 		return 0
 	}
+
 	return Invoke(inv)
 }
 
@@ -183,6 +184,7 @@ func Invoke(inv Invocation) int {
 	for i := range files {
 		fnames = append(fnames, filepath.Base(files[i]))
 	}
+
 	info, err := parse.Package(inv.Dir, fnames)
 	if err != nil {
 		log.Println("Error:", err)
@@ -264,24 +266,8 @@ func Magefiles(dir string) ([]string, error) {
 
 // Compile uses the go tool to compile the files into an executable at path.
 func Compile(path string, stdout, stderr io.Writer, gofiles []string) error {
-	// we explicitly set GOROOT on the command because go build will fail
-	// without it.
-	goroot := os.Getenv("GOROOT")
-	if goroot == "" {
-		c := exec.Command("go", "env", "GOROOT")
-		c.Stderr = stderr
-		b, err := c.Output()
-		if err != nil {
-			return fmt.Errorf("failed to get GOROOT from 'go env': %v", err)
-		}
-		goroot = strings.TrimSpace(string(b))
-		if goroot == "" {
-			return errors.New("could not determine GOROOT")
-		}
-	}
-
 	c := exec.Command("go", append([]string{"build", "-o", path}, gofiles...)...)
-	c.Env = append(os.Environ(), "GOROOT="+goroot)
+	c.Env = os.Environ()
 	c.Stderr = stderr
 	c.Stdout = stdout
 	err := c.Run()

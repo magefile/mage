@@ -3,12 +3,14 @@ package parse
 import (
 	"fmt"
 	"go/ast"
+	"go/build"
 	"go/doc"
 	"go/parser"
 	"go/token"
 	"go/types"
 	"log"
 	"os"
+	"os/exec"
 	"strings"
 )
 
@@ -105,7 +107,7 @@ func getPackage(path string, files []string, fset *token.FileSet) (*ast.Package,
 
 	pkgs, err := parser.ParseDir(fset, path, filter, parser.ParseComments)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to parse directory: %v", err)
 	}
 
 	for name, pkg := range pkgs {
@@ -117,6 +119,21 @@ func getPackage(path string, files []string, fset *token.FileSet) (*ast.Package,
 }
 
 func makeInfo(dir string, fset *token.FileSet, files map[string]*ast.File) (types.Info, error) {
+	goroot := os.Getenv("GOROOT")
+	if goroot == "" {
+		c := exec.Command("go", "env", "GOROOT")
+		b, err := c.Output()
+		if err != nil {
+			return types.Info{}, fmt.Errorf("failed to get GOROOT from 'go env': %v", err)
+		}
+		goroot = strings.TrimSpace(string(b))
+		if goroot == "" {
+			return types.Info{}, fmt.Errorf("could not determine GOROOT")
+		}
+	}
+
+	build.Default.GOROOT = goroot
+
 	cfg := types.Config{
 		Importer: getImporter(fset),
 	}
@@ -133,7 +150,10 @@ func makeInfo(dir string, fset *token.FileSet, files map[string]*ast.File) (type
 	}
 
 	_, err := cfg.Check(dir, fset, fs, &info)
-	return info, err
+	if err != nil {
+		return info, fmt.Errorf("failed to check types in directory: %v", err)
+	}
+	return info, nil
 }
 
 // errorOrVoid filters the list of functions to only those that return only an
