@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"strconv"
 	"time"
 )
 
@@ -48,13 +47,13 @@ func GetContext() (context.Context, func()) {
 	}
 
 	if os.Getenv("MAGEFILE_TIMEOUT") != "" {
-		timeout, err := strconv.Atoi(os.Getenv("MAGEFILE_TIMEOUT"))
+		timeout, err := time.ParseDuration(os.Getenv("MAGEFILE_TIMEOUT"))
 		if err != nil {
-			fmt.Println("timeout must be a number >= 0")
+			fmt.Printf("timeout error: %v\n", err)
 			os.Exit(1)
 		}
 
-		ctx, ctxCancel = context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
+		ctx, ctxCancel = context.WithTimeout(context.Background(), timeout)
 	} else {
 		ctx = context.Background()
 		ctxCancel = func() {}

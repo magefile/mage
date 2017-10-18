@@ -333,7 +333,7 @@ func TestTimeout(t *testing.T) {
 		Stdout:  ioutil.Discard,
 		Stderr:  stderr,
 		Args:    []string{"timeout"},
-		Timeout: 1,
+		Timeout: "1ms",
 	}
 	code := Invoke(inv)
 	if code != 1 {
