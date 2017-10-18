@@ -128,7 +128,7 @@ func TestList(t *testing.T) {
 		"copyStdin",
 		"panics                Function that panics.",
 		"panicsErr             Error function that panics.",
-		"returnsError*         Synopsis for returns error.",
+		`returnsError*         Synopsis for "returns" error.`,
 		"returnsNonNilError    Returns a non-nil error.",
 		"returnsVoid",
 		"testVerbose",

@@ -15,8 +15,8 @@ func TestParse(t *testing.T) {
 		{
 			Name:     "ReturnsError",
 			IsError:  true,
-			Comment:  "Synopsis for returns error.\nAnd some more text.\n",
-			Synopsis: "Synopsis for returns error.",
+			Comment:  "Synopsis for \"returns\" error.\nAnd some more text.\n",
+			Synopsis: `Synopsis for "returns" error.`,
 		},
 		{
 			Name: "ReturnsVoid",

@@ -59,7 +59,7 @@ func main() {
 		switch strings.ToLower(os.Args[1]) {
 			{{range .Funcs}}case "{{lower .Name}}":
 				fmt.Print("mage {{lower .Name}}:\n\n")
-                fmt.Println(` + "`{{.Comment}}`" + `)
+                fmt.Println({{printf "%q" .Comment}})
 				return
 			{{end}}
 			default:
@@ -84,25 +84,18 @@ func main() {
 	}
 	for _, target := range os.Args[1:] {
 		switch strings.ToLower(target) {
-			{{range .Funcs -}}
-			case "{{lower .Name}}":
-				if os.Getenv("MAGEFILE_VERBOSE") != "" {
-					logger.Println("Running target:", "{{.Name}}")
-				}
-			{{if .IsError -}}
-				if err := {{.Name}}(); err != nil {
-					logger.Printf("Error: %v\n", err)
-					os.Exit(1)
-				}
-			{{else -}}
-				{{.Name}}()
-			{{- end}}
-		{{end}}
-			default:
-				// should be impossible since we check this above.
-				logger.Printf("Unknown target: %q\n", os.Args[1])
-				os.Exit(1)
+		{{range .Funcs }}
+		case "{{lower .Name}}":
+			if os.Getenv("MAGEFILE_VERBOSE") != "" {
+				logger.Println("Running target:", "{{.Name}}")
 			}
+			{{.TemplateString}}
+			handleError(logger, err)
+		{{- end}}
+		default:
+			// should be impossible since we check this above.
+			logger.Printf("Unknown target: %q\n", os.Args[1])
+			os.Exit(1)
 		}
 	}
 }
@@ -112,7 +105,7 @@ func list() error {
 	w := tabwriter.NewWriter(os.Stdout, 0, 4, 4, ' ', 0)
 	fmt.Println("Targets:")
 	{{- range .Funcs}}
-	fmt.Fprintln(w, "  {{lowerfirst .Name}}{{if eq .Name $default}}*{{end}}\t{{.Synopsis}}")
+	fmt.Fprintln(w, "  {{lowerfirst .Name}}{{if eq .Name $default}}*{{end}}\t" + {{printf "%q" .Synopsis}})
 	{{- end}}
 	err := w.Flush()
 	{{- if .Default}}

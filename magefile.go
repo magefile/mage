@@ -12,7 +12,7 @@ import (
 	"github.com/magefile/mage/sh"
 )
 
-// Runs go install for mage.  This generates the the version
+// Runs "go install" for mage.  This generates the version
 // info the binary.
 func Build() error {
 	ldf, err := flags()

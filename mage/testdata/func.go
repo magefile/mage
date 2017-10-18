@@ -8,7 +8,7 @@ import (
 	"os"
 )
 
-// Synopsis for returns error.
+// Synopsis for "returns" error.
 // And some more text.
 func ReturnsError() error {
 	fmt.Println("stuff")
