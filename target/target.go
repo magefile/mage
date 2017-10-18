@@ -1,4 +1,4 @@
-package mg
+package target
 
 import (
 	"os"
