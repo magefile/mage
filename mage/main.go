@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"strings"
 	"text/template"
+	"time"
 	"unicode"
 
 	"github.com/magefile/mage/build"
@@ -52,16 +53,17 @@ func Main() int {
 
 // Invocation contains the args for invoking a run of Mage.
 type Invocation struct {
-	Dir     string    // directory to read magefiles from
-	Force   bool      // forces recreation of the compiled binary
-	Verbose bool      // tells the magefile to print out log statements
-	List    bool      // tells the magefile to print out a list of targets
-	Help    bool      // tells the magefile to print out help for a specific target
-	Keep    bool      // tells mage to keep the generated main file after compiling
-	Stdout  io.Writer // writer to write stdout messages to
-	Stderr  io.Writer // writer to write stderr messages to
-	Stdin   io.Reader // reader to read stdin from
-	Args    []string  // args to pass to the compiled binary
+	Dir     string        // directory to read magefiles from
+	Force   bool          // forces recreation of the compiled binary
+	Verbose bool          // tells the magefile to print out log statements
+	List    bool          // tells the magefile to print out a list of targets
+	Help    bool          // tells the magefile to print out help for a specific target
+	Keep    bool          // tells mage to keep the generated main file after compiling
+	Timeout time.Duration // tells mage to set a timeout to running the targets
+	Stdout  io.Writer     // writer to write stdout messages to
+	Stderr  io.Writer     // writer to write stderr messages to
+	Stdin   io.Reader     // reader to read stdin from
+	Args    []string      // args to pass to the compiled binary
 }
 
 // ParseAndRun parses the command line, and then compiles and runs the mage
@@ -116,6 +118,7 @@ func Parse(stdout io.Writer, args []string) (inv Invocation, mageInit, showVersi
 	fs.BoolVar(&inv.List, "l", false, "list mage targets in this directory")
 	fs.BoolVar(&inv.Help, "h", false, "show this help")
 	fs.BoolVar(&mageInit, "init", false, "create a starting template if no mage files exist")
+	fs.DurationVar(&inv.Timeout, "t", 0, "timeout in duration parsable format")
 	fs.BoolVar(&inv.Keep, "keep", false, "keep intermediate mage files around after running")
 	fs.BoolVar(&showVersion, "version", false, "show version info for the mage binary")
 	fs.Usage = func() {
@@ -244,6 +247,7 @@ type data struct {
 	Funcs        []parse.Function
 	DefaultError bool
 	Default      string
+	DefaultFunc  parse.Function
 }
 
 // Magefiles returns the list of magefiles in dir.
@@ -289,8 +293,9 @@ func GenerateMainfile(path string, info *parse.PkgInfo) error {
 	defer f.Close()
 
 	data := data{
-		Funcs:   info.Funcs,
-		Default: info.DefaultName,
+		Funcs:       info.Funcs,
+		Default:     info.DefaultName,
+		DefaultFunc: info.DefaultFunc,
 	}
 
 	data.DefaultError = info.DefaultIsError
@@ -369,6 +374,9 @@ func RunCompiled(inv Invocation, exePath string) int {
 	}
 	if inv.Help {
 		c.Env = append(c.Env, "MAGEFILE_HELP=1")
+	}
+	if inv.Timeout > 0 {
+		c.Env = append(c.Env, fmt.Sprintf("MAGEFILE_TIMEOUT=%s", inv.Timeout.String()))
 	}
 	return sh.ExitStatus(c.Run())
 }

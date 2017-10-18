@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/magefile/mage/mg"
 )
@@ -31,7 +32,11 @@ func testmain(m *testing.M) int {
 		log.Fatal(err)
 	}
 	if err := os.Mkdir(dir, 0700); err != nil {
-		log.Fatal(err)
+		if os.IsExist(err) {
+			os.RemoveAll(dir)
+		} else {
+			log.Fatal(err)
+		}
 	}
 	defer os.RemoveAll(dir)
 	return m.Run()
@@ -118,21 +123,23 @@ func TestList(t *testing.T) {
 		t.Errorf("expected to exit with code 0, but got %v", code)
 	}
 	actual := stdout.String()
-	expected := `
-Targets:
-  copyStdin             
-  panics                Function that panics.
-  panicsErr             Error function that panics.
-  returnsError*         Synopsis for returns error.
-  returnsNonNilError    Returns a non-nil error.
-  returnsVoid           
-  testVerbose           
-
-* default target
-`[1:]
-	if actual != expected {
-		t.Fatalf("expected:\n%s\n\ngot:\n%s", expected, actual)
+	expecteds := []string{
+		"Targets:",
+		"copyStdin",
+		"panics                Function that panics.",
+		"panicsErr             Error function that panics.",
+		"returnsError*         Synopsis for returns error.",
+		"returnsNonNilError    Returns a non-nil error.",
+		"returnsVoid",
+		"testVerbose",
+		"* default target",
 	}
+	for _, expected := range expecteds {
+		if strings.Contains(actual, expected) == false {
+			t.Fatalf("expected:\n%s\n\nto be in:\n%s", expected, actual)
+		}
+	}
+
 }
 
 func TestNoArgNoDefaultList(t *testing.T) {
@@ -319,6 +326,27 @@ func TestParse(t *testing.T) {
 
 }
 
+// Test the timeout option
+func TestTimeout(t *testing.T) {
+	stderr := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:     "./testdata/context",
+		Stdout:  ioutil.Discard,
+		Stderr:  stderr,
+		Args:    []string{"timeout"},
+		Timeout: time.Duration(100 * time.Millisecond),
+	}
+	code := Invoke(inv)
+	if code != 1 {
+		t.Fatalf("expected 1, but got %v", code)
+	}
+	actual := stderr.String()
+	expected := "Error: context deadline exceeded\n"
+
+	if actual != expected {
+		t.Fatalf("expected %q, but got %q", expected, actual)
+	}
+}
 func TestParseHelp(t *testing.T) {
 	buf := &bytes.Buffer{}
 	_, _, _, err := Parse(buf, []string{"-h"})
@@ -335,5 +363,4 @@ func TestParseHelp(t *testing.T) {
 	if s != s2 {
 		t.Fatalf("expected -h and --help to produce same output, but got different.\n\n-h:\n%s\n\n--help:\n%s", s, s2)
 	}
-
 }

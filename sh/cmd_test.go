@@ -69,11 +69,4 @@ func TestAutoExpand(t *testing.T) {
 		t.Fatalf(`Expected "baz" but got %q`, s)
 	}
 
-	s, err = OutputWith(map[string]string{"MAGE_FOOBAR": "hi!"}, "echo", "$MAGE_FOOBAR")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if s != "hi!" {
-		t.Fatalf(`Expected "hi!" but got %q`, s)
-	}
 }

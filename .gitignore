@@ -13,6 +13,9 @@
 # Project-local glide cache, RE: https://github.com/Masterminds/glide/issues/736
 .glide/
 
+# Magefile output
+mage_output_file.go
+
 # VScode
 .vscode
 

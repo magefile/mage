@@ -3,8 +3,8 @@
 package main
 
 import (
+	"context"
 	"fmt"
-
 	"github.com/magefile/mage/mg"
 )
 
@@ -22,3 +22,11 @@ func ReturnsVoid() {
 }
 
 func f() {}
+
+func TakesContextReturnsVoid(ctx context.Context) {
+
+}
+
+func TakesContextReturnsError(ctx context.Context) error {
+	return nil
+}
