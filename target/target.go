@@ -37,22 +37,28 @@ func Dir(dst string, sources ...string) (bool, error) {
 	}
 	srcTime := stat.ModTime()
 	if stat.IsDir() {
-		srcTime = calDirModTimeRecursive(stat)
+		srcTime, err = calDirModTimeRecursive(stat)
+		if err != nil {
+			return false, err
+		}
 	}
 	dt, err := loadTargets(sources)
 	if err != nil {
 		return false, err
 	}
-	t := dt.modTimeDir()
+	t, err := dt.modTimeDir()
+	if err != nil {
+		return false, err
+	}
 	if t.After(srcTime) {
 		return true, nil
 	}
 	return false, nil
 }
 
-func calDirModTimeRecursive(dir os.FileInfo) time.Time {
+func calDirModTimeRecursive(dir os.FileInfo) (time.Time, error) {
 	t := dir.ModTime()
-	filepath.Walk(dir.Name(), func(path string, info os.FileInfo, err error) error {
+	ferr := filepath.Walk(dir.Name(), func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -61,7 +67,10 @@ func calDirModTimeRecursive(dir os.FileInfo) time.Time {
 		}
 		return nil
 	})
-	return t
+	if ferr != nil {
+		return time.Time{}, ferr
+	}
+	return t, nil
 }
 
 type depTargets struct {
@@ -92,18 +101,22 @@ func (d *depTargets) modTime() time.Time {
 	return d.latest
 }
 
-func (d *depTargets) modTimeDir() time.Time {
+func (d *depTargets) modTimeDir() (time.Time, error) {
 	if !d.hasdir {
-		return d.latest
+		return d.latest, nil
 	}
+	var err error
 	for _, i := range d.src {
 		t := i.ModTime()
 		if i.IsDir() {
-			t = calDirModTimeRecursive(i)
+			t, err = calDirModTimeRecursive(i)
+			if err != nil {
+				return time.Time{}, err
+			}
 		}
 		if t.After(d.latest) {
 			d.latest = t
 		}
 	}
-	return d.latest
+	return d.latest, nil
 }
