@@ -103,6 +103,7 @@ func ParseAndRun(dir string, stdout, stderr io.Writer, stdin io.Reader, args []s
 		log.Println(initFile, "created")
 		return 0
 	}
+
 	return Invoke(inv)
 }
 
@@ -186,6 +187,7 @@ func Invoke(inv Invocation) int {
 	for i := range files {
 		fnames = append(fnames, filepath.Base(files[i]))
 	}
+
 	info, err := parse.Package(inv.Dir, fnames)
 	if err != nil {
 		log.Println("Error:", err)
@@ -216,6 +218,13 @@ func Invoke(inv Invocation) int {
 		log.Println("Error:", err)
 		return 1
 	}
+	if !inv.Keep {
+		// remove this file before we run the compiled version, in case the
+		// compiled file screws things up.  Yes this doubles up with the above
+		// defer, that's ok.
+		os.Remove(main)
+	}
+
 	return RunCompiled(inv, exePath)
 }
 
