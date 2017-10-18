@@ -33,7 +33,7 @@ func testmain(m *testing.M) int {
 	}
 	if err := os.Mkdir(dir, 0700); err != nil {
 		if os.IsExist(err) {
-			os.RemoveAll(fmt.Sprintf("%s", dir))
+			os.RemoveAll(dir)
 		} else {
 			log.Fatal(err)
 		}

@@ -367,7 +367,7 @@ func RunCompiled(inv Invocation, exePath string) int {
 		c.Env = append(c.Env, "MAGEFILE_HELP=1")
 	}
 	if inv.Timeout > 0 {
-		c.Env = append(c.Env, fmt.Sprintf("MAGEFILE_TIMEOUT=%dns", inv.Timeout))
+		c.Env = append(c.Env, fmt.Sprintf("MAGEFILE_TIMEOUT=%s", inv.Timeout.String()))
 	}
 	return sh.ExitStatus(c.Run())
 }
