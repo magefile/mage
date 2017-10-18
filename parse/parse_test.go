@@ -11,24 +11,48 @@ func TestParse(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expected := PkgInfo{
-		Funcs: []Function{
-			{
-				Name:     "ReturnsError",
-				IsError:  true,
-				Comment:  "Synopsis for returns error.\nAnd some more text.\n",
-				Synopsis: "Synopsis for returns error.",
-			},
-			{
-				Name: "ReturnsVoid",
-			},
+	expected := []Function{
+		{
+			Name:     "ReturnsNilError",
+			IsError:  true,
+			Comment:  "Synopsis for \"returns\" error.\nAnd some more text.\n",
+			Synopsis: `Synopsis for "returns" error.`,
 		},
-		DefaultIsError: true,
-		DefaultName:    "ReturnsError",
+		{
+			Name: "ReturnsVoid",
+		},
+		{
+			Name:      "TakesContextReturnsError",
+			IsError:   true,
+			IsContext: true,
+		},
+		{
+			Name:      "TakesContextReturnsVoid",
+			IsError:   false,
+			IsContext: true,
+		},
 	}
 
-	// TODO: Don't use DeepEqual, you lazy git!
-	if !reflect.DeepEqual(expected, *info) {
-		t.Fatalf("expected:\n%#v\n\ngot:\n%#v", expected, *info)
+	// DefaultIsError
+	if info.DefaultIsError != true {
+		t.Fatalf("expected DefaultIsError to be true")
+	}
+
+	// DefaultName
+	if info.DefaultName != "ReturnsNilError" {
+		t.Fatalf("expected DefaultName to be ReturnsNilError")
+	}
+
+	for _, fn := range expected {
+		found := false
+		for _, infoFn := range info.Funcs {
+			if reflect.DeepEqual(fn, infoFn) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Fatalf("expected:\n%#v\n\nto be in:\n%#v", fn, info.Funcs)
+		}
 	}
 }

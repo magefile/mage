@@ -9,8 +9,7 @@ import (
 	"github.com/magefile/mage/mg"
 )
 
-// This should work as a default - even if it's in a different file
-var Default = ReturnsNilError
+var Default = SomePig
 
 // this should not be a target because it returns a string
 func ReturnsString() string {
@@ -22,7 +21,8 @@ func TestVerbose() {
 	log.Println("hi!")
 }
 
-func ReturnsVoid() {
+// This is the synopsis for SomePig.  There's more data that won't show up.
+func SomePig() {
 	mg.Deps(f)
 }
 

@@ -3,26 +3,72 @@ package parse
 import (
 	"fmt"
 	"go/ast"
+	"go/build"
 	"go/doc"
 	"go/parser"
 	"go/token"
 	"go/types"
 	"log"
 	"os"
+	"os/exec"
 	"strings"
+
+	mgTypes "github.com/magefile/mage/types"
 )
 
 type PkgInfo struct {
-	Funcs          []Function
-	DefaultIsError bool
-	DefaultName    string
+	Funcs            []Function
+	DefaultIsError   bool
+	DefaultIsContext bool
+	DefaultName      string
+	DefaultFunc      Function
 }
 
+// Function represented a job function from a mage file
 type Function struct {
-	Name     string
-	IsError  bool
-	Synopsis string
-	Comment  string
+	Name      string
+	IsError   bool
+	IsContext bool
+	Synopsis  string
+	Comment   string
+}
+
+// TemplateString returns code for the template switch to run the target.
+// It wraps each target call to match the func(context.Context) error that
+// runTarget requires.
+func (f Function) TemplateString() string {
+	if f.IsContext && f.IsError {
+		out := `wrapFn := func(ctx context.Context) error {
+				return %s(ctx)
+			}
+			err := runTarget(wrapFn)`
+		return fmt.Sprintf(out, f.Name)
+	}
+	if f.IsContext && !f.IsError {
+		out := `wrapFn := func(ctx context.Context) error {
+				%s(ctx)
+				return nil
+			}
+			err := runTarget(wrapFn)`
+		return fmt.Sprintf(out, f.Name)
+	}
+	if !f.IsContext && f.IsError {
+		out := `wrapFn := func(ctx context.Context) error {
+				return %s()
+			}
+			err := runTarget(wrapFn)`
+		return fmt.Sprintf(out, f.Name)
+	}
+	if !f.IsContext && !f.IsError {
+		out := `wrapFn := func(ctx context.Context) error {
+				%s()
+				return nil
+			}
+			err := runTarget(wrapFn)`
+		return fmt.Sprintf(out, f.Name)
+	}
+	return `fmt.Printf("Error formatting job code\n")
+	os.Exit(1)`
 }
 
 // Package parses a package
@@ -51,12 +97,13 @@ func Package(path string, files []string) (*PkgInfo, error) {
 			// skip non-exported functions
 			continue
 		}
-		if typ := voidOrError(f.Decl.Type, info); typ != InvalidType {
+		if typ := voidOrError(f.Decl.Type, info); typ != mgTypes.InvalidType {
 			pi.Funcs = append(pi.Funcs, Function{
-				Name:     f.Name,
-				Comment:  f.Doc,
-				Synopsis: doc.Synopsis(f.Doc),
-				IsError:  voidOrError(f.Decl.Type, info) == ErrorType,
+				Name:      f.Name,
+				Comment:   f.Doc,
+				Synopsis:  doc.Synopsis(f.Doc),
+				IsError:   typ == mgTypes.ErrorType || typ == mgTypes.ContextErrorType,
+				IsContext: typ == mgTypes.ContextVoidType || typ == mgTypes.ContextErrorType,
 			})
 		}
 	}
@@ -84,6 +131,8 @@ func setDefault(p *doc.Package, pi *PkgInfo, info types.Info) {
 				if f.Name == id.Name {
 					pi.DefaultName = f.Name
 					pi.DefaultIsError = f.IsError
+					pi.DefaultIsContext = f.IsContext
+					pi.DefaultFunc = f
 					return
 				}
 			}
@@ -105,7 +154,7 @@ func getPackage(path string, files []string, fset *token.FileSet) (*ast.Package,
 
 	pkgs, err := parser.ParseDir(fset, path, filter, parser.ParseComments)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to parse directory: %v", err)
 	}
 
 	for name, pkg := range pkgs {
@@ -117,6 +166,21 @@ func getPackage(path string, files []string, fset *token.FileSet) (*ast.Package,
 }
 
 func makeInfo(dir string, fset *token.FileSet, files map[string]*ast.File) (types.Info, error) {
+	goroot := os.Getenv("GOROOT")
+	if goroot == "" {
+		c := exec.Command("go", "env", "GOROOT")
+		b, err := c.Output()
+		if err != nil {
+			return types.Info{}, fmt.Errorf("failed to get GOROOT from 'go env': %v", err)
+		}
+		goroot = strings.TrimSpace(string(b))
+		if goroot == "" {
+			return types.Info{}, fmt.Errorf("could not determine GOROOT")
+		}
+	}
+
+	build.Default.GOROOT = goroot
+
 	cfg := types.Config{
 		Importer: getImporter(fset),
 	}
@@ -133,7 +197,10 @@ func makeInfo(dir string, fset *token.FileSet, files map[string]*ast.File) (type
 	}
 
 	_, err := cfg.Check(dir, fset, fs, &info)
-	return info, err
+	if err != nil {
+		return info, fmt.Errorf("failed to check types in directory: %v", err)
+	}
+	return info, nil
 }
 
 // errorOrVoid filters the list of functions to only those that return only an
@@ -142,7 +209,7 @@ func errorOrVoid(fns []*ast.FuncDecl, info types.Info) []*ast.FuncDecl {
 	fds := []*ast.FuncDecl{}
 
 	for _, fn := range fns {
-		if voidOrError(fn.Type, info) != InvalidType {
+		if voidOrError(fn.Type, info) != mgTypes.InvalidType {
 			fds = append(fds, fn)
 		}
 	}
@@ -157,33 +224,60 @@ const (
 	InvalidType FuncType = iota
 	VoidType
 	ErrorType
+	ContextVoidType
+	ContextErrorType
 )
 
-func voidOrError(ft *ast.FuncType, info types.Info) FuncType {
-	// look for functions with no params
-	if ft.Params.NumFields() > 0 {
-		return InvalidType
+func hasContextParam(ft *ast.FuncType, info types.Info) bool {
+	if ft.Params.NumFields() == 1 {
+		ret := ft.Params.List[0]
+		t := info.TypeOf(ret.Type)
+		if t != nil && t.String() == "context.Context" {
+			return true
+		}
 	}
+	return false
+}
 
-	// look for functions with 0 or 1 return values
+func hasVoidReturn(ft *ast.FuncType, info types.Info) bool {
 	res := ft.Results
-	if res.NumFields() > 1 {
-		return InvalidType
-	}
-	// 0 return value is ok
 	if res.NumFields() == 0 {
-		return VoidType
+		return true
 	}
-	// if 1 return value, look for those that return an error
-	ret := res.List[0]
+	return false
+}
 
-	// handle (a, b, c int)
-	if len(ret.Names) > 1 {
-		return InvalidType
+func hasErrorReturn(ft *ast.FuncType, info types.Info) bool {
+	res := ft.Results
+	if res.NumFields() == 1 {
+		ret := res.List[0]
+		if len(ret.Names) > 1 {
+			return false
+		}
+		t := info.TypeOf(ret.Type)
+		if t != nil && t.String() == "error" {
+			return true
+		}
 	}
-	t := info.TypeOf(ret.Type)
-	if t != nil && t.String() == "error" {
-		return ErrorType
+	return false
+}
+
+func voidOrError(ft *ast.FuncType, info types.Info) mgTypes.FuncType {
+	if hasContextParam(ft, info) {
+		if hasVoidReturn(ft, info) {
+			return mgTypes.ContextVoidType
+		}
+		if hasErrorReturn(ft, info) {
+			return mgTypes.ContextErrorType
+		}
 	}
-	return InvalidType
+	if ft.Params.NumFields() == 0 {
+		if hasVoidReturn(ft, info) {
+			return mgTypes.VoidType
+		}
+		if hasErrorReturn(ft, info) {
+			return mgTypes.ErrorType
+		}
+	}
+	return mgTypes.InvalidType
 }

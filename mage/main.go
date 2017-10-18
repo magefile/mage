@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"strings"
 	"text/template"
+	"time"
 	"unicode"
 
 	"github.com/magefile/mage/build"
@@ -47,30 +48,33 @@ var (
 // function to allow it to be used from other programs, specifically so you can
 // go run a simple file that run's mage's Main.
 func Main() int {
-	return ParseAndRun(".", os.Stdout, os.Stderr, os.Args[1:])
+	return ParseAndRun(".", os.Stdout, os.Stderr, os.Stdin, os.Args[1:])
 }
 
 // Invocation contains the args for invoking a run of Mage.
 type Invocation struct {
-	Dir     string    // directory to read magefiles from
-	Force   bool      // forces recreation of the compiled binary
-	Verbose bool      // tells the magefile to print out log statements
-	List    bool      // tells the magefile to print out a list of targets
-	Help    bool      // tells the magefile to print out help for a specific target
-	Keep    bool      // tells mage to keep the generated main file after compiling
-	Stdout  io.Writer // writer to write stdout messages to
-	Stderr  io.Writer // writer to write stderr messages to
-	Args    []string  // args to pass to the compiled binary
+	Dir     string        // directory to read magefiles from
+	Force   bool          // forces recreation of the compiled binary
+	Verbose bool          // tells the magefile to print out log statements
+	List    bool          // tells the magefile to print out a list of targets
+	Help    bool          // tells the magefile to print out help for a specific target
+	Keep    bool          // tells mage to keep the generated main file after compiling
+	Timeout time.Duration // tells mage to set a timeout to running the targets
+	Stdout  io.Writer     // writer to write stdout messages to
+	Stderr  io.Writer     // writer to write stderr messages to
+	Stdin   io.Reader     // reader to read stdin from
+	Args    []string      // args to pass to the compiled binary
 }
 
 // ParseAndRun parses the command line, and then compiles and runs the mage
 // files in the given directory with the given args (do not include the command
 // name in the args).
-func ParseAndRun(dir string, stdout, stderr io.Writer, args []string) int {
+func ParseAndRun(dir string, stdout, stderr io.Writer, stdin io.Reader, args []string) int {
 	log := log.New(stderr, "", 0)
 	inv, mageInit, showVersion, err := Parse(stdout, args)
 	inv.Dir = dir
 	inv.Stderr = stderr
+	inv.Stdin = stdin
 	if err == flag.ErrHelp {
 		return 0
 	}
@@ -99,6 +103,7 @@ func ParseAndRun(dir string, stdout, stderr io.Writer, args []string) int {
 		log.Println(initFile, "created")
 		return 0
 	}
+
 	return Invoke(inv)
 }
 
@@ -113,6 +118,7 @@ func Parse(stdout io.Writer, args []string) (inv Invocation, mageInit, showVersi
 	fs.BoolVar(&inv.List, "l", false, "list mage targets in this directory")
 	fs.BoolVar(&inv.Help, "h", false, "show this help")
 	fs.BoolVar(&mageInit, "init", false, "create a starting template if no mage files exist")
+	fs.DurationVar(&inv.Timeout, "t", 0, "timeout in duration parsable format")
 	fs.BoolVar(&inv.Keep, "keep", false, "keep intermediate mage files around after running")
 	fs.BoolVar(&showVersion, "version", false, "show version info for the mage binary")
 	fs.Usage = func() {
@@ -122,7 +128,7 @@ func Parse(stdout io.Writer, args []string) (inv Invocation, mageInit, showVersi
 	}
 	err = fs.Parse(args)
 	if err == flag.ErrHelp {
-		fs.Usage()
+		// parse will have already called fs.Usage()
 		return inv, mageInit, showVersion, err
 	}
 	if err == nil && inv.Help && len(fs.Args()) == 0 {
@@ -139,19 +145,32 @@ func Parse(stdout io.Writer, args []string) (inv Invocation, mageInit, showVersi
 			inv.Verbose = envVerbose
 		}
 	}
+	numFlags := 0
+	if inv.Help {
+		numFlags++
+	}
+	if mageInit {
+		numFlags++
+	}
+	if showVersion {
+		numFlags++
+	}
+
+	if numFlags > 1 {
+		return inv, mageInit, showVersion, errors.New("-h, -init, and -version cannot be used simultaneously")
+	}
 
 	inv.Args = fs.Args()
+	if inv.Help && len(inv.Args) > 1 {
+		return inv, mageInit, showVersion, errors.New("-h can only show help for a single target")
+	}
+
 	return inv, mageInit, showVersion, err
 }
 
 // Invoke runs Mage with the given arguments.
 func Invoke(inv Invocation) int {
 	log := log.New(inv.Stderr, "", 0)
-
-	if len(inv.Args) > 1 {
-		log.Printf("Error: args after the target (%s) are not allowed: %v", inv.Args[0], strings.Join(inv.Args[1:], " "))
-		return 2
-	}
 
 	files, err := Magefiles(inv.Dir)
 	if err != nil {
@@ -182,6 +201,7 @@ func Invoke(inv Invocation) int {
 	for i := range files {
 		fnames = append(fnames, filepath.Base(files[i]))
 	}
+
 	info, err := parse.Package(inv.Dir, fnames)
 	if err != nil {
 		log.Println("Error:", err)
@@ -212,6 +232,13 @@ func Invoke(inv Invocation) int {
 		log.Println("Error:", err)
 		return 1
 	}
+	if !inv.Keep {
+		// remove this file before we run the compiled version, in case the
+		// compiled file screws things up.  Yes this doubles up with the above
+		// defer, that's ok.
+		os.Remove(main)
+	}
+
 	return RunCompiled(inv, exePath)
 }
 
@@ -234,6 +261,7 @@ type data struct {
 	Funcs        []parse.Function
 	DefaultError bool
 	Default      string
+	DefaultFunc  parse.Function
 }
 
 // Magefiles returns the list of magefiles in dir.
@@ -279,8 +307,9 @@ func GenerateMainfile(path string, info *parse.PkgInfo) error {
 	defer f.Close()
 
 	data := data{
-		Funcs:   info.Funcs,
-		Default: info.DefaultName,
+		Funcs:       info.Funcs,
+		Default:     info.DefaultName,
+		DefaultFunc: info.DefaultFunc,
 	}
 
 	data.DefaultError = info.DefaultIsError
@@ -349,6 +378,7 @@ func RunCompiled(inv Invocation, exePath string) int {
 	c := exec.Command(exePath, inv.Args...)
 	c.Stderr = inv.Stderr
 	c.Stdout = inv.Stdout
+	c.Stdin = inv.Stdin
 	c.Env = os.Environ()
 	if inv.Verbose {
 		c.Env = append(c.Env, "MAGEFILE_VERBOSE=1")
@@ -358,6 +388,9 @@ func RunCompiled(inv Invocation, exePath string) int {
 	}
 	if inv.Help {
 		c.Env = append(c.Env, "MAGEFILE_HELP=1")
+	}
+	if inv.Timeout > 0 {
+		c.Env = append(c.Env, fmt.Sprintf("MAGEFILE_TIMEOUT=%s", inv.Timeout.String()))
 	}
 	return sh.ExitStatus(c.Run())
 }

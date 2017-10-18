@@ -29,7 +29,7 @@ func f() {
 }
 
 func g() {
-    mg.Deps(g)
+    mg.Deps(h)
     fmt.Println("g running")
 }
 
