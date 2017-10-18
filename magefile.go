@@ -12,8 +12,7 @@ import (
 	"github.com/magefile/mage/sh"
 )
 
-// Runs "go install" for mage.  This generates the version
-// info the binary.
+// Runs "go install" for mage.  This generates the version info the binary.
 func Build() error {
 	ldf, err := flags()
 	if err != nil {
@@ -43,6 +42,11 @@ func Release() (err error) {
 		}
 	}()
 	return sh.RunV("goreleaser")
+}
+
+// Remove the temporarily generated files from Release.
+func Clean() error {
+	return sh.Rm("dist")
 }
 
 func flags() (string, error) {
