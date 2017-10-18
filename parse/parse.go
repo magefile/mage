@@ -31,6 +31,9 @@ type Function struct {
 	Comment   string
 }
 
+// TemplateString returns code for the template switch to run the target.
+// It wraps each target call to match the func(context.Context) error that
+// runTarget requires.
 func (f Function) TemplateString() string {
 	if f.IsContext && f.IsError {
 		out := `wrapFn := func(ctx context.Context) error {

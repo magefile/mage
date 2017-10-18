@@ -2,7 +2,6 @@ package parse
 
 import (
 	"reflect"
-	"strings"
 	"testing"
 )
 
@@ -40,7 +39,7 @@ func TestParse(t *testing.T) {
 	}
 
 	// DefaultName
-	if strings.Compare(info.DefaultName, "ReturnsError") != 0 {
+	if info.DefaultName != "ReturnsError" {
 		t.Fatalf("expected DefaultName to be ReturnsError")
 	}
 

@@ -11,9 +11,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
-
 	"strings"
-
 	"text/tabwriter"
 
 	"github.com/magefile/mage/mg"
@@ -110,7 +108,7 @@ func handleError(logger *log.Logger, err interface{}) {
 
 func runTarget(fn func(context.Context) error) interface{} {
 	var err interface{}
-	ctx, cancel := mg.GetContext()
+	ctx, cancel := mg.Context()
 	d := make(chan interface{})
 	go func() {
 		defer func() {

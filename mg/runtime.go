@@ -41,7 +41,7 @@ func CacheDir() string {
 var ctx context.Context
 var ctxCancel func()
 
-func GetContext() (context.Context, func()) {
+func Context() (context.Context, func()) {
 	if ctx != nil {
 		return ctx, ctxCancel
 	}

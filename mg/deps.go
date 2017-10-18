@@ -84,7 +84,7 @@ func DepsWithContext(ctx context.Context, fns ...interface{}) {
 
 // Deps runs the given functions with the default runtime context
 func Deps(fns ...interface{}) {
-	ctx, _ := GetContext()
+	ctx, _ := Context()
 	DepsWithContext(ctx, fns...)
 }
 
@@ -115,6 +115,7 @@ func addDep(ctx context.Context, f interface{}) *onceFun {
 	case func(context.Context) error:
 		fn = f
 	default:
+		// should be impossible, since we already checked this
 		panic("attempted to add a dep that did not match required type")
 	}
 

@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/magefile/mage/mg"
 )
@@ -32,7 +33,7 @@ func testmain(m *testing.M) int {
 	}
 	if err := os.Mkdir(dir, 0700); err != nil {
 		if os.IsExist(err) {
-			os.RemoveAll(fmt.Sprintf("%s/*", dir))
+			os.RemoveAll(fmt.Sprintf("%s", dir))
 		} else {
 			log.Fatal(err)
 		}
@@ -333,7 +334,7 @@ func TestTimeout(t *testing.T) {
 		Stdout:  ioutil.Discard,
 		Stderr:  stderr,
 		Args:    []string{"timeout"},
-		Timeout: "1ms",
+		Timeout: time.Duration(100 * time.Millisecond),
 	}
 	code := Invoke(inv)
 	if code != 1 {

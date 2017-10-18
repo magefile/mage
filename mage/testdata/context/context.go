@@ -18,7 +18,7 @@ func TakesContextNoError(ctx context.Context) {
 }
 
 func Timeout(ctx context.Context) {
-	time.Sleep(2 * time.Second)
+	time.Sleep(200 * time.Millisecond)
 }
 
 func TakesContextWithError(ctx context.Context) error {
