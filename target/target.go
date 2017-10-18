@@ -6,15 +6,16 @@ import (
 	"time"
 )
 
-// Path compares the ModTime for src with targets and returns true if any
-// target received most recent changes than src.
-func Path(src string, targets ...string) (bool, error) {
-	stat, err := os.Stat(src)
+// Path reports if any of the sources have been modified more recently
+// than the destination.  Path does not descend into directories, it literally
+// just checks the modtime of each thing you pass to it.
+func Path(dst string, sources ...string) (bool, error) {
+	stat, err := os.Stat(dst)
 	if err != nil {
 		return false, err
 	}
 	srcTime := stat.ModTime()
-	dt, err := loadTargets(targets)
+	dt, err := loadTargets(sources)
 	if err != nil {
 		return false, err
 	}
