@@ -27,4 +27,4 @@ baz`.  Targets will be run serially, from left to right (so in thise case, foo,
 then once foo is done, bar, then once bar is done, baz).  Dependencies run using
 mg.Deps will still only run once per mage execution, so if each of the targets
 depend on the same function, that function will only be run once for all
-targets.
+targets.  If any target panics or returns an error, no later targets will be run.
