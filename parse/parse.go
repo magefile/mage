@@ -39,36 +39,32 @@ type Function struct {
 func (f Function) TemplateString() string {
 	if f.IsContext && f.IsError {
 		out := `wrapFn := func(ctx context.Context) error {
-			return %s(ctx)
-		}
-		err := runTarget(wrapFn)
-		`
+				return %s(ctx)
+			}
+			err := runTarget(wrapFn)`
 		return fmt.Sprintf(out, f.Name)
 	}
 	if f.IsContext && !f.IsError {
 		out := `wrapFn := func(ctx context.Context) error {
-			%s(ctx)
-			return nil
-		}
-		err := runTarget(wrapFn)
-		`
+				%s(ctx)
+				return nil
+			}
+			err := runTarget(wrapFn)`
 		return fmt.Sprintf(out, f.Name)
 	}
 	if !f.IsContext && f.IsError {
 		out := `wrapFn := func(ctx context.Context) error {
-			return %s()
-		}
-		err := runTarget(wrapFn)
-		`
+				return %s()
+			}
+			err := runTarget(wrapFn)`
 		return fmt.Sprintf(out, f.Name)
 	}
 	if !f.IsContext && !f.IsError {
 		out := `wrapFn := func(ctx context.Context) error {
-			%s()
-			return nil
-		}
-		err := runTarget(wrapFn)
-		`
+				%s()
+				return nil
+			}
+			err := runTarget(wrapFn)`
 		return fmt.Sprintf(out, f.Name)
 	}
 	return `fmt.Printf("Error formatting job code\n")

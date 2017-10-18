@@ -112,7 +112,7 @@ func TestVerboseEnv(t *testing.T) {
 func TestList(t *testing.T) {
 	stdout := &bytes.Buffer{}
 	inv := Invocation{
-		Dir:    "./testdata",
+		Dir:    "./testdata/list",
 		Stdout: stdout,
 		Stderr: ioutil.Discard,
 		List:   true,
@@ -123,23 +123,19 @@ func TestList(t *testing.T) {
 		t.Errorf("expected to exit with code 0, but got %v", code)
 	}
 	actual := stdout.String()
-	expecteds := []string{
-		"Targets:",
-		"copyStdin",
-		"panics                Function that panics.",
-		"panicsErr             Error function that panics.",
-		"returnsError*         Synopsis for returns error.",
-		"returnsNonNilError    Returns a non-nil error.",
-		"returnsVoid",
-		"testVerbose",
-		"* default target",
-	}
-	for _, expected := range expecteds {
-		if strings.Contains(actual, expected) == false {
-			t.Fatalf("expected:\n%s\n\nto be in:\n%s", expected, actual)
-		}
-	}
+	expected := `
+Targets:
+  somePig*       This is the synopsis for SomePig.
+  testVerbose    
 
+* default target
+`[1:]
+
+	if actual != expected {
+		t.Logf("expected: %q", expected)
+		t.Logf("  actual: %q", actual)
+		t.Fatalf("expected:\n%v\n\ngot:\n%v", expected, actual)
+	}
 }
 
 func TestNoArgNoDefaultList(t *testing.T) {
@@ -285,24 +281,78 @@ func TestKeepFlag(t *testing.T) {
 	}
 }
 
-func TestStopMultipleTargets(t *testing.T) {
-	stderr := &bytes.Buffer{}
+func TestMultipleTargets(t *testing.T) {
+	var stderr, stdout bytes.Buffer
+	inv := Invocation{
+		Dir:     "./testdata",
+		Stdout:  &stdout,
+		Stderr:  &stderr,
+		Args:    []string{"TestVerbose", "ReturnsNilError"},
+		Verbose: true,
+	}
+	code := Invoke(inv)
+	if code != 0 {
+		t.Errorf("expected 0, but got %v", code)
+	}
+	actual := stderr.String()
+	expected := "Running target: TestVerbose\nhi!\nRunning target: ReturnsNilError\n"
+	if actual != expected {
+		t.Errorf("expected %q, but got %q", expected, actual)
+	}
+	actual = stdout.String()
+	expected = "stuff\n"
+	if actual != expected {
+		t.Errorf("expected %q, but got %q", expected, actual)
+	}
+}
+
+func TestFirstTargetFails(t *testing.T) {
+	var stderr, stdout bytes.Buffer
+	inv := Invocation{
+		Dir:     "./testdata",
+		Stdout:  &stdout,
+		Stderr:  &stderr,
+		Args:    []string{"ReturnsNonNilError", "ReturnsNilError"},
+		Verbose: true,
+	}
+	code := Invoke(inv)
+	if code != 1 {
+		t.Errorf("expected 1, but got %v", code)
+	}
+	actual := stderr.String()
+	expected := "Running target: ReturnsNonNilError\nError: bang!\n"
+	if actual != expected {
+		t.Errorf("expected %q, but got %q", expected, actual)
+	}
+	actual = stdout.String()
+	expected = ""
+	if actual != expected {
+		t.Errorf("expected %q, but got %q", expected, actual)
+	}
+}
+
+func TestBadSecondTargets(t *testing.T) {
+	var stderr, stdout bytes.Buffer
 	inv := Invocation{
 		Dir:    "./testdata",
-		Stdout: ioutil.Discard,
-		Stderr: stderr,
-		Args:   []string{"panicserr", "testVerbose"},
+		Stdout: &stdout,
+		Stderr: &stderr,
+		Args:   []string{"TestVerbose", "NotGonnaWork"},
 	}
 	code := Invoke(inv)
 	if code != 2 {
-		t.Fatalf("expected 1, but got %v", code)
+		t.Errorf("expected 0, but got %v", code)
 	}
 	actual := stderr.String()
-	expected := "Error: args after the target (panicserr) are not allowed: testVerbose\n"
+	expected := "Unknown target specified: NotGonnaWork\n"
 	if actual != expected {
-		t.Fatalf("expected %q, but got %q", expected, actual)
+		t.Errorf("expected %q, but got %q", expected, actual)
 	}
-
+	actual = stdout.String()
+	expected = ""
+	if actual != expected {
+		t.Errorf("expected %q, but got %q", expected, actual)
+	}
 }
 
 func TestParse(t *testing.T) {

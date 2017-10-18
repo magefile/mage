@@ -4,9 +4,9 @@ package main
 
 import "fmt"
 
-// Synopsis for returns error.
+// Synopsis for "returns" error.
 // And some more text.
-func ReturnsError() error {
+func ReturnsNilError() error {
 	fmt.Println("stuff")
 	return nil
 }

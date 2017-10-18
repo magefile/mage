@@ -145,18 +145,32 @@ func Parse(stdout io.Writer, args []string) (inv Invocation, mageInit, showVersi
 			inv.Verbose = envVerbose
 		}
 	}
+	numFlags := 0
+	if inv.Help {
+		numFlags++
+	}
+	if mageInit {
+		numFlags++
+	}
+	if showVersion {
+		numFlags++
+	}
+
+	if numFlags > 1 {
+		return inv, mageInit, showVersion, errors.New("-h, -init, and -version cannot be used simultaneously")
+	}
 
 	inv.Args = fs.Args()
+	if inv.Help && len(inv.Args) > 1 {
+		return inv, mageInit, showVersion, errors.New("-h can only show help for a single target")
+	}
+
 	return inv, mageInit, showVersion, err
 }
 
 // Invoke runs Mage with the given arguments.
 func Invoke(inv Invocation) int {
 	log := log.New(inv.Stderr, "", 0)
-	if len(inv.Args) > 1 {
-		log.Printf("Error: args after the target (%s) are not allowed: %v", inv.Args[0], strings.Join(inv.Args[1:], " "))
-		return 2
-	}
 
 	files, err := Magefiles(inv.Dir)
 	if err != nil {
