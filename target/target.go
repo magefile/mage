@@ -25,12 +25,12 @@ func Path(src string, targets ...string) (bool, error) {
 	return false, nil
 }
 
-// Dir compares the ModTime for src with targets and returns true if any
-// target received most recent changes than src.
-//
-// For directories this checks files recursively.
-func Dir(src string, targets ...string) (bool, error) {
-	stat, err := os.Stat(src)
+// Dir reports whether any of the sources have been modified
+// more recently than the destination.  If a source or destination is
+// a directory, modtimes of files under those directories are compared
+// instead.
+func Dir(dst string, sources ...string) (bool, error) {
+	stat, err := os.Stat(dst)
 	if err != nil {
 		return false, err
 	}
@@ -38,7 +38,7 @@ func Dir(src string, targets ...string) (bool, error) {
 	if stat.IsDir() {
 		srcTime = calDirModTimeRecursive(stat)
 	}
-	dt, err := loadTargets(targets)
+	dt, err := loadTargets(sources)
 	if err != nil {
 		return false, err
 	}
