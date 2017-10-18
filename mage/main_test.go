@@ -291,7 +291,7 @@ func TestMultipleTargets(t *testing.T) {
 		Dir:     "./testdata",
 		Stdout:  &stdout,
 		Stderr:  &stderr,
-		Args:    []string{"TestVerbose", "ReturnsError"},
+		Args:    []string{"TestVerbose", "ReturnsNilError"},
 		Verbose: true,
 	}
 	code := Invoke(inv)
@@ -299,12 +299,37 @@ func TestMultipleTargets(t *testing.T) {
 		t.Errorf("expected 0, but got %v", code)
 	}
 	actual := stderr.String()
-	expected := "Running target: TestVerbose\nhi!\nRunning target: ReturnsError\n"
+	expected := "Running target: TestVerbose\nhi!\nRunning target: ReturnsNilError\n"
 	if actual != expected {
 		t.Errorf("expected %q, but got %q", expected, actual)
 	}
 	actual = stdout.String()
 	expected = "stuff\n"
+	if actual != expected {
+		t.Errorf("expected %q, but got %q", expected, actual)
+	}
+}
+
+func TestFirstTargetFails(t *testing.T) {
+	var stderr, stdout bytes.Buffer
+	inv := Invocation{
+		Dir:     "./testdata",
+		Stdout:  &stdout,
+		Stderr:  &stderr,
+		Args:    []string{"ReturnsNonNilError", "ReturnsNilError"},
+		Verbose: true,
+	}
+	code := Invoke(inv)
+	if code != 1 {
+		t.Errorf("expected 1, but got %v", code)
+	}
+	actual := stderr.String()
+	expected := "Running target: ReturnsNonNilError\nError: bang!\n"
+	if actual != expected {
+		t.Errorf("expected %q, but got %q", expected, actual)
+	}
+	actual = stdout.String()
+	expected = ""
 	if actual != expected {
 		t.Errorf("expected %q, but got %q", expected, actual)
 	}

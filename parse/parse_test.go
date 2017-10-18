@@ -13,7 +13,7 @@ func TestParse(t *testing.T) {
 
 	expected := []Function{
 		{
-			Name:     "ReturnsError",
+			Name:     "ReturnsNilError",
 			IsError:  true,
 			Comment:  "Synopsis for \"returns\" error.\nAnd some more text.\n",
 			Synopsis: `Synopsis for "returns" error.`,
@@ -39,8 +39,8 @@ func TestParse(t *testing.T) {
 	}
 
 	// DefaultName
-	if info.DefaultName != "ReturnsError" {
-		t.Fatalf("expected DefaultName to be ReturnsError")
+	if info.DefaultName != "ReturnsNilError" {
+		t.Fatalf("expected DefaultName to be ReturnsNilError")
 	}
 
 	for _, fn := range expected {
