@@ -26,7 +26,7 @@ func TestPath(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		time.Sleep(time.Second)
+		time.Sleep(500 * time.Millisecond)
 	}
 	defer func() {
 		err := os.RemoveAll("testdata")
