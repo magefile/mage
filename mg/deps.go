@@ -31,21 +31,41 @@ var onces = &onceMap{
 	m:  map[string]*onceFun{},
 }
 
-// DepsWithContext runs the given functions as dependencies of the calling function.
-// Dependencies must only be of type: github.com/magefile/mage/types.FuncType.  The function calling Deps
-// is guaranteed that all dependent functions will be run exactly once when Deps
-// returns.  Dependent functions may in turn declare their own dependencies
-// using Deps. Each dependency is run in their own goroutines. Each function is
-// given the context provided if the function prototype allows for it.
-func DepsWithContext(ctx context.Context, fns ...interface{}) {
+// SerialDeps is like Deps except it runs each dependency serially, instead of
+// in parallel. This can be useful for resource intensive dependencies that
+// shouldn't be run at the same time.
+func SerialDeps(fns ...interface{}) {
+	checkFns(fns)
+	ctx, _ := Context()
 	for _, f := range fns {
-		switch f.(type) {
-		case func(), func() error, func(context.Context), func(context.Context) error:
-			// ok
-		default:
-			panic(fmt.Errorf("Invalid type for dependent function: %T. Dependencies must be func(), func() error, func(context.Context) or func(context.Context) error", f))
-		}
+		runDeps(ctx, f)
 	}
+}
+
+// SerialCtxDeps is like CtxDeps except it runs each dependency serially,
+// instead of in parallel. This can be useful for resource intensive
+// dependencies that shouldn't be run at the same time.
+func SerialCtxDeps(ctx context.Context, fns ...interface{}) {
+	checkFns(fns)
+	for _, f := range fns {
+		runDeps(ctx, f)
+	}
+}
+
+// CtxDeps runs the given functions as dependencies of the calling function.
+// Dependencies must only be of type: github.com/magefile/mage/types.FuncType.
+// The function calling Deps is guaranteed that all dependent functions will be
+// run exactly once when Deps returns.  Dependent functions may in turn declare
+// their own dependencies using Deps. Each dependency is run in their own
+// goroutines. Each function is given the context provided if the function
+// prototype allows for it.
+func CtxDeps(ctx context.Context, fns ...interface{}) {
+	checkFns(fns)
+	runDeps(ctx, fns...)
+}
+
+// runDeps assumes you've already called checkFns.
+func runDeps(ctx context.Context, fns ...interface{}) {
 	mu := &sync.Mutex{}
 	var errs []string
 	var exit int
@@ -82,10 +102,21 @@ func DepsWithContext(ctx context.Context, fns ...interface{}) {
 	}
 }
 
+func checkFns(fns []interface{}) {
+	for _, f := range fns {
+		switch f.(type) {
+		case func(), func() error, func(context.Context), func(context.Context) error:
+			// ok
+		default:
+			panic(fmt.Errorf("Invalid type for dependent function: %T. Dependencies must be func(), func() error, func(context.Context) or func(context.Context) error", f))
+		}
+	}
+}
+
 // Deps runs the given functions with the default runtime context
 func Deps(fns ...interface{}) {
 	ctx, _ := Context()
-	DepsWithContext(ctx, fns...)
+	CtxDeps(ctx, fns...)
 }
 
 func changeExit(old, new int) int {

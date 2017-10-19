@@ -23,13 +23,12 @@ func Build() error {
 }
 
 // Generates a new release.  Expects the TAG environment variable to be set,
-// which will create a new tag with that name. Expects the MSG environment
-// variable to be set, which will be the message of the tag.
+// which will create a new tag with that name.
 func Release() (err error) {
-	if os.Getenv("TAG") == "" || os.Getenv("MSG") == "" {
+	if os.Getenv("TAG") == "" {
 		return errors.New("MSG and TAG environment variables are required")
 	}
-	if err := sh.RunV("git", "tag", "-a", "$TAG", "-m", "$MSG"); err != nil {
+	if err := sh.RunV("git", "tag", "-a", "$TAG"); err != nil {
 		return err
 	}
 	if err := sh.RunV("git", "push", "origin", "$TAG"); err != nil {
