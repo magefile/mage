@@ -103,7 +103,7 @@ func TestVerboseEnv(t *testing.T) {
 	expected := true
 
 	if inv.Verbose != true {
-		t.Fatalf("expected %t, but got %t", expected, inv.Verbose)
+		t.Fatalf("expected %t, but got %t ", expected, inv.Verbose)
 	}
 
 	os.Unsetenv("MAGE_VERBOSE")

@@ -25,6 +25,6 @@ func TakesContextWithError(ctx context.Context) error {
 	return errors.New("Something went sideways")
 }
 
-func DepsWithContext(ctx context.Context) {
-	mg.DepsWithContext(ctx, TakesContextNoError)
+func CtxDeps(ctx context.Context) {
+	mg.CtxDeps(ctx, TakesContextNoError)
 }

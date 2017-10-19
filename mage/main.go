@@ -118,7 +118,7 @@ func Parse(stdout io.Writer, args []string) (inv Invocation, mageInit, showVersi
 	fs.BoolVar(&inv.List, "l", false, "list mage targets in this directory")
 	fs.BoolVar(&inv.Help, "h", false, "show this help")
 	fs.BoolVar(&mageInit, "init", false, "create a starting template if no mage files exist")
-	fs.DurationVar(&inv.Timeout, "t", 0, "timeout in duration parsable format")
+	fs.DurationVar(&inv.Timeout, "t", 0, "timeout in duration parsable format (e.g. 5m30s)")
 	fs.BoolVar(&inv.Keep, "keep", false, "keep intermediate mage files around after running")
 	fs.BoolVar(&showVersion, "version", false, "show version info for the mage binary")
 	fs.Usage = func() {
