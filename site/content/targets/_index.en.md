@@ -2,8 +2,14 @@
 title = "Targets"
 weight = 10
 +++
-Any exported function that is either `func()` or `func() error` is considered a
-mage target.  A target is effectively a subcommand of mage while running mage in
+A target is any exported function that is one of the following types:
+```
+func()
+func() error 
+func(context.Context)
+func(context.Context) error
+```
+A target is effectively a subcommand of mage while running mage in
 this directory.  i.e. you can run a target by running `mage <target>`
 
 If the function has an error return, errors returned from the function will
@@ -28,3 +34,9 @@ then once foo is done, bar, then once bar is done, baz).  Dependencies run using
 mg.Deps will still only run once per mage execution, so if each of the targets
 depend on the same function, that function will only be run once for all
 targets.  If any target panics or returns an error, no later targets will be run.
+
+## Contexts and Cancellation
+
+A default context is passed into any target with a context argument.  This
+context will have a timeout if mage was run with -t, and thus will cancel
+the running targets and dependencies at that time.
