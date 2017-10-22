@@ -36,7 +36,7 @@ home = [ "HTML", "RSS", "JSON"]
 
 ## Create your first chapter page
 
-Chapters are pages containg other child pages. It has a special layout style and usually just contains a _chapter name_, the _title_ and a _brief abstract_ of the section.
+Chapters are pages containing other child pages. It has a special layout style and usually just contains a _chapter name_, the _title_ and a _brief abstract_ of the section.
 
 ```
 ### Chapter 1

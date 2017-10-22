@@ -35,7 +35,7 @@ Example from the current website:
     weight = 30
 
 By default, shortcuts are preceded by a title. This title can be disabled by setting `disableShortcutsTitle=true`. 
-However, if you want to keep the title but change its value, it can be overriden by changing your local i18n translation string configuration. 
+However, if you want to keep the title but change its value, it can be overridden by changing your local i18n translation string configuration. 
 
 For example, in your local `i18n/en.toml` file, add the following content
 

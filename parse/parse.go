@@ -204,7 +204,7 @@ func makeInfo(dir string, fset *token.FileSet, files map[string]*ast.File) (type
 }
 
 // errorOrVoid filters the list of functions to only those that return only an
-// error or have no return value, and have no paramters.
+// error or have no return value, and have no parameters.
 func errorOrVoid(fns []*ast.FuncDecl, info types.Info) []*ast.FuncDecl {
 	fds := []*ast.FuncDecl{}
 
