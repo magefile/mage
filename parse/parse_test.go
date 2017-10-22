@@ -6,7 +6,7 @@ import (
 )
 
 func TestParse(t *testing.T) {
-	info, err := Package("./testdata", []string{"func.go", "command.go"})
+	info, err := Package("./testdata", []string{"func.go", "command.go", "alias.go"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -41,6 +41,10 @@ func TestParse(t *testing.T) {
 	// DefaultName
 	if info.DefaultName != "ReturnsNilError" {
 		t.Fatalf("expected DefaultName to be ReturnsNilError")
+	}
+
+	if info.Aliases["void"] != "ReturnsVoid" {
+		t.Fatalf("expected alias of void to be ReturnsVoid")
 	}
 
 	for _, fn := range expected {

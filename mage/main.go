@@ -267,6 +267,7 @@ type data struct {
 	DefaultError bool
 	Default      string
 	DefaultFunc  parse.Function
+	Aliases      map[string]string
 }
 
 // Magefiles returns the list of magefiles in dir.
@@ -315,6 +316,7 @@ func GenerateMainfile(path string, info *parse.PkgInfo) error {
 		Funcs:       info.Funcs,
 		Default:     info.DefaultName,
 		DefaultFunc: info.DefaultFunc,
+		Aliases:     info.Aliases,
 	}
 
 	data.DefaultError = info.DefaultIsError

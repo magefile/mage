@@ -22,6 +22,7 @@ type PkgInfo struct {
 	DefaultIsContext bool
 	DefaultName      string
 	DefaultFunc      Function
+	Aliases          map[string]string
 }
 
 // Function represented a job function from a mage file
@@ -109,6 +110,7 @@ func Package(path string, files []string) (*PkgInfo, error) {
 	}
 
 	setDefault(p, pi, info)
+	setAliases(p, pi, info)
 
 	return pi, nil
 }
@@ -137,6 +139,57 @@ func setDefault(p *doc.Package, pi *PkgInfo, info types.Info) {
 				}
 			}
 			log.Println("warning: default declaration does not reference a mage target")
+		}
+	}
+}
+
+func setAliases(p *doc.Package, pi *PkgInfo, info types.Info) {
+	for _, v := range p.Vars {
+		for x, name := range v.Names {
+			if name != "Aliases" {
+				continue
+			}
+			spec, ok := v.Decl.Specs[x].(*ast.ValueSpec)
+			if !ok {
+				log.Println("warning: aliases declaration is not a value")
+				return
+			}
+			if len(spec.Values) != 1 {
+				log.Println("warning: aliases declaration has multiple values")
+			}
+			comp, ok := spec.Values[0].(*ast.CompositeLit)
+			if !ok {
+				log.Println("warning: aliases declaration is not a map")
+				return
+			}
+			pi.Aliases = make(map[string]string)
+			for _, elem := range comp.Elts {
+				kv, ok := elem.(*ast.KeyValueExpr)
+				if !ok {
+					log.Println("warning: alias declaration is not a map element")
+					return
+				}
+				k, ok := kv.Key.(*ast.BasicLit)
+				if !ok || k.Kind != token.STRING {
+					log.Println("warning: alias is not a string")
+					return
+				}
+				v, ok := kv.Value.(*ast.Ident)
+				if !ok {
+					log.Println("warning: alias target is not a function")
+					return
+				}
+				alias := strings.Trim(k.Value, "\"")
+				valid := false
+				for _, f := range pi.Funcs {
+					valid = valid || f.Name == v.Name
+				}
+				if !valid {
+					log.Printf("warning: alias declaration (%s) does not reference a mage target", alias)
+				}
+				pi.Aliases[alias] = v.Name
+			}
+			return
 		}
 	}
 }

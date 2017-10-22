@@ -19,7 +19,7 @@ functions that do not fit this pattern are not considered targets by mage.
 Comments on the target function will become documentation accessible by running
 `mage -l` which will list all the build targets in this directory with the first
 sentence from their docs, or `mage -h <target>` which will show the full comment
-from the docs on the function.
+from the docs on the function, and a list of aliases if specified.
 
 A target may be designated the default target, which is run when the user runs
 `mage` with no target specified. To denote the default, create a `var Default =
@@ -48,3 +48,18 @@ when the timeout set with -t expires.
 mg.CtxDeps will pass along whatever context you give it, so if you want to
 modify the original context, or pass in your own, that will work like you expect
 it to.
+
+## Aliases
+
+Target aliases can be specified using the following notation:
+
+```
+var Aliases = map[string]interface{} {
+  "i":     Install,
+  "build": Install,
+  "ls":    List,
+}
+```
+
+The key is an alias and the value is a function identifier.
+An alias can be used interchangeably with it's target.
