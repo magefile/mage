@@ -5,23 +5,23 @@ import (
 	"testing"
 )
 
-func TestIsFuncType(t *testing.T) {
-	if !IsFuncType(func() {}) {
+func TestFuncCheck(t *testing.T) {
+	if FuncCheck(func() {}) != nil {
 		t.Errorf("expected func() to be a valid FuncType")
 	}
-	if !IsFuncType(func() error { return nil }) {
+	if FuncCheck(func() error { return nil }) != nil {
 		t.Errorf("expected func() error to be a valid FuncType")
 	}
-	if !IsFuncType(func(context.Context) {}) {
+	if FuncCheck(func(context.Context) {}) != nil {
 		t.Errorf("expected func(context.Context) to be a valid FuncType")
 	}
-	if !IsFuncType(func(context.Context) error { return nil }) {
+	if FuncCheck(func(context.Context) error { return nil }) != nil {
 		t.Errorf("expected func(context.Context) error to be a valid FuncType")
 	}
 
 	// Test the Invalid case
-	if IsFuncType(func(int) error { return nil }) {
-		t.Errorf("expected func(int) error to not be a valid FuncType")
+	if err := FuncCheck(func(int) error { return nil }); err == nil {
+		t.Errorf("expected func(int) error to not be a valid FuncType\n\tgot error: %v", err)
 	}
 }
 

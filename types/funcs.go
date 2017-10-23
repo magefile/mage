@@ -2,6 +2,7 @@ package types
 
 import (
 	"context"
+	"fmt"
 )
 
 // FuncType indicates a prototype of build job function
@@ -28,24 +29,24 @@ type FuncContext func(context.Context)
 // FuncContextError takes a context and may return an error
 type FuncContextError func(context.Context) error
 
-// IsFuncType tests if a function is one of FuncType
-func IsFuncType(fn interface{}) bool {
+// FuncCheck tests if a function is one of FuncType
+func FuncCheck(fn interface{}) error {
 	switch fn.(type) {
 	case func():
-		return true
+		return nil
 	case func() error:
-		return true
+		return nil
 	case func(context.Context):
-		return true
+		return nil
 	case func(context.Context) error:
-		return true
+		return nil
 	}
-	return false
+	return fmt.Errorf("Invalid type for dependent function: %T. Dependencies must be func(), func() error, func(context.Context) or func(context.Context) error", fn)
 }
 
 // FuncTypeWrap wraps a valid FuncType to FuncContextError
-func FuncTypeWrap(fn interface{}) FuncContextError {
-	if IsFuncType(fn) {
+func FuncTypeWrap(fn interface{}) func(context.Context) error {
+	if FuncCheck(fn) == nil {
 		switch f := fn.(type) {
 		case func():
 			return func(context.Context) error {

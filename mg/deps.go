@@ -106,8 +106,8 @@ func runDeps(ctx context.Context, fns ...interface{}) {
 
 func checkFns(fns []interface{}) {
 	for _, f := range fns {
-		if !types.IsFuncType(f) {
-			panic(fmt.Errorf("Invalid type for dependent function: %T. Dependencies must be func(), func() error, func(context.Context) or func(context.Context) error", f))
+		if err := types.FuncCheck(f); err != nil {
+			panic(err)
 		}
 	}
 }
