@@ -25,7 +25,7 @@ continue until it has been run.
 
 If run with `mg.Deps` or `mg.CtxDeps`, dependencies are run in their own
 goroutines, so they are parellelized as much as possible given the dependency
-tree ordering restrictions.  If run with `mg,SerialDeps` or `mg.SerialCtxDeps`,
+tree ordering restrictions.  If run with `mg.SerialDeps` or `mg.SerialCtxDeps`,
 the dependencies are run serially, though each dependency or sub-dependency will
 still only ever be run once. 
 
