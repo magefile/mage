@@ -7,6 +7,8 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+
+	"github.com/magefile/mage/types"
 )
 
 type onceMap struct {
@@ -104,10 +106,7 @@ func runDeps(ctx context.Context, fns ...interface{}) {
 
 func checkFns(fns []interface{}) {
 	for _, f := range fns {
-		switch f.(type) {
-		case func(), func() error, func(context.Context), func(context.Context) error:
-			// ok
-		default:
+		if !types.IsFuncType(f) {
 			panic(fmt.Errorf("Invalid type for dependent function: %T. Dependencies must be func(), func() error, func(context.Context) or func(context.Context) error", f))
 		}
 	}
@@ -136,16 +135,7 @@ func changeExit(old, new int) int {
 
 func addDep(ctx context.Context, f interface{}) *onceFun {
 	var fn func(context.Context) error
-	switch f := f.(type) {
-	case func():
-		fn = func(ctx context.Context) error { f(); return nil }
-	case func() error:
-		fn = func(ctx context.Context) error { return f() }
-	case func(context.Context):
-		fn = func(ctx context.Context) error { f(ctx); return nil }
-	case func(context.Context) error:
-		fn = f
-	default:
+	if fn = types.FuncTypeWrap(f); fn == nil {
 		// should be impossible, since we already checked this
 		panic("attempted to add a dep that did not match required type")
 	}
