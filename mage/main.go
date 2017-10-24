@@ -40,8 +40,11 @@ var initOutput = template.Must(template.New("").Parse(mageTpl))
 const mainfile = "mage_output_file.go"
 const initFile = "magefile.go"
 
+// set by ldflags when you "mage build"
 var (
-	timestamp, commitHash, gitTag string // set by ldflags when you "mage build"
+	commitHash string
+	timestamp  string
+	gitTag     = "v2"
 )
 
 // Main is the entrypoint for running mage.  It exists external to mage's main

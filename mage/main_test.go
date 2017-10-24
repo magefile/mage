@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
+	"go/parser"
+	"go/token"
 	"io/ioutil"
 	"log"
 	"os"
@@ -13,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/magefile/mage/build"
 	"github.com/magefile/mage/mg"
 )
 
@@ -264,12 +267,15 @@ func TestKeepFlag(t *testing.T) {
 	buildFile := fmt.Sprintf("./testdata/keep_flag/%s", mainfile)
 	os.Remove(buildFile)
 	defer os.Remove(buildFile)
+	w := tLogWriter{t}
+
 	inv := Invocation{
 		Dir:    "./testdata/keep_flag",
-		Stdout: ioutil.Discard,
-		Stderr: ioutil.Discard,
-		Args:   []string{"noop"},
+		Stdout: w,
+		Stderr: w,
+		List:   true,
 		Keep:   true,
+		Force:  true, // need force so we always regenerate
 	}
 	code := Invoke(inv)
 	if code != 0 {
@@ -278,6 +284,63 @@ func TestKeepFlag(t *testing.T) {
 
 	if _, err := os.Stat(buildFile); err != nil {
 		t.Fatalf("expected file %q to exist but got err, %v", buildFile, err)
+	}
+}
+
+type tLogWriter struct {
+	*testing.T
+}
+
+func (t tLogWriter) Write(b []byte) (n int, err error) {
+	t.Log(string(b))
+	return len(b), nil
+}
+
+// Test if generated mainfile references anything other than the stdlib
+func TestOnlyStdLib(t *testing.T) {
+	buildFile := fmt.Sprintf("./testdata/onlyStdLib/%s", mainfile)
+	os.Remove(buildFile)
+	defer os.Remove(buildFile)
+
+	w := tLogWriter{t}
+
+	inv := Invocation{
+		Dir:     "./testdata/onlyStdLib",
+		Stdout:  w,
+		Stderr:  w,
+		List:    true,
+		Keep:    true,
+		Force:   true, // need force so we always regenerate
+		Verbose: true,
+	}
+	code := Invoke(inv)
+	if code != 0 {
+		t.Fatalf("expected code 0, but got %v", code)
+	}
+
+	if _, err := os.Stat(buildFile); err != nil {
+		t.Fatalf("expected file %q to exist but got err, %v", buildFile, err)
+	}
+
+	fset := &token.FileSet{}
+	// Parse src but stop after processing the imports.
+	f, err := parser.ParseFile(fset, buildFile, nil, parser.ImportsOnly)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	// Print the imports from the file's AST.
+	for _, s := range f.Imports {
+		// the path value comes in as a quoted string, i.e. literally \"context\"
+		path := strings.Trim(s.Path.Value, "\"")
+		pkg, err := build.Default.Import(path, "./testdata/keep_flag", build.FindOnly)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !filepath.HasPrefix(pkg.Dir, build.Default.GOROOT) {
+			t.Errorf("import of non-stdlib package: %s", s.Path.Value)
+		}
 	}
 }
 

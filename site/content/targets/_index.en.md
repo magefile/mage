@@ -38,5 +38,13 @@ targets.  If any target panics or returns an error, no later targets will be run
 ## Contexts and Cancellation
 
 A default context is passed into any target with a context argument.  This
-context will have a timeout if mage was run with -t, and thus will cancel
-the running targets and dependencies at that time.
+context will have a timeout if mage was run with -t, and thus will cancel the
+running targets and dependencies at that time.  To pass this context to
+dependencies, use mg.CtxDeps(ctx, ...) to pass the context from the target to
+its dependencies (and pass the context to sub-dependencies).  Dependencies run
+with mg.Deps will not get the starting context, and thus will not be cancelled
+when the timeout set with -t expires.
+
+mg.CtxDeps will pass along whatever context you give it, so if you want to
+modify the original context, or pass in your own, that will work like you expect
+it to.
