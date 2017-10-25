@@ -38,7 +38,7 @@ var onces = &onceMap{
 // shouldn't be run at the same time.
 func SerialDeps(fns ...interface{}) {
 	checkFns(fns)
-	ctx, _ := Context()
+	ctx := context.Background()
 	for _, f := range fns {
 		runDeps(ctx, f)
 	}
@@ -114,8 +114,7 @@ func checkFns(fns []interface{}) {
 
 // Deps runs the given functions with the default runtime context
 func Deps(fns ...interface{}) {
-	ctx, _ := Context()
-	CtxDeps(ctx, fns...)
+	CtxDeps(context.Background(), fns...)
 }
 
 func changeExit(old, new int) int {
