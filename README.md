@@ -1,9 +1,24 @@
 <h1 align=center>mage</h1>
 <p align="center"><img src="https://user-images.githubusercontent.com/3185864/31061203-6f6743dc-a6ec-11e7-9469-b8d667d9bc3f.png"/></p>
 
-<p align="center">Mage is a make/rake-like build tool using Go.</p>
+## About [![Build Status](https://travis-ci.org/magefile/mage.svg?branch=master)](https://travis-ci.org/magefile/mage)
 
-[![Build Status](https://travis-ci.org/magefile/mage.svg?branch=master)](https://travis-ci.org/magefile/mage)
+Mage is a make/rake-like build tool using Go.  You write plain-old go functions,
+and mage automatically uses them as Makefile-like runnable targets.
+
+
+## Installation
+
+Install by running `go run bootstrap.go`, which will build the mage binary with
+compile-time data on the version number and commit hash.  If you have installed
+using `go get`, your binary will work just fine, but will not have the version
+number or commit hash. To fix this, just run `mage build` in the root of the
+mage repo (or run `go run bootstrap.go`).
+
+The mage binary will be created in your $GOPATH/bin directory.
+
+You may also install a binary release from our
+[releases](https://github.com/magefile/mage/releases) page. 
 
 ## Demo
 
