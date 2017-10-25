@@ -4,15 +4,37 @@ title = "Mage"
 
 <p align="center"><img width=300 src="/images/gary.svg"/></p>
 
-<p align="center">Mage is a make/rake-like build tool using Go.</p>
+## About
+
+Mage is a make/rake-like build tool using Go.  You write plain-old go functions,
+and Mage automatically uses them as Makefile-like runnable targets.
+
 
 ## Installation
 
 Mage has no dependencies outside the Go standard library, and builds with Go 1.7
-and above (possibly even lower versions, but they're not regularly tested). To
-install, just use `go get`:
+and above (possibly even lower versions, but they're not regularly tested). 
 
-`go get github.com/magefile/mage`
+Install mage by running 
+
+```
+go get -u -d github.com/magefile/mage
+cd $GOPATH/src/github.com/magefile/mage
+go run bootstrap.go
+```
+
+This will download the code into your GOPATH, and then run the bootstrap script
+to build mage with version infomation embedded in it.  A normal `go get`
+(without -d) will build the binary correctly, but no version info will be
+embedded.  If you've done this, no worries, just go to
+$GOPATH/src/github.com/magefile/mage and run `mage build` or `go run
+bootstrap.go` and a new binary will be created with the correct version
+information.
+
+The mage binary will be created in your $GOPATH/bin directory.
+
+You may also install a binary release from our
+[releases](https://github.com/magefile/mage/releases) page. 
 
 ## Demo
 

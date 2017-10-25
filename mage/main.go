@@ -24,9 +24,11 @@ import (
 	"github.com/magefile/mage/sh"
 )
 
-// mageVer is used when hashing the output binary to ensure that we get a new
-// binary if we use a differernt version of mage.
-const mageVer = "v0.3"
+// magicRebuildKey is used when hashing the output binary to ensure that we get
+// a new binary even if nothing in the input files or generated mainfile has
+// changed. This can be used when we change how we parse files, or otherwise
+// change the inputs to the compiling process.
+const magicRebuildKey = "v0.3"
 
 var output = template.Must(template.New("").Funcs(map[string]interface{}{
 	"lower": strings.ToLower,
@@ -338,7 +340,7 @@ func ExeName(files []string) (string, error) {
 	// binary.
 	hashes = append(hashes, fmt.Sprintf("%x", sha1.Sum([]byte(tpl))))
 	sort.Strings(hashes)
-	hash := sha1.Sum([]byte(strings.Join(hashes, "") + mageVer))
+	hash := sha1.Sum([]byte(strings.Join(hashes, "") + magicRebuildKey))
 	filename := fmt.Sprintf("%x", hash)
 
 	out := filepath.Join(mg.CacheDir(), filename)

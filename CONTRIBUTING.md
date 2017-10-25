@@ -22,15 +22,16 @@ or other trivial change.
 
 ## Dependency Management
 
-Currently mage has no dependencies(!).  Let's try to keep it that way.  Since
-it's likely that mage will be vendored into a project, adding dependencies to
-mage adds dependencies to every project that uses mage.
+Currently mage has no dependencies(!) outside the standard libary.  Let's keep
+it that way.  Since it's likely that mage will be vendored into a project,
+adding dependencies to mage adds dependencies to every project that uses mage.
 
 ## Versions
 
-Please try to avoid using features of go and the stdlib that prevent mage from
-being buildable with old versions of Go.  Definitely avoid anything that
-requires go 1.9.
+Please avoid using features of go and the stdlib that prevent mage from being
+buildable with older versions of Go.  The CI tests currently check that mage is
+buildable with go 1.7 and later.  You may build with whatever version you like,
+but CI has the final say.
 
 ## Testing
 

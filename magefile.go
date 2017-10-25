@@ -19,7 +19,10 @@ func Build() error {
 		return err
 	}
 
-	return sh.Run("go", "install", "-ldflags="+ldf, "github.com/magefile/mage")
+	// we use -a here to always reinstall, because if someone built with go get,
+	// then this would turn into a no-op, and they wouldn't get a binary with
+	// the version and commit etc set.
+	return sh.RunV("go", "install", "-a", "-ldflags="+ldf, "github.com/magefile/mage")
 }
 
 // Generates a new release.  Expects the TAG environment variable to be set,
