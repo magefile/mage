@@ -216,18 +216,6 @@ func errorOrVoid(fns []*ast.FuncDecl, info types.Info) []*ast.FuncDecl {
 	return fds
 }
 
-// FuncType is the type of a function that mage understands.
-type FuncType int
-
-// FuncTypes
-const (
-	InvalidType FuncType = iota
-	VoidType
-	ErrorType
-	ContextVoidType
-	ContextErrorType
-)
-
 func hasContextParam(ft *ast.FuncType, info types.Info) bool {
 	if ft.Params.NumFields() == 1 {
 		ret := ft.Params.List[0]
