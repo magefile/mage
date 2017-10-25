@@ -4,16 +4,28 @@
 ## About [![Build Status](https://travis-ci.org/magefile/mage.svg?branch=master)](https://travis-ci.org/magefile/mage)
 
 Mage is a make/rake-like build tool using Go.  You write plain-old go functions,
-and mage automatically uses them as Makefile-like runnable targets.
-
+and Mage automatically uses them as Makefile-like runnable targets.
 
 ## Installation
 
-Install by running `go run bootstrap.go`, which will build the mage binary with
-compile-time data on the version number and commit hash.  If you have installed
-using `go get`, your binary will work just fine, but will not have the version
-number or commit hash. To fix this, just run `mage build` in the root of the
-mage repo (or run `go run bootstrap.go`).
+Mage has no dependencies outside the Go standard library, and builds with Go 1.7
+and above (possibly even lower versions, but they're not regularly tested). 
+
+Install mage by running 
+
+```
+go get -u -d github.com/magefile/mage
+cd $GOPATH/src/github.com/magefile/mage
+go run bootstrap.go
+```
+
+This will download the code into your GOPATH, and then run the bootstrap script
+to build mage with version infomation embedded in it.  A normal `go get`
+(without -d) will build the binary correctly, but no version info will be
+embedded.  If you've done this, no worries, just go to
+$GOPATH/src/github.com/magefile/mage and run `mage build` or `go run
+bootstrap.go` and a new binary will be created with the correct version
+information.
 
 The mage binary will be created in your $GOPATH/bin directory.
 
