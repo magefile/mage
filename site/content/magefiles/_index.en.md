@@ -61,7 +61,7 @@ var Default = Install
 
 // Targets may have a context argument, in which case a default context is passed
 // to the target, which will be cancelled after a timeout if the -t flag is used.
-func Build(ctx context.Context) error {
+func Build(ctx context.Context) {
     mg.CtxDeps(ctx, Target)
 }
 

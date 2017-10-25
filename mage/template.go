@@ -13,8 +13,7 @@ import (
 	"os"
 	"strings"
 	"text/tabwriter"
-
-	"github.com/magefile/mage/mg"
+	"time"
 )
 
 func main() {
@@ -131,7 +130,7 @@ func handleError(logger *log.Logger, err interface{}) {
 
 func runTarget(fn func(context.Context) error) interface{} {
 	var err interface{}
-	ctx, cancel := mg.Context()
+	ctx, cancel := getContext()
 	d := make(chan interface{})
 	go func() {
 		defer func() {
@@ -152,4 +151,30 @@ func runTarget(fn func(context.Context) error) interface{} {
 		return err
 	}
 }
+
+var ctx context.Context
+var ctxCancel func()
+
+func getContext() (context.Context, func()) {
+	if ctx != nil {
+		return ctx, ctxCancel
+	}
+
+	if os.Getenv("MAGEFILE_TIMEOUT") != "" {
+		timeout, err := time.ParseDuration(os.Getenv("MAGEFILE_TIMEOUT"))
+		if err != nil {
+			fmt.Printf("timeout error: %v\n", err)
+			os.Exit(1)
+		}
+
+		ctx, ctxCancel = context.WithTimeout(context.Background(), timeout)
+	} else {
+		ctx = context.Background()
+		ctxCancel = func() {}
+	}
+	return ctx, ctxCancel
+}
+
+
+
 `
