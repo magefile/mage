@@ -17,18 +17,6 @@ const (
 	ContextErrorType
 )
 
-// FuncVoid is the simplist job function
-type FuncVoid func()
-
-// FuncError may return an error
-type FuncError func() error
-
-// FuncContext takes a context for the job
-type FuncContext func(context.Context)
-
-// FuncContextError takes a context and may return an error
-type FuncContextError func(context.Context) error
-
 // FuncCheck tests if a function is one of FuncType
 func FuncCheck(fn interface{}) error {
 	switch fn.(type) {
