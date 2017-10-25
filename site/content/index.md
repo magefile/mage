@@ -2,8 +2,6 @@
 title = "Mage"
 +++
 
-<p align="center"><img width=300 src="/images/gary.svg"/></p>
-
 ## About
 
 Mage is a make/rake-like build tool using Go.  You write plain-old go functions,
