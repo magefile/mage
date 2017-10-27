@@ -3,26 +3,46 @@
 package main
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
+	"runtime"
+	"strings"
 	"time"
 
 	"github.com/magefile/mage/sh"
 )
 
 // Runs "go install" for mage.  This generates the version info the binary.
-func Build() error {
+func Install() error {
 	ldf, err := flags()
 	if err != nil {
 		return err
 	}
 
-	// we use -a here to always reinstall, because if someone built with go get,
-	// then this would turn into a no-op, and they wouldn't get a binary with
-	// the version and commit etc set.
-	return sh.RunV("go", "install", "-a", "-ldflags="+ldf, "github.com/magefile/mage")
+	name := "mage"
+	if runtime.GOOS == "windows" {
+		name += ".exe"
+	}
+	gopath, err := sh.Output("go", "env", "GOPATH")
+	if err != nil {
+		return fmt.Errorf("can't determine GOPATH: %v", err)
+	}
+	paths := strings.Split(gopath, string([]rune{os.PathListSeparator}))
+	bin := filepath.Join(paths[0], "bin")
+	// specifically don't mkdirall, if you have an invalid gopath in the first
+	// place, that's not on us to fix.
+	if err := os.Mkdir(bin, 0700); err != nil && !os.IsExist(err) {
+		return fmt.Errorf("failed to create %q: %v", bin, err)
+	}
+	path := filepath.Join(bin, name)
+
+	// we use go build here because if someone built with go get, then `go
+	// install` turns into a no-op, and `go install -a` fails on people's
+	// machines that have go installed in a non-writeable directory (such as
+	// normal OS installs in /usr/bin)
+	return sh.RunV("go", "build", "-o", path, "-ldflags="+ldf, "github.com/magefile/mage")
 }
 
 // Generates a new release.  Expects the TAG environment variable to be set,
@@ -63,9 +83,8 @@ func flags() (string, error) {
 
 // tag returns the git tag for the current branch or "" if none.
 func tag() string {
-	buf := &bytes.Buffer{}
-	_, _ = sh.Exec(nil, buf, nil, "git", "describe", "--tags")
-	return buf.String()
+	s, _ := sh.Output("git", "describe", "--tags")
+	return s
 }
 
 // hash returns the git hash for the current repo or "" if none.

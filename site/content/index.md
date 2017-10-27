@@ -25,7 +25,7 @@ This will download the code into your GOPATH, and then run the bootstrap script
 to build mage with version infomation embedded in it.  A normal `go get`
 (without -d) will build the binary correctly, but no version info will be
 embedded.  If you've done this, no worries, just go to
-$GOPATH/src/github.com/magefile/mage and run `mage build` or `go run
+$GOPATH/src/github.com/magefile/mage and run `mage install` or `go run
 bootstrap.go` and a new binary will be created with the correct version
 information.
 
