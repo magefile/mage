@@ -16,5 +16,5 @@ Package `sh` contains helpers for running shell-like commands with an API that's
 easier on the eyes and more helpful than os/exec, including things like
 understanding how to expand environment variables in command args.
 
-Package `target` contains helpers for performing make-like timestamp cmoparing
+Package `target` contains helpers for performing make-like timestamp comparing
 of files.  It makes it easy to bail early if this target doesn't need to be run.
