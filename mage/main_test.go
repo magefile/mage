@@ -477,3 +477,108 @@ func TestParseHelp(t *testing.T) {
 		t.Fatalf("expected -h and --help to produce same output, but got different.\n\n-h:\n%s\n\n--help:\n%s", s, s2)
 	}
 }
+
+func TestHelpTarget(t *testing.T) {
+	stdout := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:    "./testdata",
+		Stdout: stdout,
+		Stderr: os.Stderr,
+		Args:   []string{"panics"},
+		Help:   true,
+	}
+	code := Invoke(inv)
+	if code != 0 {
+		t.Errorf("expected to exit with code 0, but got %v", code)
+	}
+	actual := stdout.String()
+	expected := "mage panics:\n\nFunction that panics.\n\n"
+	if actual != expected {
+		t.Fatalf("expected %q, but got %q", expected, actual)
+	}
+}
+
+func TestHelpAlias(t *testing.T) {
+	stdout := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:    "./testdata/alias",
+		Stdout: stdout,
+		Stderr: os.Stderr,
+		Args:   []string{"status"},
+		Help:   true,
+	}
+	code := Invoke(inv)
+	if code != 0 {
+		t.Errorf("expected to exit with code 0, but got %v", code)
+	}
+	actual := stdout.String()
+	expected := "mage status:\n\nPrints status.\n\nAliases: st, stat\n\n"
+	if actual != expected {
+		t.Fatalf("expected %q, but got %q", expected, actual)
+	}
+	inv = Invocation{
+		Dir:    "./testdata/alias",
+		Stdout: stdout,
+		Stderr: os.Stderr,
+		Args:   []string{"checkout"},
+		Help:   true,
+	}
+	stdout.Reset()
+	code = Invoke(inv)
+	if code != 0 {
+		t.Errorf("expected to exit with code 0, but got %v", code)
+	}
+	actual = stdout.String()
+	expected = "mage checkout:\n\nAliases: co\n\n"
+	if actual != expected {
+		t.Fatalf("expected %q, but got %q", expected, actual)
+	}
+}
+
+func TestAlias(t *testing.T) {
+	stdout := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:    "./testdata/alias",
+		Stdout: stdout,
+		Stderr: ioutil.Discard,
+		Args:   []string{"status"},
+	}
+	code := Invoke(inv)
+	if code != 0 {
+		t.Errorf("expected to exit with code 0, but got %v", code)
+	}
+	actual := stdout.String()
+	expected := "alias!\n"
+	if actual != expected {
+		t.Fatalf("expected %q, but got %q", expected, actual)
+	}
+	stdout.Reset()
+	inv.Args = []string{"st"}
+	code = Invoke(inv)
+	if code != 0 {
+		t.Errorf("expected to exit with code 0, but got %v", code)
+	}
+	actual = stdout.String()
+	if actual != expected {
+		t.Fatalf("expected %q, but got %q", expected, actual)
+	}
+}
+
+func TestInvalidAlias(t *testing.T) {
+	stderr := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:    "./testdata/invalid_alias",
+		Stdout: ioutil.Discard,
+		Stderr: stderr,
+		Args:   []string{"co"},
+	}
+	code := Invoke(inv)
+	if code != 1 {
+		t.Errorf("expected to exit with code 1, but got %v", code)
+	}
+	actual := stderr.String()
+	expected := "Unknown target: \"co\"\n"
+	if actual != expected {
+		t.Fatalf("expected %q, but got %q", expected, actual)
+	}
+}

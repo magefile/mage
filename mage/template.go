@@ -31,6 +31,8 @@ func main() {
 	}
 
 	targets := map[string]bool {
+		{{range $alias, $funci := .Aliases}}"{{lower $alias}}": true,
+		{{end}}
 		{{range .Funcs}}"{{lower .Name}}": true,
 		{{end}}
 	}
@@ -58,7 +60,15 @@ func main() {
 		switch strings.ToLower(os.Args[1]) {
 			{{range .Funcs}}case "{{lower .Name}}":
 				fmt.Print("mage {{lower .Name}}:\n\n")
-                fmt.Println({{printf "%q" .Comment}})
+				{{if ne .Comment ""}}fmt.Println({{printf "%q" .Comment}}){{end}}
+				var aliases []string
+				{{- $name := .Name -}}
+				{{range $alias, $func := $.Aliases}}
+				{{if eq $name $func}}aliases = append(aliases, "{{$alias}}"){{end -}}
+				{{- end}}
+				if len(aliases) > 0 {
+					fmt.Printf("Aliases: %s\n\n", strings.Join(aliases, ", "))
+				}
 				return
 			{{end}}
 			default:
@@ -82,6 +92,12 @@ func main() {
 	{{- end}}
 	}
 	for _, target := range os.Args[1:] {
+		switch strings.ToLower(target) {
+		{{range $alias, $func := .Aliases}}
+		case "{{lower $alias}}":
+			target = "{{$func}}"
+		{{- end}}
+		}
 		switch strings.ToLower(target) {
 		{{range .Funcs }}
 		case "{{lower .Name}}":
