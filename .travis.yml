@@ -19,10 +19,3 @@ install: true
 # don't call go test -v because we want to be able to only show t.Log output when
 # a test fails
 script:  go test -tags CI -race $(go list ./... | grep -v /vendor/)
-
-# run a test for every major OS
-env:
-  - GOOS=linux
-  - GOOS=windows
-  - GOOS=darwin
-  
