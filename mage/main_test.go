@@ -98,7 +98,7 @@ func TestVerboseEnv(t *testing.T) {
 	os.Setenv("MAGE_VERBOSE", "true")
 
 	stdout := &bytes.Buffer{}
-	inv, _, _, err := Parse(stdout, []string{})
+	inv, _, err := Parse(stdout, []string{})
 	if err != nil {
 		t.Fatal("unexpected error", err)
 	}
@@ -420,14 +420,14 @@ func TestBadSecondTargets(t *testing.T) {
 
 func TestParse(t *testing.T) {
 	buf := &bytes.Buffer{}
-	inv, init, showVer, err := Parse(buf, []string{"-v", "build"})
+	inv, cmd, err := Parse(buf, []string{"-v", "build"})
 	if err != nil {
 		t.Fatal("unexpected error", err)
 	}
-	if init {
+	if cmd == INIT {
 		t.Fatal("init should be false but was true")
 	}
-	if showVer {
+	if cmd == VERSION {
 		t.Fatal("showVersion should be false but was true")
 	}
 	if len(inv.Args) != 1 && inv.Args[0] != "build" {
@@ -581,4 +581,18 @@ func TestInvalidAlias(t *testing.T) {
 	if actual != expected {
 		t.Fatalf("expected %q, but got %q", expected, actual)
 	}
+}
+
+func TestClean(t *testing.T) {
+	TestGoRun(t)
+	dir := "./testing"
+	abs, err := filepath.Abs(dir)
+	if err != nil {
+		log.Fatal(err)
+	}
+	files, err := ioutil.ReadDir(abs)
+	if err != nil {
+		t.Error("issue reading file:", err)
+	}
+	t.Logf("Here's what we found %v", files)
 }

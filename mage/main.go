@@ -49,6 +49,14 @@ var (
 	gitTag     = "v2"
 )
 
+type Command int
+
+const (
+	NONE Command = iota
+	VERSION
+	INIT
+)
+
 // Main is the entrypoint for running mage.  It exists external to mage's main
 // function to allow it to be used from other programs, specifically so you can
 // go run a simple file that run's mage's Main.
@@ -76,7 +84,7 @@ type Invocation struct {
 // name in the args).
 func ParseAndRun(dir string, stdout, stderr io.Writer, stdin io.Reader, args []string) int {
 	log := log.New(stderr, "", 0)
-	inv, mageInit, showVersion, err := Parse(stdout, args)
+	inv, cmd, err := Parse(stdout, args)
 	inv.Dir = dir
 	inv.Stderr = stderr
 	inv.Stdin = stdin
@@ -88,7 +96,8 @@ func ParseAndRun(dir string, stdout, stderr io.Writer, stdin io.Reader, args []s
 		return 2
 	}
 
-	if showVersion {
+	switch cmd {
+	case VERSION:
 		if timestamp == "" {
 			timestamp = "<not set>"
 		}
@@ -99,14 +108,14 @@ func ParseAndRun(dir string, stdout, stderr io.Writer, stdin io.Reader, args []s
 		log.Println("Build Date:", timestamp)
 		log.Println("Commit:", commitHash)
 		return 0
-	}
-	if mageInit {
+	case INIT:
 		if err := generateInit(dir); err != nil {
 			log.Println("Error:", err)
 			return 1
 		}
 		log.Println(initFile, "created")
 		return 0
+
 	}
 
 	return Invoke(inv)
@@ -114,7 +123,7 @@ func ParseAndRun(dir string, stdout, stderr io.Writer, stdin io.Reader, args []s
 
 // Parse parses the given args and returns structured data.  If parse returns
 // flag.ErrHelp, the calling process should exit with code 0.
-func Parse(stdout io.Writer, args []string) (inv Invocation, mageInit, showVersion bool, err error) {
+func Parse(stdout io.Writer, args []string) (inv Invocation, cmd Command, err error) {
 	inv.Stdout = stdout
 	fs := flag.FlagSet{}
 	fs.SetOutput(stdout)
@@ -122,10 +131,13 @@ func Parse(stdout io.Writer, args []string) (inv Invocation, mageInit, showVersi
 	fs.BoolVar(&inv.Verbose, "v", false, "show verbose output when running mage targets")
 	fs.BoolVar(&inv.List, "l", false, "list mage targets in this directory")
 	fs.BoolVar(&inv.Help, "h", false, "show this help")
-	fs.BoolVar(&mageInit, "init", false, "create a starting template if no mage files exist")
 	fs.DurationVar(&inv.Timeout, "t", 0, "timeout in duration parsable format (e.g. 5m30s)")
 	fs.BoolVar(&inv.Keep, "keep", false, "keep intermediate mage files around after running")
+	var showVersion bool
 	fs.BoolVar(&showVersion, "version", false, "show version info for the mage binary")
+	var mageInit bool
+	fs.BoolVar(&mageInit, "init", false, "create a starting template if no mage files exist")
+
 	fs.Usage = func() {
 		fmt.Fprintln(stdout, "mage [options] [target]")
 		fmt.Fprintln(stdout, "Options:")
@@ -134,12 +146,26 @@ func Parse(stdout io.Writer, args []string) (inv Invocation, mageInit, showVersi
 	err = fs.Parse(args)
 	if err == flag.ErrHelp {
 		// parse will have already called fs.Usage()
-		return inv, mageInit, showVersion, err
+		return inv, cmd, err
 	}
 	if err == nil && inv.Help && len(fs.Args()) == 0 {
 		fs.Usage()
 		// tell upstream, to just exit
-		return inv, mageInit, showVersion, flag.ErrHelp
+		return inv, cmd, flag.ErrHelp
+	}
+
+	numFlags := 0
+	switch {
+	case mageInit:
+		numFlags++
+		cmd = INIT
+		fallthrough
+	case showVersion:
+		numFlags++
+		cmd = VERSION
+		fallthrough
+	case inv.Help:
+		numFlags++
 	}
 
 	// If verbose is still false, we're going to peek at the environment variable to see if
@@ -150,27 +176,17 @@ func Parse(stdout io.Writer, args []string) (inv Invocation, mageInit, showVersi
 			inv.Verbose = envVerbose
 		}
 	}
-	numFlags := 0
-	if inv.Help {
-		numFlags++
-	}
-	if mageInit {
-		numFlags++
-	}
-	if showVersion {
-		numFlags++
-	}
 
 	if numFlags > 1 {
-		return inv, mageInit, showVersion, errors.New("-h, -init, and -version cannot be used simultaneously")
+		return inv, cmd, errors.New("-h, -init, and -version cannot be used simultaneously")
 	}
 
 	inv.Args = fs.Args()
 	if inv.Help && len(inv.Args) > 1 {
-		return inv, mageInit, showVersion, errors.New("-h can only show help for a single target")
+		return inv, cmd, errors.New("-h can only show help for a single target")
 	}
 
-	return inv, mageInit, showVersion, err
+	return inv, cmd, err
 }
 
 // Invoke runs Mage with the given arguments.
