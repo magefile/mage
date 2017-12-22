@@ -17,6 +17,88 @@ import (
 )
 
 func main() {
+	// These functions are local variables to avoid name conflicts with 
+	// magefiles.
+	list := func() error {
+		{{- $default := .Default}}
+		w := tabwriter.NewWriter(os.Stdout, 0, 4, 4, ' ', 0)
+		fmt.Println("Targets:")
+		{{- range .Funcs}}
+		fmt.Fprintln(w, "  {{lowerfirst .Name}}{{if eq .Name $default}}*{{end}}\t" + {{printf "%q" .Synopsis}})
+		{{- end}}
+		err := w.Flush()
+		{{- if .Default}}
+		if err == nil {
+			fmt.Println("\n* default target")
+		}
+		{{- end}}
+		return err
+	}
+
+	var ctx context.Context
+	var ctxCancel func()
+
+	getContext := func() (context.Context, func()) {
+		if ctx != nil {
+			return ctx, ctxCancel
+		}
+
+		if os.Getenv("MAGEFILE_TIMEOUT") != "" {
+			timeout, err := time.ParseDuration(os.Getenv("MAGEFILE_TIMEOUT"))
+			if err != nil {
+				fmt.Printf("timeout error: %v\n", err)
+				os.Exit(1)
+			}
+
+			ctx, ctxCancel = context.WithTimeout(context.Background(), timeout)
+		} else {
+			ctx = context.Background()
+			ctxCancel = func() {}
+		}
+		return ctx, ctxCancel
+	}
+
+	runTarget := func(fn func(context.Context) error) interface{} {
+		var err interface{}
+		ctx, cancel := getContext()
+		d := make(chan interface{})
+		go func() {
+			defer func() {
+				err := recover()
+				d <- err
+			}()
+			err := fn(ctx)
+			d <- err
+		}()
+		select {
+		case <-ctx.Done():
+			cancel()
+			e := ctx.Err()
+			fmt.Printf("ctx err: %v\n", e)
+			return e
+		case err = <-d:
+			cancel()
+			return err
+		}
+	}
+	// This is necessary in case there aren't any targets, to avoid an unused
+	// variable error.
+	_ = runTarget
+
+	handleError := func(logger *log.Logger, err interface{}) {
+		if err != nil {
+			logger.Printf("Error: %v\n", err)
+			type code interface {
+				ExitStatus() int
+			}
+			if c, ok := err.(code); ok {
+				os.Exit(c.ExitStatus())
+			}
+			os.Exit(1)
+		}
+	}
+	_ = handleError
+
 	log.SetFlags(0)
 	if os.Getenv("MAGEFILE_VERBOSE") == "" {
 		log.SetOutput(ioutil.Discard)
@@ -77,7 +159,6 @@ func main() {
 		}	
 	}
 
-
 	if len(os.Args) < 2 {
 	{{- if .Default}}
 		{{.DefaultFunc.TemplateString}}
@@ -115,81 +196,6 @@ func main() {
 	}
 }
 
-func list() error {
-	{{- $default := .Default}}
-	w := tabwriter.NewWriter(os.Stdout, 0, 4, 4, ' ', 0)
-	fmt.Println("Targets:")
-	{{- range .Funcs}}
-	fmt.Fprintln(w, "  {{lowerfirst .Name}}{{if eq .Name $default}}*{{end}}\t" + {{printf "%q" .Synopsis}})
-	{{- end}}
-	err := w.Flush()
-	{{- if .Default}}
-	if err == nil {
-		fmt.Println("\n* default target")
-	}
-	{{- end}}
-	return err
-}
-
-func handleError(logger *log.Logger, err interface{}) {
-	if err != nil {
-		logger.Printf("Error: %v\n", err)
-		type code interface {
-			ExitStatus() int
-		}
-		if c, ok := err.(code); ok {
-			os.Exit(c.ExitStatus())
-		}
-		os.Exit(1)
-	}
-}
-
-func runTarget(fn func(context.Context) error) interface{} {
-	var err interface{}
-	ctx, cancel := getContext()
-	d := make(chan interface{})
-	go func() {
-		defer func() {
-			err := recover()
-			d <- err
-		}()
-		err := fn(ctx)
-		d <- err
-	}()
-	select {
-	case <-ctx.Done():
-		cancel()
-		e := ctx.Err()
-		fmt.Printf("ctx err: %v\n", e)
-		return e
-	case err = <-d:
-		cancel()
-		return err
-	}
-}
-
-var ctx context.Context
-var ctxCancel func()
-
-func getContext() (context.Context, func()) {
-	if ctx != nil {
-		return ctx, ctxCancel
-	}
-
-	if os.Getenv("MAGEFILE_TIMEOUT") != "" {
-		timeout, err := time.ParseDuration(os.Getenv("MAGEFILE_TIMEOUT"))
-		if err != nil {
-			fmt.Printf("timeout error: %v\n", err)
-			os.Exit(1)
-		}
-
-		ctx, ctxCancel = context.WithTimeout(context.Background(), timeout)
-	} else {
-		ctx = context.Background()
-		ctxCancel = func() {}
-	}
-	return ctx, ctxCancel
-}
 
 
 
