@@ -177,6 +177,11 @@ func Parse(stdout io.Writer, args []string) (inv Invocation, cmd Command, err er
 	case clean:
 		numFlags++
 		cmd = CLEAN
+		if fs.NArg() > 0 || fs.NFlag() > 1 {
+			// Temporary dupe of below check until we refactor the other commands to use this check
+			return inv, cmd, errors.New("-h, -init, -clean, and -version cannot be used simultaneously")
+
+		}
 	}
 	if inv.Help {
 		numFlags++
