@@ -14,6 +14,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"text/tabwriter"
 	"text/template"
 	"time"
 	"unicode"
@@ -126,10 +127,32 @@ func Parse(stdout io.Writer, args []string) (inv Invocation, mageInit, showVersi
 	fs.DurationVar(&inv.Timeout, "t", 0, "timeout in duration parsable format (e.g. 5m30s)")
 	fs.BoolVar(&inv.Keep, "keep", false, "keep intermediate mage files around after running")
 	fs.BoolVar(&showVersion, "version", false, "show version info for the mage binary")
+
+	// Categorize commands and options.
+	commands := []string{"init", "version"}
+	options := []string{"f", "h", "keep", "l", "t", "v"}
+
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
+
+	printUsage := func(flagname string) {
+		f := fs.Lookup(flagname)
+		fmt.Fprintf(w, "  -%s\t\t%s\n", f.Name, f.Usage)
+	}
+
 	fs.Usage = func() {
-		fmt.Fprintln(stdout, "mage [options] [target]")
-		fmt.Fprintln(stdout, "Options:")
-		fs.PrintDefaults()
+		fmt.Fprintln(w, "mage [options] [target]")
+		fmt.Fprintln(w, "")
+		fmt.Fprintln(w, "Commands:")
+		for _, cmd := range commands {
+			printUsage(cmd)
+		}
+
+		fmt.Fprintln(w, "")
+		fmt.Fprintln(w, "Options:")
+		for _, opt := range options {
+			printUsage(opt)
+		}
+		w.Flush()
 	}
 	err = fs.Parse(args)
 	if err == flag.ErrHelp {
