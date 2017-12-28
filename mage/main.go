@@ -1,3 +1,5 @@
+//go:generate stringer -type=Command
+
 package mage
 
 import (
@@ -55,6 +57,7 @@ const (
 	NONE Command = iota
 	VERSION
 	INIT
+	CLEAN
 )
 
 // Main is the entrypoint for running mage.  It exists external to mage's main

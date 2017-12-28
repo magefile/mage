@@ -462,12 +462,12 @@ func TestTimeout(t *testing.T) {
 }
 func TestParseHelp(t *testing.T) {
 	buf := &bytes.Buffer{}
-	_, _, _, err := Parse(buf, []string{"-h"})
+	_, _, err := Parse(buf, []string{"-h"})
 	if err != flag.ErrHelp {
 		t.Fatal("unexpected error", err)
 	}
 	buf2 := &bytes.Buffer{}
-	_, _, _, err = Parse(buf2, []string{"--help"})
+	_, _, err = Parse(buf2, []string{"--help"})
 	if err != flag.ErrHelp {
 		t.Fatal("unexpected error", err)
 	}
@@ -584,15 +584,25 @@ func TestInvalidAlias(t *testing.T) {
 }
 
 func TestClean(t *testing.T) {
-	TestGoRun(t)
+	TestGoRun(t) // make sure we've got something in the CACHE_DIR
 	dir := "./testing"
 	abs, err := filepath.Abs(dir)
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	files, err := ioutil.ReadDir(abs)
 	if err != nil {
 		t.Error("issue reading file:", err)
 	}
-	t.Logf("Here's what we found %v", files)
+
+	if len(files) < 1 {
+		t.Error("Need at least 1 cached binaries to test --clean")
+	}
+
+	buf := &bytes.Buffer{}
+	_, cmd, err := Parse(buf, []string{"-clean"})
+	if cmd != CLEAN {
+		t.Errorf("Expected 'clean' command but got %v", cmd)
+	}
 }
