@@ -1,5 +1,3 @@
-//go:generate stringer -type=Command
-
 package mage
 
 import (
@@ -51,13 +49,15 @@ var (
 	gitTag     = "v2"
 )
 
+//go:generate stringer -type=Command
+// Command tracks invocations of mage that run without targets or other flgs.
 type Command int
 
 const (
-	NONE Command = iota
-	VERSION
-	INIT
-	CLEAN
+	None    Command = iota
+	Version         // report the current version of mage
+	Init            // create a starting template for mage
+	Clean           // clean out old compiled mage binaries from the cache
 )
 
 // Main is the entrypoint for running mage.  It exists external to mage's main
@@ -100,7 +100,7 @@ func ParseAndRun(dir string, stdout, stderr io.Writer, stdin io.Reader, args []s
 	}
 
 	switch cmd {
-	case VERSION:
+	case Version:
 		if timestamp == "" {
 			timestamp = "<not set>"
 		}
@@ -111,14 +111,14 @@ func ParseAndRun(dir string, stdout, stderr io.Writer, stdin io.Reader, args []s
 		log.Println("Build Date:", timestamp)
 		log.Println("Commit:", commitHash)
 		return 0
-	case INIT:
+	case Init:
 		if err := generateInit(dir); err != nil {
 			log.Println("Error:", err)
 			return 1
 		}
 		log.Println(initFile, "created")
 		return 0
-	case CLEAN:
+	case Clean:
 		dir := mg.CacheDir()
 		if err := removeContents(dir); err != nil {
 			log.Println("Error:", err)
@@ -126,9 +126,11 @@ func ParseAndRun(dir string, stdout, stderr io.Writer, stdin io.Reader, args []s
 		}
 		log.Println(dir, "cleaned")
 		return 0
+	case None:
+		return Invoke(inv)
+	default:
+		panic(fmt.Errorf("Unknown command type: %v", cmd))
 	}
-
-	return Invoke(inv)
 }
 
 // Parse parses the given args and returns structured data.  If parse returns
@@ -170,13 +172,13 @@ func Parse(stdout io.Writer, args []string) (inv Invocation, cmd Command, err er
 	switch {
 	case mageInit:
 		numFlags++
-		cmd = INIT
+		cmd = Init
 	case showVersion:
 		numFlags++
-		cmd = VERSION
+		cmd = Version
 	case clean:
 		numFlags++
-		cmd = CLEAN
+		cmd = Clean
 		if fs.NArg() > 0 || fs.NFlag() > 1 {
 			// Temporary dupe of below check until we refactor the other commands to use this check
 			return inv, cmd, errors.New("-h, -init, -clean, and -version cannot be used simultaneously")

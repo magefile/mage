@@ -424,10 +424,10 @@ func TestParse(t *testing.T) {
 	if err != nil {
 		t.Fatal("unexpected error", err)
 	}
-	if cmd == INIT {
+	if cmd == Init {
 		t.Fatal("init should be false but was true")
 	}
-	if cmd == VERSION {
+	if cmd == Version {
 		t.Fatal("showVersion should be false but was true")
 	}
 	if len(inv.Args) != 1 && inv.Args[0] != "build" {
@@ -602,7 +602,7 @@ func TestClean(t *testing.T) {
 
 	buf := &bytes.Buffer{}
 	_, cmd, err := Parse(buf, []string{"-clean"})
-	if cmd != CLEAN {
+	if cmd != Clean {
 		t.Errorf("Expected 'clean' command but got %v", cmd)
 	}
 	code := ParseAndRun(dir, os.Stdin, os.Stderr, buf, []string{"-clean"})
