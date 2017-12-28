@@ -6,7 +6,7 @@ import (
 )
 
 func TestParse(t *testing.T) {
-	info, err := Package("./testdata", []string{"func.go", "command.go", "alias.go"})
+	info, err := Package("./testdata", []string{"func.go", "command.go", "alias.go", "repeating_synopsis.go"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -30,6 +30,12 @@ func TestParse(t *testing.T) {
 			Name:      "TakesContextReturnsVoid",
 			IsError:   false,
 			IsContext: true,
+		},
+		{
+			Name:     "RepeatingSynopsis",
+			IsError:  true,
+			Comment:  "RepeatingSynopsis chops off the repeating function name.\nSome more text.\n",
+			Synopsis: "chops off the repeating function name.",
 		},
 	}
 
