@@ -605,4 +605,17 @@ func TestClean(t *testing.T) {
 	if cmd != CLEAN {
 		t.Errorf("Expected 'clean' command but got %v", cmd)
 	}
+	code := ParseAndRun(dir, os.Stdin, os.Stderr, buf, []string{"-clean"})
+	if code != 0 {
+		t.Errorf("expected 0, but got %v", code)
+	}
+
+	files, err = ioutil.ReadDir(abs)
+	if err != nil {
+		t.Error("issue reading file:", err)
+	}
+
+	if len(files) != 0 {
+		t.Errorf("expected '-clean' to remove files from CACHE_DIR, but still have %v", files)
+	}
 }

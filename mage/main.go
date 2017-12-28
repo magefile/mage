@@ -118,7 +118,14 @@ func ParseAndRun(dir string, stdout, stderr io.Writer, stdin io.Reader, args []s
 		}
 		log.Println(initFile, "created")
 		return 0
-
+	case CLEAN:
+		dir := mg.CacheDir()
+		if err := removeContents(dir); err != nil {
+			log.Println("Error:", err)
+			return 1
+		}
+		log.Println(dir, "cleaned")
+		return 0
 	}
 
 	return Invoke(inv)
@@ -140,6 +147,8 @@ func Parse(stdout io.Writer, args []string) (inv Invocation, cmd Command, err er
 	fs.BoolVar(&showVersion, "version", false, "show version info for the mage binary")
 	var mageInit bool
 	fs.BoolVar(&mageInit, "init", false, "create a starting template if no mage files exist")
+	var clean bool
+	fs.BoolVar(&clean, "clean", false, "clean out old generated binaries from CACHE_DIR")
 
 	fs.Usage = func() {
 		fmt.Fprintln(stdout, "mage [options] [target]")
@@ -162,12 +171,14 @@ func Parse(stdout io.Writer, args []string) (inv Invocation, cmd Command, err er
 	case mageInit:
 		numFlags++
 		cmd = INIT
-		fallthrough
 	case showVersion:
 		numFlags++
 		cmd = VERSION
-		fallthrough
-	case inv.Help:
+	case clean:
+		numFlags++
+		cmd = CLEAN
+	}
+	if inv.Help {
 		numFlags++
 	}
 
@@ -181,7 +192,7 @@ func Parse(stdout io.Writer, args []string) (inv Invocation, cmd Command, err er
 	}
 
 	if numFlags > 1 {
-		return inv, cmd, errors.New("-h, -init, and -version cannot be used simultaneously")
+		return inv, cmd, errors.New("-h, -init, -clean, and -version cannot be used simultaneously")
 	}
 
 	inv.Args = fs.Args()
@@ -419,4 +430,23 @@ func RunCompiled(inv Invocation, exePath string) int {
 		c.Env = append(c.Env, fmt.Sprintf("MAGEFILE_TIMEOUT=%s", inv.Timeout.String()))
 	}
 	return sh.ExitStatus(c.Run())
+}
+
+func removeContents(dir string) error {
+	d, err := os.Open(dir)
+	if err != nil {
+		return err
+	}
+	defer d.Close()
+	names, err := d.Readdirnames(-1)
+	if err != nil {
+		return err
+	}
+	for _, name := range names {
+		err = os.RemoveAll(filepath.Join(dir, name))
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
