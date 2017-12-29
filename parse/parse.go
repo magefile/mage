@@ -102,7 +102,7 @@ func Package(path string, files []string) (*PkgInfo, error) {
 			pi.Funcs = append(pi.Funcs, Function{
 				Name:      f.Name,
 				Comment:   f.Doc,
-				Synopsis:  doc.Synopsis(f.Doc),
+				Synopsis:  sanitizeSynopsis(f),
 				IsError:   typ == mgTypes.ErrorType || typ == mgTypes.ContextErrorType,
 				IsContext: typ == mgTypes.ContextVoidType || typ == mgTypes.ContextErrorType,
 			})
@@ -113,6 +113,23 @@ func Package(path string, files []string) (*PkgInfo, error) {
 	setAliases(p, pi, info)
 
 	return pi, nil
+}
+
+// sanitizeSynopsis sanitizes function Doc to create a summary.
+func sanitizeSynopsis(f *doc.Func) string {
+	synopsis := doc.Synopsis(f.Doc)
+
+	// If the synopsis begins with the function name, remove it. This is done to
+	// not repeat the text.
+	// From:
+	// clean	Clean removes the temporarily generated files
+	// To:
+	// clean 	removes the temporarily generated files
+	if syns := strings.Split(synopsis, " "); strings.EqualFold(f.Name, syns[0]) {
+		return strings.Join(syns[1:], " ")
+	}
+
+	return synopsis
 }
 
 func setDefault(p *doc.Package, pi *PkgInfo, info types.Info) {
