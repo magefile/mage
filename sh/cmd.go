@@ -2,6 +2,7 @@ package sh
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -11,6 +12,73 @@ import (
 
 	"github.com/magefile/mage/mg"
 )
+
+// CfgMode is configuration mode type for command expansion.
+type CfgMode int
+
+// Configuration options for command expansion. It can be used for env vars
+// and glob files expansion.
+const (
+	OnForAll    CfgMode = iota // enable the config for all commands (default)
+	OffForAll                  // disable the config for all commands
+	IncludeCmds                // disable the config except for the given commands
+	ExcludeCmds                // enable the config except for the given commands
+)
+
+// Expand env var defaults to enabled.
+var expandEnvDefault = true
+
+// expandEnvConfig is to store the env var expand config for various commands.
+var expandEnvConfig = make(map[string]bool)
+
+// CfgExpandEnv sets configuration for command expansion of given set of
+// commands with the configuration mode.
+func CfgExpandEnv(m CfgMode, cmds ...string) error {
+	switch m {
+	case OnForAll:
+		if len(cmds) > 0 {
+			return errors.New("OnForAll cannot accept slice of commands")
+		}
+	case OffForAll:
+		if len(cmds) > 0 {
+			return errors.New("OffForAll cannot accept slice of commands")
+		}
+		// Turn off env var expansion for all commands.
+		expandEnvDefault = false
+	case IncludeCmds:
+		if len(cmds) < 1 {
+			return errors.New("IncludeCmds expects a slice of commands to be passed")
+		}
+		setCfgExpandEnv(true, cmds...)
+		// Turn off env var expansion for all other commands.
+		expandEnvDefault = false
+	case ExcludeCmds:
+		if len(cmds) < 1 {
+			return errors.New("ExcludeCmds expects a slice of commands to be passed")
+		}
+		setCfgExpandEnv(false, cmds...)
+		// Turn on env var expansion for all other commands.
+		expandEnvDefault = true
+	}
+
+	return nil
+}
+
+// setCfgExpandEnv enables or disables env var expansion for a given set of commands.
+func setCfgExpandEnv(val bool, cmds ...string) {
+	for _, cmd := range cmds {
+		expandEnvConfig[cmd] = val
+	}
+}
+
+// expandEnv checks expandEnvConfig and expandEnvDefault and decides if a given
+// command should be expanded or not.
+func expandEnv(cmd string) bool {
+	if val, ok := expandEnvConfig[cmd]; ok {
+		return val
+	}
+	return expandEnvDefault
+}
 
 // RunCmd returns a function that will call Run with the given command. This is
 // useful for creating command aliases to make your scripts easier to read, like
@@ -96,17 +164,21 @@ func OutputWith(env map[string]string, cmd string, args ...string) (string, erro
 // Code reports the exit code the command returned if it ran. If err == nil, ran
 // is always true and code is always 0.
 func Exec(env map[string]string, stdout, stderr io.Writer, cmd string, args ...string) (ran bool, err error) {
-	expand := func(s string) string {
-		s2, ok := env[s]
-		if ok {
-			return s2
+	// Expand env var if required.
+	if expandEnv(cmd) {
+		expand := func(s string) string {
+			s2, ok := env[s]
+			if ok {
+				return s2
+			}
+			return os.Getenv(s)
 		}
-		return os.Getenv(s)
+		cmd = os.Expand(cmd, expand)
+		for i := range args {
+			args[i] = os.Expand(args[i], expand)
+		}
 	}
-	cmd = os.Expand(cmd, expand)
-	for i := range args {
-		args[i] = os.Expand(args[i], expand)
-	}
+
 	ran, code, err := run(env, stdout, stderr, cmd, args...)
 	if err == nil {
 		return true, nil
