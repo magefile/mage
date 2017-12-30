@@ -129,8 +129,8 @@ func Parse(stdout io.Writer, args []string) (inv Invocation, mageInit, showVersi
 	fs.BoolVar(&showVersion, "version", false, "show version info for the mage binary")
 
 	// Categorize commands and options.
-	commands := []string{"init", "version"}
-	options := []string{"f", "h", "keep", "l", "t", "v"}
+	commands := []string{"init", "l", "h", "version"}
+	options := []string{"f", "keep", "t", "v"}
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
 
@@ -149,6 +149,7 @@ func Parse(stdout io.Writer, args []string) (inv Invocation, mageInit, showVersi
 
 		fmt.Fprintln(w, "")
 		fmt.Fprintln(w, "Options:")
+		fmt.Fprintln(w, "  -h\t\tshow description of a target")
 		for _, opt := range options {
 			printUsage(opt)
 		}

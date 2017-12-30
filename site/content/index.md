@@ -55,13 +55,14 @@ mage [options] [target]
 
 Commands:
   -init     create a starting template if no mage files exist
+  -l        list mage targets in this directory
+  -h        show this help
   -version  show version info for the mage binary
 
 Options:
+  -h     show description of a target
   -f     force recreation of compiled magefile
-  -h     show this help
   -keep  keep intermediate mage files around after running
-  -l     list mage targets in this directory
   -t     timeout in duration parsable format (e.g. 5m30s)
   -v     show verbose output when running mage targets
 ```
