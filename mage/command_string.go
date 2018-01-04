@@ -4,7 +4,7 @@ package mage
 
 import "fmt"
 
-const _Command_name = "NONEVERSIONINITCLEAN"
+const _Command_name = "NoneVersionInitClean"
 
 var _Command_index = [...]uint8{0, 4, 11, 15, 20}
 
