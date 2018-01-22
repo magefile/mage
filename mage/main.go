@@ -50,7 +50,8 @@ var (
 )
 
 //go:generate stringer -type=Command
-// Command tracks invocations of mage that run without targets or other flgs.
+
+// Command tracks invocations of mage that run without targets or other flags.
 type Command int
 
 const (
