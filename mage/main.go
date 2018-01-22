@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -441,17 +442,15 @@ func RunCompiled(inv Invocation, exePath string) int {
 }
 
 func removeContents(dir string) error {
-	d, err := os.Open(dir)
+	files, err := ioutil.ReadDir(dir)
 	if err != nil {
 		return err
 	}
-	defer d.Close()
-	names, err := d.Readdirnames(-1)
-	if err != nil {
-		return err
-	}
-	for _, name := range names {
-		err = os.RemoveAll(filepath.Join(dir, name))
+	for _, f := range files {
+		if f.IsDir() {
+			continue
+		}
+		err = os.Remove(filepath.Join(dir, f.Name()))
 		if err != nil {
 			return err
 		}
