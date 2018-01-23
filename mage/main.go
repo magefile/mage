@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -49,6 +50,18 @@ var (
 	gitTag     = "v2"
 )
 
+//go:generate stringer -type=Command
+
+// Command tracks invocations of mage that run without targets or other flags.
+type Command int
+
+const (
+	None    Command = iota
+	Version         // report the current version of mage
+	Init            // create a starting template for mage
+	Clean           // clean out old compiled mage binaries from the cache
+)
+
 // Main is the entrypoint for running mage.  It exists external to mage's main
 // function to allow it to be used from other programs, specifically so you can
 // go run a simple file that run's mage's Main.
@@ -76,7 +89,7 @@ type Invocation struct {
 // name in the args).
 func ParseAndRun(dir string, stdout, stderr io.Writer, stdin io.Reader, args []string) int {
 	log := log.New(stderr, "", 0)
-	inv, mageInit, showVersion, err := Parse(stdout, args)
+	inv, cmd, err := Parse(stdout, args)
 	inv.Dir = dir
 	inv.Stderr = stderr
 	inv.Stdin = stdin
@@ -88,7 +101,8 @@ func ParseAndRun(dir string, stdout, stderr io.Writer, stdin io.Reader, args []s
 		return 2
 	}
 
-	if showVersion {
+	switch cmd {
+	case Version:
 		if timestamp == "" {
 			timestamp = "<not set>"
 		}
@@ -99,22 +113,31 @@ func ParseAndRun(dir string, stdout, stderr io.Writer, stdin io.Reader, args []s
 		log.Println("Build Date:", timestamp)
 		log.Println("Commit:", commitHash)
 		return 0
-	}
-	if mageInit {
+	case Init:
 		if err := generateInit(dir); err != nil {
 			log.Println("Error:", err)
 			return 1
 		}
 		log.Println(initFile, "created")
 		return 0
+	case Clean:
+		dir := mg.CacheDir()
+		if err := removeContents(dir); err != nil {
+			log.Println("Error:", err)
+			return 1
+		}
+		log.Println(dir, "cleaned")
+		return 0
+	case None:
+		return Invoke(inv)
+	default:
+		panic(fmt.Errorf("Unknown command type: %v", cmd))
 	}
-
-	return Invoke(inv)
 }
 
 // Parse parses the given args and returns structured data.  If parse returns
 // flag.ErrHelp, the calling process should exit with code 0.
-func Parse(stdout io.Writer, args []string) (inv Invocation, mageInit, showVersion bool, err error) {
+func Parse(stdout io.Writer, args []string) (inv Invocation, cmd Command, err error) {
 	inv.Stdout = stdout
 	fs := flag.FlagSet{}
 	fs.SetOutput(stdout)
@@ -122,10 +145,15 @@ func Parse(stdout io.Writer, args []string) (inv Invocation, mageInit, showVersi
 	fs.BoolVar(&inv.Verbose, "v", false, "show verbose output when running mage targets")
 	fs.BoolVar(&inv.List, "l", false, "list mage targets in this directory")
 	fs.BoolVar(&inv.Help, "h", false, "show this help")
-	fs.BoolVar(&mageInit, "init", false, "create a starting template if no mage files exist")
 	fs.DurationVar(&inv.Timeout, "t", 0, "timeout in duration parsable format (e.g. 5m30s)")
 	fs.BoolVar(&inv.Keep, "keep", false, "keep intermediate mage files around after running")
+	var showVersion bool
 	fs.BoolVar(&showVersion, "version", false, "show version info for the mage binary")
+	var mageInit bool
+	fs.BoolVar(&mageInit, "init", false, "create a starting template if no mage files exist")
+	var clean bool
+	fs.BoolVar(&clean, "clean", false, "clean out old generated binaries from CACHE_DIR")
+
 	fs.Usage = func() {
 		fmt.Fprintln(stdout, "mage [options] [target]")
 		fmt.Fprintln(stdout, "Options:")
@@ -134,12 +162,33 @@ func Parse(stdout io.Writer, args []string) (inv Invocation, mageInit, showVersi
 	err = fs.Parse(args)
 	if err == flag.ErrHelp {
 		// parse will have already called fs.Usage()
-		return inv, mageInit, showVersion, err
+		return inv, cmd, err
 	}
 	if err == nil && inv.Help && len(fs.Args()) == 0 {
 		fs.Usage()
 		// tell upstream, to just exit
-		return inv, mageInit, showVersion, flag.ErrHelp
+		return inv, cmd, flag.ErrHelp
+	}
+
+	numFlags := 0
+	switch {
+	case mageInit:
+		numFlags++
+		cmd = Init
+	case showVersion:
+		numFlags++
+		cmd = Version
+	case clean:
+		numFlags++
+		cmd = Clean
+		if fs.NArg() > 0 || fs.NFlag() > 1 {
+			// Temporary dupe of below check until we refactor the other commands to use this check
+			return inv, cmd, errors.New("-h, -init, -clean, and -version cannot be used simultaneously")
+
+		}
+	}
+	if inv.Help {
+		numFlags++
 	}
 
 	// If verbose is still false, we're going to peek at the environment variable to see if
@@ -150,27 +199,17 @@ func Parse(stdout io.Writer, args []string) (inv Invocation, mageInit, showVersi
 			inv.Verbose = envVerbose
 		}
 	}
-	numFlags := 0
-	if inv.Help {
-		numFlags++
-	}
-	if mageInit {
-		numFlags++
-	}
-	if showVersion {
-		numFlags++
-	}
 
 	if numFlags > 1 {
-		return inv, mageInit, showVersion, errors.New("-h, -init, and -version cannot be used simultaneously")
+		return inv, cmd, errors.New("-h, -init, -clean, and -version cannot be used simultaneously")
 	}
 
 	inv.Args = fs.Args()
 	if inv.Help && len(inv.Args) > 1 {
-		return inv, mageInit, showVersion, errors.New("-h can only show help for a single target")
+		return inv, cmd, errors.New("-h can only show help for a single target")
 	}
 
-	return inv, mageInit, showVersion, err
+	return inv, cmd, err
 }
 
 // Invoke runs Mage with the given arguments.
@@ -400,4 +439,21 @@ func RunCompiled(inv Invocation, exePath string) int {
 		c.Env = append(c.Env, fmt.Sprintf("MAGEFILE_TIMEOUT=%s", inv.Timeout.String()))
 	}
 	return sh.ExitStatus(c.Run())
+}
+
+func removeContents(dir string) error {
+	files, err := ioutil.ReadDir(dir)
+	if err != nil {
+		return err
+	}
+	for _, f := range files {
+		if f.IsDir() {
+			continue
+		}
+		err = os.Remove(filepath.Join(dir, f.Name()))
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
