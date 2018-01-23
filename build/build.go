@@ -145,7 +145,7 @@ func (ctxt *Context) hasSubdir(root, dir string) (rel string, ok bool) {
 
 	// Try using paths we received.
 	if rel, ok = hasSubdir(root, dir); ok {
-		return
+		return rel, ok
 	}
 
 	// Try expanding symlinks and comparing
@@ -155,10 +155,10 @@ func (ctxt *Context) hasSubdir(root, dir string) (rel string, ok bool) {
 	dirSym, _ := filepath.EvalSymlinks(dir)
 
 	if rel, ok = hasSubdir(rootSym, dir); ok {
-		return
+		return rel, ok
 	}
 	if rel, ok = hasSubdir(root, dirSym); ok {
-		return
+		return rel, ok
 	}
 	return hasSubdir(rootSym, dirSym)
 }
@@ -1052,7 +1052,8 @@ func parseWord(data []byte) (word, rest []byte) {
 // read some or all of the file's content.
 func (ctxt *Context) MatchFile(dir, name string) (match bool, err error) {
 	match, _, _, err = ctxt.matchFile(dir, name, nil, nil)
-	return
+	return match, err
+
 }
 
 // matchFile determines whether the file with the given name in the given directory
@@ -1066,7 +1067,7 @@ func (ctxt *Context) MatchFile(dir, name string) (match bool, err error) {
 func (ctxt *Context) matchFile(dir, name string, allTags map[string]bool, binaryOnly *bool) (match bool, data []byte, filename string, err error) {
 	if strings.HasPrefix(name, "_") ||
 		strings.HasPrefix(name, ".") {
-		return
+		return match, data, filename, err
 	}
 
 	i := strings.LastIndex(name, ".")
@@ -1076,7 +1077,7 @@ func (ctxt *Context) matchFile(dir, name string, allTags map[string]bool, binary
 	ext := name[i:]
 
 	if !ctxt.goodOSArchFile(name, allTags) && !ctxt.UseAllFiles {
-		return
+		return match, data, filename, err
 	}
 
 	switch ext {
@@ -1085,16 +1086,16 @@ func (ctxt *Context) matchFile(dir, name string, allTags map[string]bool, binary
 	case ".syso":
 		// binary, no reading
 		match = true
-		return
+		return match, data, filename, err
 	default:
 		// skip
-		return
+		return match, data, filename, err
 	}
 
 	filename = ctxt.joinPath(dir, name)
 	f, err := ctxt.openFile(filename)
 	if err != nil {
-		return
+		return match, data, filename, err
 	}
 
 	if strings.HasSuffix(filename, ".go") {
@@ -1109,20 +1110,20 @@ func (ctxt *Context) matchFile(dir, name string, allTags map[string]bool, binary
 	f.Close()
 	if err != nil {
 		err = fmt.Errorf("read %s: %v", filename, err)
-		return
+		return match, data, filename, err
 	}
 
 	// Look for +build comments to accept or reject the file.
 	var sawBinaryOnly bool
 	if !ctxt.shouldBuild(data, allTags, &sawBinaryOnly) && !ctxt.UseAllFiles {
-		return
+		return match, data, filename, err
 	}
 
 	if binaryOnly != nil && sawBinaryOnly {
 		*binaryOnly = true
 	}
 	match = true
-	return
+	return match, data, filename, err
 }
 
 func cleanImports(m map[string][]token.Position) ([]string, map[string][]token.Position) {
