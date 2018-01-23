@@ -14,6 +14,11 @@ import (
 	"github.com/magefile/mage/sh"
 )
 
+// Runs all the golang tests while checking for race conditions
+func Test() error {
+	return sh.RunV("go", "test", "-race", "./...")
+}
+
 // Runs "go install" for mage.  This generates the version info the binary.
 func Install() error {
 	ldf, err := flags()
