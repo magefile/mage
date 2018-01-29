@@ -36,7 +36,7 @@ they won't.
 ## Use Mage as a library
 
 All of mage's functionality is accessible as a compile-in library.  Checkout
-[godoc.org/github.com/magefile/mage/mage](https://godoc.org/github.com/mage/mage)
+[godoc.org/github.com/magefile/mage/mage](https://godoc.org/github.com/magefile/mage/mage)
 for full details.
 
 Fair warning, the API of mage/mage may change, so be sure to use vendoring.
