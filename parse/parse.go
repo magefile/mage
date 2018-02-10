@@ -1,6 +1,7 @@
 package parse
 
 import (
+	"bufio"
 	"fmt"
 	"go/ast"
 	"go/build"
@@ -106,6 +107,15 @@ func Package(path string, files []string) (*PkgInfo, error) {
 				IsError:   typ == mgTypes.ErrorType || typ == mgTypes.ContextErrorType,
 				IsContext: typ == mgTypes.ContextVoidType || typ == mgTypes.ContextErrorType,
 			})
+			if alias := scanAlias(f.Doc); alias != nil {
+				if pi.Aliases == nil {
+					pi.Aliases = make(map[string]string)
+				}
+				for _, a := range alias {
+					pi.Aliases[a] = f.Name
+				}
+			}
+
 		}
 	}
 
@@ -113,6 +123,28 @@ func Package(path string, files []string) (*PkgInfo, error) {
 	setAliases(p, pi, info)
 
 	return pi, nil
+}
+
+// Any word following alias: is considered to be an alias.
+func scanAlias(doc string) []string {
+	a := "alias:"
+	var o []string
+	for {
+		i := strings.Index(doc, a)
+		if i == -1 {
+			return o
+		}
+		doc = doc[i+len(a):]
+		doc = strings.TrimSpace(doc)
+		if doc != "" {
+			s := bufio.NewScanner(strings.NewReader(doc))
+			s.Split(bufio.ScanWords)
+			if s.Scan() {
+				x := s.Text()
+				o = append(o, x)
+			}
+		}
+	}
 }
 
 // sanitizeSynopsis sanitizes function Doc to create a summary.
