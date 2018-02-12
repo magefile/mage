@@ -29,7 +29,7 @@ will print the list of targets, like `mage -l`.
 ## Multiple Targets
 
 Multiple targets can be specified as args to Mage, for example `mage foo bar
-baz`.  Targets will be run serially, from left to right (so in thise case, foo,
+baz`.  Targets will be run serially, from left to right (so in this case, foo,
 then once foo is done, bar, then once bar is done, baz).  Dependencies run using
 mg.Deps will still only run once per mage execution, so if each of the targets
 depend on the same function, that function will only be run once for all
