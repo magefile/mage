@@ -185,6 +185,7 @@ func Parse(stdout io.Writer, args []string) (inv Invocation, cmd Command, err er
 		numFlags++
 		cmd = CompileStatic
 		inv.CompileOut = compileOutPath
+		inv.Force = true
 	case showVersion:
 		numFlags++
 		cmd = Version
