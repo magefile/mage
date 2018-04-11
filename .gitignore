@@ -21,3 +21,7 @@ mage_output_file.go
 
 # stupid osx
 .DS_Store
+
+# Goland
+.idea
+*.iml

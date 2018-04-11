@@ -40,3 +40,14 @@ All of mage's functionality is accessible as a compile-in library.  Checkout
 for full details.
 
 Fair warning, the API of mage/mage may change, so be sure to use vendoring.
+
+## Compiling a static binary
+
+If your tasks are not related to compiling Go code, it can be useful to compile a binary which has
+the mage execution runtime and the tasks compiled in such that it can be run on another machine
+without requiring installation of dependencies. To do so, pass the output path to the compile flag.
+like this:
+
+```
+$ mage -compile ./static-output
+```

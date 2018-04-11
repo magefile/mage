@@ -56,10 +56,11 @@ var (
 type Command int
 
 const (
-	None    Command = iota
-	Version         // report the current version of mage
-	Init            // create a starting template for mage
-	Clean           // clean out old compiled mage binaries from the cache
+	None          Command = iota
+	Version               // report the current version of mage
+	Init                  // create a starting template for mage
+	Clean                 // clean out old compiled mage binaries from the cache
+	CompileStatic         // compile a static binary of the current directory
 )
 
 // Main is the entrypoint for running mage.  It exists external to mage's main
@@ -71,17 +72,18 @@ func Main() int {
 
 // Invocation contains the args for invoking a run of Mage.
 type Invocation struct {
-	Dir     string        // directory to read magefiles from
-	Force   bool          // forces recreation of the compiled binary
-	Verbose bool          // tells the magefile to print out log statements
-	List    bool          // tells the magefile to print out a list of targets
-	Help    bool          // tells the magefile to print out help for a specific target
-	Keep    bool          // tells mage to keep the generated main file after compiling
-	Timeout time.Duration // tells mage to set a timeout to running the targets
-	Stdout  io.Writer     // writer to write stdout messages to
-	Stderr  io.Writer     // writer to write stderr messages to
-	Stdin   io.Reader     // reader to read stdin from
-	Args    []string      // args to pass to the compiled binary
+	Dir        string        // directory to read magefiles from
+	Force      bool          // forces recreation of the compiled binary
+	Verbose    bool          // tells the magefile to print out log statements
+	List       bool          // tells the magefile to print out a list of targets
+	Help       bool          // tells the magefile to print out help for a specific target
+	Keep       bool          // tells mage to keep the generated main file after compiling
+	Timeout    time.Duration // tells mage to set a timeout to running the targets
+	CompileOut string        // tells mage to compile a static binary to this path, but not execute
+	Stdout     io.Writer     // writer to write stdout messages to
+	Stderr     io.Writer     // writer to write stderr messages to
+	Stdin      io.Reader     // reader to read stdin from
+	Args       []string      // args to pass to the compiled binary
 }
 
 // ParseAndRun parses the command line, and then compiles and runs the mage
@@ -128,6 +130,8 @@ func ParseAndRun(dir string, stdout, stderr io.Writer, stdin io.Reader, args []s
 		}
 		log.Println(dir, "cleaned")
 		return 0
+	case CompileStatic:
+		return Invoke(inv)
 	case None:
 		return Invoke(inv)
 	default:
@@ -153,6 +157,8 @@ func Parse(stdout io.Writer, args []string) (inv Invocation, cmd Command, err er
 	fs.BoolVar(&mageInit, "init", false, "create a starting template if no mage files exist")
 	var clean bool
 	fs.BoolVar(&clean, "clean", false, "clean out old generated binaries from CACHE_DIR")
+	var compileOutPath string
+	fs.StringVar(&compileOutPath, "compile", "", "path to which to output a static binary")
 
 	fs.Usage = func() {
 		fmt.Fprintln(stdout, "mage [options] [target]")
@@ -175,6 +181,11 @@ func Parse(stdout io.Writer, args []string) (inv Invocation, cmd Command, err er
 	case mageInit:
 		numFlags++
 		cmd = Init
+	case compileOutPath != "":
+		numFlags++
+		cmd = CompileStatic
+		inv.CompileOut = compileOutPath
+		inv.Force = true
 	case showVersion:
 		numFlags++
 		cmd = Version
@@ -183,7 +194,7 @@ func Parse(stdout io.Writer, args []string) (inv Invocation, cmd Command, err er
 		cmd = Clean
 		if fs.NArg() > 0 || fs.NFlag() > 1 {
 			// Temporary dupe of below check until we refactor the other commands to use this check
-			return inv, cmd, errors.New("-h, -init, -clean, and -version cannot be used simultaneously")
+			return inv, cmd, errors.New("-h, -init, -clean, -compile and -version cannot be used simultaneously")
 
 		}
 	}
@@ -201,7 +212,7 @@ func Parse(stdout io.Writer, args []string) (inv Invocation, cmd Command, err er
 	}
 
 	if numFlags > 1 {
-		return inv, cmd, errors.New("-h, -init, -clean, and -version cannot be used simultaneously")
+		return inv, cmd, errors.New("-h, -init, -clean, -compile and -version cannot be used simultaneously")
 	}
 
 	inv.Args = fs.Args()
@@ -228,10 +239,12 @@ func Invoke(inv Invocation) int {
 	}
 
 	exePath, err := ExeName(files)
-
 	if err != nil {
 		log.Println("Error:", err)
 		return 1
+	}
+	if inv.CompileOut != "" {
+		exePath = inv.CompileOut
 	}
 
 	if !inv.Force {
@@ -281,6 +294,10 @@ func Invoke(inv Invocation) int {
 		// compiled file screws things up.  Yes this doubles up with the above
 		// defer, that's ok.
 		os.Remove(main)
+	}
+
+	if inv.CompileOut != "" {
+		return 0
 	}
 
 	return RunCompiled(inv, exePath)
