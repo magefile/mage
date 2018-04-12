@@ -66,3 +66,32 @@ func TestParse(t *testing.T) {
 		}
 	}
 }
+
+func TestScanAlias(t *testing.T) {
+	table := []struct {
+		doc   string
+		alias []string
+	}{
+		{
+			"", nil,
+		},
+		{
+			"alias:a", []string{"a"},
+		},
+		{
+			"alias: a", []string{"a"},
+		},
+		{
+			"alias: a this is an alias", []string{"a"},
+		},
+		{
+			"alias: a this is an alias \n alias: b", []string{"a", "b"},
+		},
+	}
+	for _, v := range table {
+		a := scanAlias(v.doc)
+		if !reflect.DeepEqual(a, v.alias) {
+			t.Errorf("expected %v got %v", v.alias, a)
+		}
+	}
+}
