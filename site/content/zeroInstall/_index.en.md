@@ -32,6 +32,13 @@ will only ever exit with an error code of 0 or 1.  If mage exits with error code
 error code 1.  Why?  Ask the go team.  I've tried to get them to fix it, and
 they won't.
 
+If you are using `dep` for managing Go dependencies, it is necessary to add the mage import path to
+a `required` clause in `Gopkg.toml` to prevent it being subsequently removed due to lack of
+perceived use thanks for the `+build ignore` tag - for example:
+
+```toml
+required = ["github.com/magefile/mage/mage"]
+```
 
 ## Use Mage as a library
 
