@@ -3,6 +3,8 @@ package mg
 import (
 	"context"
 	"fmt"
+	"log"
+	"os"
 	"reflect"
 	"runtime"
 	"strings"
@@ -75,6 +77,7 @@ func runDeps(ctx context.Context, fns ...interface{}) {
 	for _, f := range fns {
 		fn := addDep(ctx, f)
 		wg.Add(1)
+		logger := log.New(os.Stderr, "", 0)
 		go func() {
 			defer func() {
 				if v := recover(); v != nil {
@@ -89,6 +92,9 @@ func runDeps(ctx context.Context, fns ...interface{}) {
 				}
 				wg.Done()
 			}()
+			if os.Getenv("MAGEFILE_VERBOSE") != "" {
+				logger.Println("Running dependency:", fn.displayName)
+			}
 			if err := fn.run(); err != nil {
 				mu.Lock()
 				errs = append(errs, fmt.Sprint(err))
@@ -143,6 +149,8 @@ func addDep(ctx context.Context, f interface{}) *onceFun {
 	of := onces.LoadOrStore(n, &onceFun{
 		fn:  fn,
 		ctx: ctx,
+
+		displayName: displayName(n),
 	})
 	return of
 }
@@ -151,10 +159,17 @@ func name(i interface{}) string {
 	return runtime.FuncForPC(reflect.ValueOf(i).Pointer()).Name()
 }
 
+func displayName(name string) string {
+	splitByPackage := strings.Split(name, ".")
+	return splitByPackage[len(splitByPackage)-1]
+}
+
 type onceFun struct {
 	once sync.Once
 	fn   func(context.Context) error
 	ctx  context.Context
+
+	displayName string
 }
 
 func (o *onceFun) run() error {
