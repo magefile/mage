@@ -24,7 +24,7 @@ func main() {
 		w := tabwriter.NewWriter(os.Stdout, 0, 4, 4, ' ', 0)
 		fmt.Println("Targets:")
 		{{- range .Funcs}}
-		fmt.Fprintln(w, "  {{lowerfirst .Name}}{{if eq .Name $default}}*{{end}}\t" + {{printf "%q" .Synopsis}})
+		fmt.Fprintln(w, "  {{lowerfirst .TemplateName}}{{if eq .Name $default}}*{{end}}\t" + {{printf "%q" .Synopsis}})
 		{{- end}}
 		err := w.Flush()
 		{{- if .Default}}
@@ -115,7 +115,7 @@ func main() {
 	targets := map[string]bool {
 		{{range $alias, $funci := .Aliases}}"{{lower $alias}}": true,
 		{{end}}
-		{{range .Funcs}}"{{lower .Name}}": true,
+		{{range .Funcs}}"{{lower .TemplateName}}": true,
 		{{end}}
 	}
 
@@ -140,8 +140,8 @@ func main() {
 			os.Exit(1)
 		}
 		switch strings.ToLower(os.Args[1]) {
-			{{range .Funcs}}case "{{lower .Name}}":
-				fmt.Print("mage {{lower .Name}}:\n\n")
+			{{range .Funcs}}case "{{lower .TemplateName}}":
+				fmt.Print("mage {{lower .TemplateName}}:\n\n")
 				{{if ne .Comment ""}}fmt.Println({{printf "%q" .Comment}}){{end}}
 				var aliases []string
 				{{- $name := .Name -}}
@@ -181,9 +181,9 @@ func main() {
 		}
 		switch strings.ToLower(target) {
 		{{range .Funcs }}
-		case "{{lower .Name}}":
+		case "{{lower .TemplateName}}":
 			if os.Getenv("MAGEFILE_VERBOSE") != "" {
-				logger.Println("Running target:", "{{.Name}}")
+				logger.Println("Running target:", "{{.TemplateName}}")
 			}
 			{{.TemplateString}}
 			handleError(logger, err)

@@ -28,22 +28,36 @@ type PkgInfo struct {
 // Function represented a job function from a mage file
 type Function struct {
 	Name      string
+	Receiver  string
 	IsError   bool
 	IsContext bool
 	Synopsis  string
 	Comment   string
 }
 
+// TemplateName returns the invocation name, supporting namespaced functions.
+func (f Function) TemplateName() string {
+	if len(f.Receiver) > 0 {
+		return strings.ToLower(fmt.Sprintf("%s:%s", f.Receiver, f.Name))
+	}
+
+	return f.Name
+}
+
 // TemplateString returns code for the template switch to run the target.
 // It wraps each target call to match the func(context.Context) error that
 // runTarget requires.
 func (f Function) TemplateString() string {
+	name := f.Name
+	if len(f.Receiver) > 0 {
+		name = fmt.Sprintf("%s{}.%s", f.Receiver, f.Name)
+	}
 	if f.IsContext && f.IsError {
 		out := `wrapFn := func(ctx context.Context) error {
 				return %s(ctx)
 			}
 			err := runTarget(wrapFn)`
-		return fmt.Sprintf(out, f.Name)
+		return fmt.Sprintf(out, name)
 	}
 	if f.IsContext && !f.IsError {
 		out := `wrapFn := func(ctx context.Context) error {
@@ -51,14 +65,14 @@ func (f Function) TemplateString() string {
 				return nil
 			}
 			err := runTarget(wrapFn)`
-		return fmt.Sprintf(out, f.Name)
+		return fmt.Sprintf(out, name)
 	}
 	if !f.IsContext && f.IsError {
 		out := `wrapFn := func(ctx context.Context) error {
 				return %s()
 			}
 			err := runTarget(wrapFn)`
-		return fmt.Sprintf(out, f.Name)
+		return fmt.Sprintf(out, name)
 	}
 	if !f.IsContext && !f.IsError {
 		out := `wrapFn := func(ctx context.Context) error {
@@ -66,7 +80,7 @@ func (f Function) TemplateString() string {
 				return nil
 			}
 			err := runTarget(wrapFn)`
-		return fmt.Sprintf(out, f.Name)
+		return fmt.Sprintf(out, name)
 	}
 	return `fmt.Printf("Error formatting job code\n")
 	os.Exit(1)`
