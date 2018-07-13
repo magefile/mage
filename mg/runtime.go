@@ -34,3 +34,6 @@ func CacheDir() string {
 		return filepath.Join(os.Getenv("HOME"), ".magefile")
 	}
 }
+
+// Namespace allows for the grouping of similar commands
+type Namespace struct{}
