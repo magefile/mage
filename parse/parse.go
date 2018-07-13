@@ -89,6 +89,33 @@ func Package(path string, files []string) (*PkgInfo, error) {
 	pi := &PkgInfo{}
 
 	p := doc.New(pkg, "./", 0)
+typeloop:
+	for _, t := range p.Types {
+		for _, s := range t.Decl.Specs {
+			if id, ok := s.(*ast.TypeSpec); ok {
+				if id.Type.(*ast.SelectorExpr).X.(*ast.Ident).Name != "mg" || id.Type.(*ast.SelectorExpr).Sel.Name != "Namespace" {
+					continue typeloop
+				}
+				break
+
+			}
+		}
+		for _, f := range t.Methods {
+			if !ast.IsExported(f.Name) {
+				continue
+			}
+			if typ := voidOrError(f.Decl.Type, info); typ != mgTypes.InvalidType {
+				pi.Funcs = append(pi.Funcs, Function{
+					Name:      f.Name,
+					Receiver:  f.Recv,
+					Comment:   f.Doc,
+					Synopsis:  sanitizeSynopsis(f),
+					IsError:   typ == mgTypes.ErrorType || typ == mgTypes.ContextErrorType,
+					IsContext: typ == mgTypes.ContextVoidType || typ == mgTypes.ContextErrorType,
+				})
+			}
+		}
+	}
 	for _, f := range p.Funcs {
 		if f.Recv != "" {
 			// skip methods

@@ -6,7 +6,7 @@ import (
 )
 
 func TestParse(t *testing.T) {
-	info, err := Package("./testdata", []string{"func.go", "command.go", "alias.go", "repeating_synopsis.go"})
+	info, err := Package("./testdata", []string{"func.go", "command.go", "alias.go", "repeating_synopsis.go", "subcommands.go"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -36,6 +36,16 @@ func TestParse(t *testing.T) {
 			IsError:  true,
 			Comment:  "RepeatingSynopsis chops off the repeating function name.\nSome more text.\n",
 			Synopsis: "chops off the repeating function name.",
+		},
+		{
+			Name:     "Foobar",
+			Receiver: "Build",
+			IsError:  true,
+		},
+		{
+			Name:     "Baz",
+			Receiver: "Build",
+			IsError:  false,
 		},
 	}
 
