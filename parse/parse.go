@@ -49,7 +49,7 @@ func (f Function) TemplateName() string {
 // runTarget requires.
 func (f Function) TemplateString() string {
 	name := f.Name
-	if len(f.Receiver) > 0 {
+	if f.Receiver != "" {
 		name = fmt.Sprintf("%s{}.%s", f.Receiver, f.Name)
 	}
 	if f.IsContext && f.IsError {
