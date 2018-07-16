@@ -37,7 +37,7 @@ type Function struct {
 
 // TemplateName returns the invocation name, supporting namespaced functions.
 func (f Function) TemplateName() string {
-	if len(f.Receiver) > 0 {
+	if f.Receiver != "" {
 		return strings.ToLower(fmt.Sprintf("%s:%s", f.Receiver, f.Name))
 	}
 
