@@ -10,7 +10,6 @@ import (
 // Path is a synonym for File
 var Path = File
 
-
 // File returns true if either the target does not exist or
 // is older than at least one of the sources. If any of the
 // sources are a directory, the modification time of the newest
