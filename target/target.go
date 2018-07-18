@@ -7,11 +7,14 @@ import (
 	"time"
 )
 
+// Path is a synonym for File
 var Path = File
 
-// Path reports if any of the sources have been modified more recently
-// than the destination.  Path does not descend into directories, it literally
-// just checks the modtime of each thing you pass to it.
+
+// File returns true if either the target does not exist or
+// is older than at least one of the sources. If any of the
+// sources are a directory, the modification time of the newest
+// file within the directory or any of its children is used.
 func File(target string, sources ...string) (bool, error) {
 	sourcesModTime, err := checkDependencies(sources)
 	if err != nil {
@@ -30,10 +33,11 @@ func File(target string, sources ...string) (bool, error) {
 	return os.IsNotExist(err) || sourcesModTime.After(targetInfo.ModTime()), nil
 }
 
-// Dir reports whether any of the sources have been modified
-// more recently than the destination.  If a source or destination is
-// a directory, modtimes of files under those directories are compared
-// instead.
+// Dir returns true if either the target does not exist or
+// the newest file within the target directory is older than
+// at least one of the sources. If any of the sources are a
+// directory, the modification time of the newest file within
+// that directory is used.
 func Dir(target string, sources ...string) (bool, error) {
 	sourcesModTime, err := checkDependencies(sources)
 	if err != nil {
