@@ -28,22 +28,36 @@ type PkgInfo struct {
 // Function represented a job function from a mage file
 type Function struct {
 	Name      string
+	Receiver  string
 	IsError   bool
 	IsContext bool
 	Synopsis  string
 	Comment   string
 }
 
+// TemplateName returns the invocation name, supporting namespaced functions.
+func (f Function) TemplateName() string {
+	if f.Receiver != "" {
+		return strings.ToLower(fmt.Sprintf("%s:%s", f.Receiver, f.Name))
+	}
+
+	return f.Name
+}
+
 // TemplateString returns code for the template switch to run the target.
 // It wraps each target call to match the func(context.Context) error that
 // runTarget requires.
 func (f Function) TemplateString() string {
+	name := f.Name
+	if f.Receiver != "" {
+		name = fmt.Sprintf("%s{}.%s", f.Receiver, f.Name)
+	}
 	if f.IsContext && f.IsError {
 		out := `wrapFn := func(ctx context.Context) error {
 				return %s(ctx)
 			}
 			err := runTarget(wrapFn)`
-		return fmt.Sprintf(out, f.Name)
+		return fmt.Sprintf(out, name)
 	}
 	if f.IsContext && !f.IsError {
 		out := `wrapFn := func(ctx context.Context) error {
@@ -51,14 +65,14 @@ func (f Function) TemplateString() string {
 				return nil
 			}
 			err := runTarget(wrapFn)`
-		return fmt.Sprintf(out, f.Name)
+		return fmt.Sprintf(out, name)
 	}
 	if !f.IsContext && f.IsError {
 		out := `wrapFn := func(ctx context.Context) error {
 				return %s()
 			}
 			err := runTarget(wrapFn)`
-		return fmt.Sprintf(out, f.Name)
+		return fmt.Sprintf(out, name)
 	}
 	if !f.IsContext && !f.IsError {
 		out := `wrapFn := func(ctx context.Context) error {
@@ -66,7 +80,7 @@ func (f Function) TemplateString() string {
 				return nil
 			}
 			err := runTarget(wrapFn)`
-		return fmt.Sprintf(out, f.Name)
+		return fmt.Sprintf(out, name)
 	}
 	return `fmt.Printf("Error formatting job code\n")
 	os.Exit(1)`
@@ -89,6 +103,33 @@ func Package(path string, files []string) (*PkgInfo, error) {
 	pi := &PkgInfo{}
 
 	p := doc.New(pkg, "./", 0)
+typeloop:
+	for _, t := range p.Types {
+		for _, s := range t.Decl.Specs {
+			if id, ok := s.(*ast.TypeSpec); ok {
+				if id.Type.(*ast.SelectorExpr).X.(*ast.Ident).Name != "mg" || id.Type.(*ast.SelectorExpr).Sel.Name != "Namespace" {
+					continue typeloop
+				}
+				break
+
+			}
+		}
+		for _, f := range t.Methods {
+			if !ast.IsExported(f.Name) {
+				continue
+			}
+			if typ := voidOrError(f.Decl.Type, info); typ != mgTypes.InvalidType {
+				pi.Funcs = append(pi.Funcs, Function{
+					Name:      f.Name,
+					Receiver:  f.Recv,
+					Comment:   f.Doc,
+					Synopsis:  sanitizeSynopsis(f),
+					IsError:   typ == mgTypes.ErrorType || typ == mgTypes.ContextErrorType,
+					IsContext: typ == mgTypes.ContextVoidType || typ == mgTypes.ContextErrorType,
+				})
+			}
+		}
+	}
 	for _, f := range p.Funcs {
 		if f.Recv != "" {
 			// skip methods

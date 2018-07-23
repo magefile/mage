@@ -34,8 +34,12 @@ const magicRebuildKey = "v0.3"
 var output = template.Must(template.New("").Funcs(map[string]interface{}{
 	"lower": strings.ToLower,
 	"lowerfirst": func(s string) string {
-		r := []rune(s)
-		return string(unicode.ToLower(r[0])) + string(r[1:])
+		parts := strings.Split(s, ":")
+		for i, t := range parts {
+			r := []rune(t)
+			parts[i] = string(unicode.ToLower(r[0])) + string(r[1:])
+		}
+		return strings.Join(parts, ":")
 	},
 }).Parse(tpl))
 var initOutput = template.Must(template.New("").Parse(mageTpl))
