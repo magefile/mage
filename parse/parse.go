@@ -107,11 +107,14 @@ typeloop:
 	for _, t := range p.Types {
 		for _, s := range t.Decl.Specs {
 			if id, ok := s.(*ast.TypeSpec); ok {
-				if id.Type.(*ast.SelectorExpr).X.(*ast.Ident).Name != "mg" || id.Type.(*ast.SelectorExpr).Sel.Name != "Namespace" {
-					continue typeloop
+				if sel, ok := id.Type.(*ast.SelectorExpr); ok {
+					if ident, ok := sel.X.(*ast.Ident); ok {
+						if ident.Name != "mg" || sel.Sel.Name != "Namespace" {
+							continue typeloop
+						}
+					}
 				}
 				break
-
 			}
 		}
 		for _, f := range t.Methods {
