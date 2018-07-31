@@ -29,7 +29,7 @@ will print the list of targets, like `mage -l`.
 ## Multiple Targets
 
 Multiple targets can be specified as args to Mage, for example `mage foo bar
-baz`.  Targets will be run serially, from left to right (so in thise case, foo,
+baz`.  Targets will be run serially, from left to right (so in this case, foo,
 then once foo is done, bar, then once bar is done, baz).  Dependencies run using
 mg.Deps will still only run once per mage execution, so if each of the targets
 depend on the same function, that function will only be run once for all
@@ -63,3 +63,40 @@ var Aliases = map[string]interface{} {
 
 The key is an alias and the value is a function identifier.
 An alias can be used interchangeably with it's target.
+
+## Namespaces
+
+Namespaces are a way to group related commands, much like subcommands in a
+normal application.   To define a namespace in your magefile, simply define an
+exported named type of type `mg.Namespace`.  Then, every method on that type which
+matches the normal target signature becomes a target under that namespace.
+
+```
+import "github.com/magefile/mage/mg"
+
+type Build mg.Namespace
+
+// Builds the site using hugo.
+func (Build) Site() error {
+  return nil
+}
+
+// Builds the pdf docs.
+func (Build) Docs() {}
+```
+
+To call a namespaced target, type it as `namespace:target`. For example, the
+above would be called by typing
+
+```
+$ mage build:site
+```
+
+Similarly, the help for the target will show how it may be called:
+
+```
+$ mage -l
+
+build:docs    Builds the pdf docs.
+build:site    Builds the site using hugo.
+```

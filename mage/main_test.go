@@ -98,7 +98,7 @@ func TestVerboseEnv(t *testing.T) {
 	os.Setenv("MAGE_VERBOSE", "true")
 
 	stdout := &bytes.Buffer{}
-	inv, _, _, err := Parse(stdout, []string{})
+	inv, _, err := Parse(stdout, []string{})
 	if err != nil {
 		t.Fatal("unexpected error", err)
 	}
@@ -420,14 +420,14 @@ func TestBadSecondTargets(t *testing.T) {
 
 func TestParse(t *testing.T) {
 	buf := &bytes.Buffer{}
-	inv, init, showVer, err := Parse(buf, []string{"-v", "build"})
+	inv, cmd, err := Parse(buf, []string{"-v", "build"})
 	if err != nil {
 		t.Fatal("unexpected error", err)
 	}
-	if init {
+	if cmd == Init {
 		t.Fatal("init should be false but was true")
 	}
-	if showVer {
+	if cmd == Version {
 		t.Fatal("showVersion should be false but was true")
 	}
 	if len(inv.Args) != 1 && inv.Args[0] != "build" {
@@ -462,12 +462,12 @@ func TestTimeout(t *testing.T) {
 }
 func TestParseHelp(t *testing.T) {
 	buf := &bytes.Buffer{}
-	_, _, _, err := Parse(buf, []string{"-h"})
+	_, _, err := Parse(buf, []string{"-h"})
 	if err != flag.ErrHelp {
 		t.Fatal("unexpected error", err)
 	}
 	buf2 := &bytes.Buffer{}
-	_, _, _, err = Parse(buf2, []string{"--help"})
+	_, _, err = Parse(buf2, []string{"--help"})
 	if err != flag.ErrHelp {
 		t.Fatal("unexpected error", err)
 	}
@@ -580,5 +580,42 @@ func TestInvalidAlias(t *testing.T) {
 	expected := "Unknown target: \"co\"\n"
 	if actual != expected {
 		t.Fatalf("expected %q, but got %q", expected, actual)
+	}
+}
+
+func TestClean(t *testing.T) {
+	TestGoRun(t) // make sure we've got something in the CACHE_DIR
+	dir := "./testing"
+	abs, err := filepath.Abs(dir)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	files, err := ioutil.ReadDir(abs)
+	if err != nil {
+		t.Error("issue reading file:", err)
+	}
+
+	if len(files) < 1 {
+		t.Error("Need at least 1 cached binaries to test --clean")
+	}
+
+	buf := &bytes.Buffer{}
+	_, cmd, err := Parse(buf, []string{"-clean"})
+	if cmd != Clean {
+		t.Errorf("Expected 'clean' command but got %v", cmd)
+	}
+	code := ParseAndRun(dir, os.Stdin, os.Stderr, buf, []string{"-clean"})
+	if code != 0 {
+		t.Errorf("expected 0, but got %v", code)
+	}
+
+	files, err = ioutil.ReadDir(abs)
+	if err != nil {
+		t.Error("issue reading file:", err)
+	}
+
+	if len(files) != 0 {
+		t.Errorf("expected '-clean' to remove files from CACHE_DIR, but still have %v", files)
 	}
 }
