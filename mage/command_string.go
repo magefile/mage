@@ -2,15 +2,15 @@
 
 package mage
 
-import "fmt"
+import "strconv"
 
-const _Command_name = "NoneVersionInitClean"
+const _Command_name = "NoneVersionInitCleanCompileStatic"
 
-var _Command_index = [...]uint8{0, 4, 11, 15, 20}
+var _Command_index = [...]uint8{0, 4, 11, 15, 20, 33}
 
 func (i Command) String() string {
 	if i < 0 || i >= Command(len(_Command_index)-1) {
-		return fmt.Sprintf("Command(%d)", i)
+		return "Command(" + strconv.FormatInt(int64(i), 10) + ")"
 	}
 	return _Command_name[_Command_index[i]:_Command_index[i+1]]
 }

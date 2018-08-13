@@ -32,6 +32,13 @@ will only ever exit with an error code of 0 or 1.  If mage exits with error code
 error code 1.  Why?  Ask the go team.  I've tried to get them to fix it, and
 they won't.
 
+If you are using `dep` for managing Go dependencies, it is necessary to add the mage import path to
+a `required` clause in `Gopkg.toml` to prevent it being subsequently removed due to lack of
+perceived use thanks for the `+build ignore` tag - for example:
+
+```toml
+required = ["github.com/magefile/mage/mage"]
+```
 
 ## Use Mage as a library
 
@@ -40,3 +47,14 @@ All of mage's functionality is accessible as a compile-in library.  Checkout
 for full details.
 
 Fair warning, the API of mage/mage may change, so be sure to use vendoring.
+
+## Compiling a static binary
+
+If your tasks are not related to compiling Go code, it can be useful to compile a binary which has
+the mage execution runtime and the tasks compiled in such that it can be run on another machine
+without requiring installation of dependencies. To do so, pass the output path to the compile flag.
+like this:
+
+```
+$ mage -compile ./static-output
+```

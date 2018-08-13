@@ -18,4 +18,6 @@ install: true
 
 # don't call go test -v because we want to be able to only show t.Log output when
 # a test fails
-script:  go test -tags CI -race $(go list ./... | grep -v /vendor/)
+script:  
+  - go vet ./...
+  - go test -tags CI -race ./...
