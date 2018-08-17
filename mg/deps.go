@@ -92,7 +92,7 @@ func runDeps(ctx context.Context, fns ...interface{}) {
 				}
 				wg.Done()
 			}()
-			if os.Getenv("MAGEFILE_VERBOSE") != "" {
+			if Verbose() {
 				logger.Println("Running dependency:", fn.displayName)
 			}
 			if err := fn.run(); err != nil {
