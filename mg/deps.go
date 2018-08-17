@@ -13,6 +13,8 @@ import (
 	"github.com/magefile/mage/types"
 )
 
+var logger = log.New(os.Stderr, "", 0)
+
 type onceMap struct {
 	mu *sync.Mutex
 	m  map[string]*onceFun
@@ -77,7 +79,6 @@ func runDeps(ctx context.Context, fns ...interface{}) {
 	for _, f := range fns {
 		fn := addDep(ctx, f)
 		wg.Add(1)
-		logger := log.New(os.Stderr, "", 0)
 		go func() {
 			defer func() {
 				if v := recover(); v != nil {
