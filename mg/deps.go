@@ -161,7 +161,10 @@ func name(i interface{}) string {
 
 func displayName(name string) string {
 	splitByPackage := strings.Split(name, ".")
-	return splitByPackage[len(splitByPackage)-1]
+	if len(splitByPackage) == 2 && splitByPackage[0] == "main" {
+		return splitByPackage[len(splitByPackage)-1]
+	}
+	return name
 }
 
 type onceFun struct {
