@@ -15,6 +15,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"text/tabwriter"
 	"text/template"
 	"time"
 	"unicode"
@@ -157,7 +158,19 @@ func Parse(stdout io.Writer, args []string) (inv Invocation, cmd Command, err er
 	fs.BoolVar(&inv.Keep, "keep", false, "keep intermediate mage files around after running")
 	var showVersion bool
 	fs.BoolVar(&showVersion, "version", false, "show version info for the mage binary")
-	var mageInit bool
+
+	// Categorize commands and options.
+	commands := []string{"clean", "init", "l", "h", "version"}
+	options := []string{"f", "keep", "t", "v", "compile"}
+
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
+
+	printUsage := func(flagname string) {
+		f := fs.Lookup(flagname)
+		fmt.Fprintf(w, "  -%s\t\t%s\n", f.Name, f.Usage)
+	}
+
+  var mageInit bool
 	fs.BoolVar(&mageInit, "init", false, "create a starting template if no mage files exist")
 	var clean bool
 	fs.BoolVar(&clean, "clean", false, "clean out old generated binaries from CACHE_DIR")
@@ -165,9 +178,20 @@ func Parse(stdout io.Writer, args []string) (inv Invocation, cmd Command, err er
 	fs.StringVar(&compileOutPath, "compile", "", "path to which to output a static binary")
 
 	fs.Usage = func() {
-		fmt.Fprintln(stdout, "mage [options] [target]")
-		fmt.Fprintln(stdout, "Options:")
-		fs.PrintDefaults()
+		fmt.Fprintln(w, "mage [options] [target]")
+		fmt.Fprintln(w, "")
+		fmt.Fprintln(w, "Commands:")
+		for _, cmd := range commands {
+			printUsage(cmd)
+		}
+
+		fmt.Fprintln(w, "")
+		fmt.Fprintln(w, "Options:")
+		fmt.Fprintln(w, "  -h\t\tshow description of a target")
+		for _, opt := range options {
+			printUsage(opt)
+		}
+		w.Flush()
 	}
 	err = fs.Parse(args)
 	if err == flag.ErrHelp {

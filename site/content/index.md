@@ -52,23 +52,22 @@ plugin.  Every tool you use with Go can be used with Magefiles.
 ## Usage
 ```
 mage [options] [target]
+
+Commands:
+  -clean   	clean out old generated binaries from CACHE_DIR
+  -init     create a starting template if no mage files exist
+  -l        list mage targets in this directory
+  -h        show this help
+  -version  show version info for the mage binary
+
 Options:
-  -clean
-    	clean out old generated binaries from CACHE_DIR
-  -compile string
-    	path to which to output a static binary
-  -f	force recreation of compiled magefile
-  -h	show this help
-  -init
-    	create a starting template if no mage files exist
-  -keep
-    	keep intermediate mage files around after running
-  -l	list mage targets in this directory
-  -t duration
-    	timeout in duration parsable format (e.g. 5m30s)
-  -v	show verbose output when running mage targets
-  -version
-    	show version info for the mage binary
+  -h     show description of a target
+  -f     force recreation of compiled magefile
+  -keep  keep intermediate mage files around after running
+  -t     timeout in duration parsable format (e.g. 5m30s)
+  -v     show verbose output when running mage targets
+  -compile <string> 	
+         path to which to output a static binary
 ```
 
 ## Environment Variables
