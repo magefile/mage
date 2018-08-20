@@ -3,6 +3,8 @@ package mg
 import (
 	"context"
 	"fmt"
+	"log"
+	"os"
 	"reflect"
 	"runtime"
 	"strings"
@@ -10,6 +12,8 @@ import (
 
 	"github.com/magefile/mage/types"
 )
+
+var logger = log.New(os.Stderr, "", 0)
 
 type onceMap struct {
 	mu *sync.Mutex
@@ -89,6 +93,9 @@ func runDeps(ctx context.Context, fns ...interface{}) {
 				}
 				wg.Done()
 			}()
+			if Verbose() {
+				logger.Println("Running dependency:", fn.displayName)
+			}
 			if err := fn.run(); err != nil {
 				mu.Lock()
 				errs = append(errs, fmt.Sprint(err))
@@ -143,6 +150,8 @@ func addDep(ctx context.Context, f interface{}) *onceFun {
 	of := onces.LoadOrStore(n, &onceFun{
 		fn:  fn,
 		ctx: ctx,
+
+		displayName: displayName(n),
 	})
 	return of
 }
@@ -151,10 +160,20 @@ func name(i interface{}) string {
 	return runtime.FuncForPC(reflect.ValueOf(i).Pointer()).Name()
 }
 
+func displayName(name string) string {
+	splitByPackage := strings.Split(name, ".")
+	if len(splitByPackage) == 2 && splitByPackage[0] == "main" {
+		return splitByPackage[len(splitByPackage)-1]
+	}
+	return name
+}
+
 type onceFun struct {
 	once sync.Once
 	fn   func(context.Context) error
 	ctx  context.Context
+
+	displayName string
 }
 
 func (o *onceFun) run() error {
