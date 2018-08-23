@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-func TestMissingPathTarget(t *testing.T) {
+func TestPathMissingDest(t *testing.T) {
 	t.Parallel()
 	dir, err := ioutil.TempDir("", "")
 	if err != nil {
@@ -16,7 +16,7 @@ func TestMissingPathTarget(t *testing.T) {
 	}
 	defer os.RemoveAll(dir)
 	src := filepath.Join(dir, "source")
-	err = ioutil.WriteFile(filepath.Join(dir, "source"), []byte("hi!"), 0644)
+	err = ioutil.WriteFile(src, []byte("hi!"), 0644)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -30,7 +30,45 @@ func TestMissingPathTarget(t *testing.T) {
 	}
 }
 
-func TestMissingDirTarget(t *testing.T) {
+func TestPathMissingSource(t *testing.T) {
+	t.Parallel()
+	dir, err := ioutil.TempDir("", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+	dst := filepath.Join(dir, "dst")
+	err = ioutil.WriteFile(dst, []byte("hi!"), 0644)
+	if err != nil {
+		t.Fatal(err)
+	}
+	src := filepath.Join(dir, "missing")
+	_, err = Path(dst, src)
+	if !os.IsNotExist(err) {
+		t.Fatal("Expected os.IsNotExist(err), but got", err)
+	}
+}
+
+func TestDirMissingSrc(t *testing.T) {
+	t.Parallel()
+	dir, err := ioutil.TempDir("", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+	dst := filepath.Join(dir, "dst")
+	err = ioutil.WriteFile(dst, []byte("hi!"), 0644)
+	if err != nil {
+		t.Fatal(err)
+	}
+	src := filepath.Join(dir, "missing")
+	_, err = Dir(dst, src)
+	if !os.IsNotExist(err) {
+		t.Fatal("Expected os.IsNotExist(err), but got", err)
+	}
+}
+
+func TestDirMissingDest(t *testing.T) {
 	t.Parallel()
 	dir, err := ioutil.TempDir("", "")
 	if err != nil {
@@ -38,7 +76,7 @@ func TestMissingDirTarget(t *testing.T) {
 	}
 	defer os.RemoveAll(dir)
 	src := filepath.Join(dir, "source")
-	err = os.Mkdir(filepath.Join(dir, "source"), 0755)
+	err = os.Mkdir(src, 0755)
 	if err != nil {
 		t.Fatal(err)
 	}
