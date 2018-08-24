@@ -46,21 +46,36 @@ func main() {
 		if os.Getenv("MAGEFILE_TIMEOUT") != "" {
 			timeout, err := time.ParseDuration(os.Getenv("MAGEFILE_TIMEOUT"))
 			if err != nil {
-				fmt.Printf("timeout error: %v\n", err)
+				fmt.Printf("error parsing MAGEFILE_TIMEOUT: %v\n", err)
 				os.Exit(1)
 			}
 
 			ctx, ctxCancel = context.WithTimeout(context.Background(), timeout)
 		} else {
-			ctx = context.Background()
-			ctxCancel = func() {}
+			ctx, ctxCancel = context.WithCancel(context.Background())
 		}
+
 		return ctx, ctxCancel
 	}
 
 	runTarget := func(fn func(context.Context) error) interface{} {
 		var err interface{}
 		ctx, cancel := getContext()
+
+		// trap Ctrl+C and call cancel on the context
+		c := make(chan os.Signal, 1)
+		signal.Notify(c, os.Interrupt)
+		defer func() {
+			signal.Stop(c)
+		}()
+		go func() {
+			select {
+			case <-c:
+				cancel()
+			case <-ctx.Done():
+			}
+		}()	
+
 		d := make(chan interface{})
 		go func() {
 			defer func() {
