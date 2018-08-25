@@ -20,6 +20,7 @@ func main() {
 	// These functions are local variables to avoid name conflicts with 
 	// magefiles.
 	list := func() error {
+		{{with .Description}}fmt.Println(` + "`{{.}}`" + `){{end}}
 		{{- $default := .Default}}
 		w := tabwriter.NewWriter(os.Stdout, 0, 4, 4, ' ', 0)
 		fmt.Println("Targets:")
