@@ -1,5 +1,8 @@
 //+build mage
 
+// This is the build script for Mage. The install target is all you really need.
+// The release target is for generating offial releases and is really only
+// useful to project admins.
 package main
 
 import (

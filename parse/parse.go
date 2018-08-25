@@ -17,6 +17,7 @@ import (
 )
 
 type PkgInfo struct {
+	Description      string
 	Funcs            []Function
 	DefaultIsError   bool
 	DefaultIsContext bool
@@ -100,9 +101,11 @@ func Package(path string, files []string) (*PkgInfo, error) {
 		return nil, err
 	}
 
-	pi := &PkgInfo{}
-
 	p := doc.New(pkg, "./", 0)
+	pi := &PkgInfo{
+		Description: p.Doc,
+	}
+
 typeloop:
 	for _, t := range p.Types {
 		for _, s := range t.Decl.Specs {
