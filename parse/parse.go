@@ -1,6 +1,7 @@
 package parse
 
 import (
+	"errors"
 	"fmt"
 	"go/ast"
 	"go/build"
@@ -16,6 +17,8 @@ import (
 	mgTypes "github.com/magefile/mage/types"
 )
 
+// PkgInfo contains inforamtion about a package of files according to mage's
+// parsing rules.
 type PkgInfo struct {
 	Description      string
 	Funcs            []Function
@@ -156,10 +159,39 @@ typeloop:
 		}
 	}
 
+	hasDupes, names := checkDupes(pi)
+	if hasDupes {
+		msg := "Build targets must be case insensitive, thus the following targets conflict:\n"
+		for _, v := range names {
+			if len(v) > 1 {
+				msg += "  " + strings.Join(v, ", ") + "\n"
+			}
+		}
+		return nil, errors.New(msg)
+	}
+
 	setDefault(p, pi, info)
 	setAliases(p, pi, info)
 
 	return pi, nil
+}
+
+// checkDupes checks a package for duplicate target names.
+func checkDupes(info *PkgInfo) (hasDupes bool, names map[string][]string) {
+	names = map[string][]string{}
+	lowers := map[string]bool{}
+	for _, f := range info.Funcs {
+		low := strings.ToLower(f.Name)
+		if f.Receiver != "" {
+			low = strings.ToLower(f.Receiver) + ":" + low
+		}
+		if lowers[low] {
+			hasDupes = true
+		}
+		lowers[low] = true
+		names[low] = append(names[low], f.Name)
+	}
+	return hasDupes, names
 }
 
 // sanitizeSynopsis sanitizes function Doc to create a summary.

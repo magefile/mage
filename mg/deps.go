@@ -119,7 +119,10 @@ func checkFns(fns []interface{}) {
 	}
 }
 
-// Deps runs the given functions with the default runtime context
+// Deps runs the given functions in parallel, exactly once.  This is a way to
+// build up a tree of dependencies with each dependency defining its own
+// dependencies.  Functions must have the same signature as a Mage target, i.e.
+// optional context argument, optional error return.
 func Deps(fns ...interface{}) {
 	CtxDeps(context.Background(), fns...)
 }
