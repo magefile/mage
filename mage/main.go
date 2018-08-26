@@ -293,17 +293,6 @@ func Invoke(inv Invocation) int {
 		return 1
 	}
 
-	hasDupes, names := CheckDupes(info)
-	if hasDupes {
-		log.Println("Build targets must be case insensitive, thus the follow targets conflict:")
-		for _, v := range names {
-			if len(v) > 1 {
-				log.Println("  " + strings.Join(v, ", "))
-			}
-		}
-		return 1
-	}
-
 	main := filepath.Join(inv.Dir, mainfile)
 	if err := GenerateMainfile(main, info); err != nil {
 		log.Println("Error:", err)
@@ -329,24 +318,6 @@ func Invoke(inv Invocation) int {
 	}
 
 	return RunCompiled(inv, exePath)
-}
-
-// CheckDupes checks a package for duplicate target names.
-func CheckDupes(info *parse.PkgInfo) (hasDupes bool, names map[string][]string) {
-	names = map[string][]string{}
-	lowers := map[string]bool{}
-	for _, f := range info.Funcs {
-		low := strings.ToLower(f.Name)
-		if f.Receiver != "" {
-			low = strings.ToLower(f.Receiver) + ":" + low
-		}
-		if lowers[low] {
-			hasDupes = true
-		}
-		lowers[low] = true
-		names[low] = append(names[low], f.Name)
-	}
-	return hasDupes, names
 }
 
 type data struct {
