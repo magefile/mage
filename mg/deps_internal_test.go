@@ -11,21 +11,25 @@ import (
 func TestDepsOfDeps(t *testing.T) {
 	os.Setenv("MAGEFILE_VERBOSE", "1")
 	defer os.Unsetenv("MAGEFILE_VERBOSE")
-	buf := bytes.NewBuffer(make([]byte, 4096))
+	buf := &bytes.Buffer{}
 
 	defaultLogger := logger
 	logger = log.New(buf, "", 0)
 	defer func() { logger = defaultLogger }()
 
-	ch := make(chan string, 1)
-	f := func() {
-		Deps(func() {})
-		ch <- "f"
-	}
-	Deps(f)
+	foo()
 
-	<-ch
-	if !strings.Contains(buf.String(), "Running dependency") {
-		t.Fatal("expected dependencies to be logged")
+	if strings.Count(buf.String(), "Running dependency: github.com/magefile/mage/mg.baz") != 1 {
+		t.Fatalf("expected one baz to be logged, but got\n%s", buf)
 	}
 }
+
+func foo() {
+	Deps(bar, baz)
+}
+
+func bar() {
+	Deps(baz)
+}
+
+func baz() {}

@@ -93,9 +93,6 @@ func runDeps(ctx context.Context, fns ...interface{}) {
 				}
 				wg.Done()
 			}()
-			if Verbose() {
-				logger.Println("Running dependency:", fn.displayName)
-			}
 			if err := fn.run(); err != nil {
 				mu.Lock()
 				errs = append(errs, fmt.Sprint(err))
@@ -182,6 +179,9 @@ type onceFun struct {
 func (o *onceFun) run() error {
 	var err error
 	o.once.Do(func() {
+		if Verbose() {
+			logger.Println("Running dependency:", o.displayName)
+		}
 		err = o.fn(o.ctx)
 	})
 	return err
