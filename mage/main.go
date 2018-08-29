@@ -430,11 +430,12 @@ func Magefiles(dir string) ([]string, error) {
 // Compile uses the go tool to compile the files into an executable at path.
 func Compile(path string, stdout, stderr io.Writer, gofiles []string, isdebug bool) error {
 	debug.Println("compiling to", path)
+	debug.Println("compiling using gocmd:", mg.GoCmd())
 	if isdebug {
-		runDebug("go", "version")
-		runDebug("go", "env")
+		runDebug(mg.GoCmd(), "version")
+		runDebug(mg.GoCmd(), "env")
 	}
-	c := exec.Command("go", append([]string{"build", "-o", path}, gofiles...)...)
+	c := exec.Command(mg.GoCmd(), append([]string{"build", "-o", path}, gofiles...)...)
 	c.Env = os.Environ()
 	c.Stderr = stderr
 	c.Stdout = stdout

@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
 )
 
@@ -28,7 +29,8 @@ func Install() error {
 	if runtime.GOOS == "windows" {
 		name += ".exe"
 	}
-	gopath, err := sh.Output("go", "env", "GOPATH")
+	gocmd := mg.GoCmd()
+	gopath, err := sh.Output(gocmd, "env", "GOPATH")
 	if err != nil {
 		return fmt.Errorf("can't determine GOPATH: %v", err)
 	}
@@ -45,7 +47,7 @@ func Install() error {
 	// install` turns into a no-op, and `go install -a` fails on people's
 	// machines that have go installed in a non-writeable directory (such as
 	// normal OS installs in /usr/bin)
-	return sh.RunV("go", "build", "-o", path, "-ldflags="+ldf, "github.com/magefile/mage")
+	return sh.RunV(gocmd, "build", "-o", path, "-ldflags="+ldf, "github.com/magefile/mage")
 }
 
 // Generates a new release.  Expects the TAG environment variable to be set,
