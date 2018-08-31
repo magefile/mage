@@ -68,12 +68,8 @@ Options:
   -v     show verbose output when running mage targets
   -compile <string> 	
          path to which to output a static binary
+  -debug turn on debug messages (implies -keep)
 ```
-
-## Environment Variables
-
-You may set MAGE_VERBOSE=1 to always enable verbose logging in your magefiles,
-without having to remember to pass -v every time.
 
 ## Why?
 
