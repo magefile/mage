@@ -333,6 +333,18 @@ func errorOrVoid(fns []*ast.FuncDecl, info types.Info) []*ast.FuncDecl {
 	return fds
 }
 
+
+func params(ft *ast.FuncType, info types.Info) bool {
+	for _, field := range ft.Params.List {
+		t := info.TypeOf(field.Type)
+		if t != nil &&  {
+			return true
+		}
+	}
+	return false
+}
+
+
 func hasContextParam(ft *ast.FuncType, info types.Info) bool {
 	if ft.Params.NumFields() == 1 {
 		ret := ft.Params.List[0]

@@ -52,7 +52,7 @@ const initFile = "magefile.go"
 var (
 	commitHash string
 	timestamp  string
-	gitTag     = "v2"
+	gitTag     = "unknown"
 )
 
 //go:generate stringer -type=Command
