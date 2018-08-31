@@ -19,7 +19,13 @@ import (
 	"github.com/magefile/mage/mg"
 )
 
+const testExeEnv = "MAGE_TEST_STRING"
+
 func TestMain(m *testing.M) {
+	if s := os.Getenv(testExeEnv); s != "" {
+		fmt.Fprint(os.Stdout, s)
+		os.Exit(0)
+	}
 	os.Exit(testmain(m))
 }
 
@@ -618,5 +624,35 @@ func TestClean(t *testing.T) {
 
 	if len(files) != 0 {
 		t.Errorf("expected '-clean' to remove files from CACHE_DIR, but still have %v", files)
+	}
+}
+
+func TestGoCmd(t *testing.T) {
+	textOutput := "TestGoCmd"
+	if err := os.Setenv(testExeEnv, textOutput); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Setenv(mg.GoCmdEnv, os.Args[0]); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Unsetenv(mg.GoCmdEnv)
+
+	// fake out the compiled file, since the code checks for it.
+	f, err := ioutil.TempFile("", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	name := f.Name()
+	defer os.Remove(name)
+	f.Close()
+
+	buf := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	if err := Compile(name, buf, stderr, []string{}); err != nil {
+		t.Log("stderr: ", stderr.String())
+		t.Fatal(err)
+	}
+	if buf.String() != textOutput {
+		t.Fatal("We didn't run the custom go cmd: ", buf.String())
 	}
 }
