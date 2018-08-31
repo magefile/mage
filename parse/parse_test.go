@@ -15,7 +15,7 @@ func TestParse(t *testing.T) {
 		{
 			Name:     "ReturnsNilError",
 			IsError:  true,
-			Comment:  "Synopsis for \"returns\" error.\nAnd some more text.\n",
+			Comment:  "Synopsis for \"returns\" error. And some more text.",
 			Synopsis: `Synopsis for "returns" error.`,
 		},
 		{
@@ -34,7 +34,7 @@ func TestParse(t *testing.T) {
 		{
 			Name:     "RepeatingSynopsis",
 			IsError:  true,
-			Comment:  "RepeatingSynopsis chops off the repeating function name.\nSome more text.\n",
+			Comment:  "RepeatingSynopsis chops off the repeating function name. Some more text.",
 			Synopsis: "chops off the repeating function name.",
 		},
 		{

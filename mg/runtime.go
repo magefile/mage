@@ -4,19 +4,31 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 )
 
 // CacheEnv is the environment variable that users may set to change the
 // location where mage stores its compiled binaries.
 const CacheEnv = "MAGEFILE_CACHE"
 
-// verboseEnv is the environment variable that indicates the user requested
+// VerboseEnv is the environment variable that indicates the user requested
 // verbose mode when running a magefile.
-const verboseEnv = "MAGEFILE_VERBOSE"
+const VerboseEnv = "MAGEFILE_VERBOSE"
+
+// DebugEnv is the environment variable that indicates the user requested
+// debug mode when running mage.
+const DebugEnv = "MAGEFILE_DEBUG"
 
 // Verbose reports whether a magefile was run with the verbose flag.
 func Verbose() bool {
-	return os.Getenv(verboseEnv) != ""
+	b, _ := strconv.ParseBool(os.Getenv(VerboseEnv))
+	return b
+}
+
+// Debug reports whether a magefile was run with the verbose flag.
+func Debug() bool {
+	b, _ := strconv.ParseBool(os.Getenv(VerboseEnv))
+	return b
 }
 
 // CacheDir returns the directory where mage caches compiled binaries.  It

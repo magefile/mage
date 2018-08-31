@@ -95,10 +95,9 @@ func TestVerbose(t *testing.T) {
 }
 
 func TestVerboseEnv(t *testing.T) {
-	os.Setenv("MAGE_VERBOSE", "true")
-
+	os.Setenv("MAGEFILE_VERBOSE", "true")
 	stdout := &bytes.Buffer{}
-	inv, _, err := Parse(stdout, []string{})
+	inv, _, err := Parse(ioutil.Discard, stdout, []string{})
 	if err != nil {
 		t.Fatal("unexpected error", err)
 	}
@@ -109,7 +108,7 @@ func TestVerboseEnv(t *testing.T) {
 		t.Fatalf("expected %t, but got %t ", expected, inv.Verbose)
 	}
 
-	os.Unsetenv("MAGE_VERBOSE")
+	os.Unsetenv("MAGEFILE_VERBOSE")
 }
 
 func TestList(t *testing.T) {
@@ -127,8 +126,7 @@ func TestList(t *testing.T) {
 	}
 	actual := stdout.String()
 	expected := `
-This is a comment on the package which should get turned into output with the
-list of targets.
+This is a comment on the package which should get turned into output with the list of targets.
 
 Targets:
   somePig*       This is the synopsis for SomePig.
@@ -423,7 +421,7 @@ func TestBadSecondTargets(t *testing.T) {
 
 func TestParse(t *testing.T) {
 	buf := &bytes.Buffer{}
-	inv, cmd, err := Parse(buf, []string{"-v", "build"})
+	inv, cmd, err := Parse(ioutil.Discard, buf, []string{"-v", "build"})
 	if err != nil {
 		t.Fatal("unexpected error", err)
 	}
@@ -465,12 +463,12 @@ func TestTimeout(t *testing.T) {
 }
 func TestParseHelp(t *testing.T) {
 	buf := &bytes.Buffer{}
-	_, _, err := Parse(buf, []string{"-h"})
+	_, _, err := Parse(ioutil.Discard, buf, []string{"-h"})
 	if err != flag.ErrHelp {
 		t.Fatal("unexpected error", err)
 	}
 	buf2 := &bytes.Buffer{}
-	_, _, err = Parse(buf2, []string{"--help"})
+	_, _, err = Parse(ioutil.Discard, buf2, []string{"--help"})
 	if err != flag.ErrHelp {
 		t.Fatal("unexpected error", err)
 	}
@@ -604,7 +602,7 @@ func TestClean(t *testing.T) {
 	}
 
 	buf := &bytes.Buffer{}
-	_, cmd, err := Parse(buf, []string{"-clean"})
+	_, cmd, err := Parse(ioutil.Discard, buf, []string{"-clean"})
 	if cmd != Clean {
 		t.Errorf("Expected 'clean' command but got %v", cmd)
 	}
