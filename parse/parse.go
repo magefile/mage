@@ -106,7 +106,7 @@ func Package(path string, files []string) (*PkgInfo, error) {
 
 	p := doc.New(pkg, "./", 0)
 	pi := &PkgInfo{
-		Description: p.Doc,
+		Description: toOneLine(p.Doc),
 	}
 
 typeloop:
@@ -131,7 +131,7 @@ typeloop:
 				pi.Funcs = append(pi.Funcs, Function{
 					Name:      f.Name,
 					Receiver:  f.Recv,
-					Comment:   f.Doc,
+					Comment:   toOneLine(f.Doc),
 					Synopsis:  sanitizeSynopsis(f),
 					IsError:   typ == mgTypes.ErrorType || typ == mgTypes.ContextErrorType,
 					IsContext: typ == mgTypes.ContextVoidType || typ == mgTypes.ContextErrorType,
@@ -151,7 +151,7 @@ typeloop:
 		if typ := voidOrError(f.Decl.Type, info); typ != mgTypes.InvalidType {
 			pi.Funcs = append(pi.Funcs, Function{
 				Name:      f.Name,
-				Comment:   f.Doc,
+				Comment:   toOneLine(f.Doc),
 				Synopsis:  sanitizeSynopsis(f),
 				IsError:   typ == mgTypes.ErrorType || typ == mgTypes.ContextErrorType,
 				IsContext: typ == mgTypes.ContextVoidType || typ == mgTypes.ContextErrorType,
@@ -417,4 +417,8 @@ func voidOrError(ft *ast.FuncType, info types.Info) mgTypes.FuncType {
 		}
 	}
 	return mgTypes.InvalidType
+}
+
+func toOneLine(s string) string {
+	return strings.TrimSpace(strings.Replace(s, "\n", " ", -1))
 }
