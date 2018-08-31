@@ -1,6 +1,7 @@
 package mage
 
 import (
+	"bytes"
 	"crypto/sha1"
 	"errors"
 	"flag"
@@ -223,7 +224,7 @@ func Parse(stderr, stdout io.Writer, args []string) (inv Invocation, cmd Command
 	case clean:
 		numFlags++
 		cmd = Clean
-		if fs.NArg() > 0 || fs.NFlag() > 1 {
+		if fs.NArg() > 0 {
 			// Temporary dupe of below check until we refactor the other commands to use this check
 			return inv, cmd, errors.New("-h, -init, -clean, -compile and -version cannot be used simultaneously")
 
@@ -329,7 +330,7 @@ func Invoke(inv Invocation) int {
 		}()
 	}
 	files = append(files, main)
-	if err := Compile(exePath, inv.Stdout, inv.Stderr, files); err != nil {
+	if err := Compile(exePath, inv.Stdout, inv.Stderr, files, inv.Debug); err != nil {
 		log.Println("Error:", err)
 		return 1
 	}
@@ -380,8 +381,12 @@ func Magefiles(dir string) ([]string, error) {
 }
 
 // Compile uses the go tool to compile the files into an executable at path.
-func Compile(path string, stdout, stderr io.Writer, gofiles []string) error {
+func Compile(path string, stdout, stderr io.Writer, gofiles []string, isdebug bool) error {
 	debug.Println("compiling to", path)
+	if isdebug {
+		runDebug("go", "version")
+		runDebug("go", "env")
+	}
 	c := exec.Command("go", append([]string{"build", "-o", path}, gofiles...)...)
 	c.Env = os.Environ()
 	c.Stderr = stderr
@@ -394,6 +399,20 @@ func Compile(path string, stdout, stderr io.Writer, gofiles []string) error {
 		return errors.New("failed to find compiled magefile")
 	}
 	return nil
+}
+
+func runDebug(cmd string, args ...string) {
+	buf := &bytes.Buffer{}
+	errbuf := &bytes.Buffer{}
+	debug.Println("running", cmd, strings.Join(args, " "))
+	c := exec.Command(cmd, args...)
+	c.Env = os.Environ()
+	c.Stderr = errbuf
+	c.Stdout = buf
+	if err := c.Run(); err != nil {
+		debug.Print("error running '", cmd, strings.Join(args, " "), "': ", err, ": ", errbuf)
+	}
+	debug.Println(buf)
 }
 
 // GenerateMainfile creates the mainfile at path with the info from
@@ -495,8 +514,18 @@ func RunCompiled(inv Invocation, exePath string) int {
 	if inv.Timeout > 0 {
 		c.Env = append(c.Env, fmt.Sprintf("MAGEFILE_TIMEOUT=%s", inv.Timeout.String()))
 	}
-	debug.Println("running magefile with env:\n", strings.Join(c.Env, "\n"))
+	debug.Print("running magefile with mage vars:\n", strings.Join(filter(c.Env, "MAGEFILE"), "\n"))
 	return sh.ExitStatus(c.Run())
+}
+
+func filter(list []string, prefix string) []string {
+	var out []string
+	for _, s := range list {
+		if strings.HasPrefix(s, prefix) {
+			out = append(out, s)
+		}
+	}
+	return out
 }
 
 func removeContents(dir string) error {
