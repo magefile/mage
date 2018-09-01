@@ -5,6 +5,7 @@
 package build
 
 import (
+	"internal/testenv"
 	"io"
 	"os"
 	"path/filepath"
@@ -125,8 +126,8 @@ func TestLocalDirectory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if p.ImportPath != "github.com/magefile/mage/build" {
-		t.Fatalf("ImportPath=%q, want %q", p.ImportPath, "github.com/magefile/mage/build")
+	if p.ImportPath != "go/build" {
+		t.Fatalf("ImportPath=%q, want %q", p.ImportPath, "go/build")
 	}
 }
 
@@ -175,43 +176,15 @@ func TestShouldBuild(t *testing.T) {
 	}
 }
 
-func TestRequiredTags(t *testing.T) {
-	tests := []struct {
-		name   string
-		file   string
-		should bool
-	}{
-		{
-			"no req tag",
-			"package main",
-			false,
-		},
-		{
-			"has req tag",
-			`// +build req
-			
-			package main`,
-			true,
-		},
-		{
-			"OR with req",
-			`// +build no req
-			
-			package main`,
-			true,
-		},
+func TestGoodOSArchFile(t *testing.T) {
+	ctx := &Context{BuildTags: []string{"linux"}, GOOS: "darwin"}
+	m := map[string]bool{}
+	want := map[string]bool{"linux": true}
+	if !ctx.goodOSArchFile("hello_linux.go", m) {
+		t.Errorf("goodOSArchFile(hello_linux.go) = false, want true")
 	}
-
-	ctx := &Context{
-		BuildTags:    []string{"req"},
-		RequiredTags: []string{"req"},
-	}
-	for _, tst := range tests {
-		t.Run(tst.name, func(t *testing.T) {
-			if tst.should != ctx.shouldBuild([]byte(tst.file), nil, nil) {
-				t.Errorf("shouldBuild = %v, want %v", !tst.should, tst.should)
-			}
-		})
+	if !reflect.DeepEqual(m, want) {
+		t.Errorf("goodOSArchFile(hello_linux.go) tags = %v, want %v", m, want)
 	}
 }
 
@@ -344,7 +317,7 @@ func TestShellSafety(t *testing.T) {
 // Want to get a "cannot find package" error when directory for package does not exist.
 // There should be valid partial information in the returned non-nil *Package.
 func TestImportDirNotExist(t *testing.T) {
-	MustHaveGoBuild(t) // really must just have source
+	testenv.MustHaveGoBuild(t) // really must just have source
 	ctxt := Default
 	ctxt.GOPATH = ""
 
@@ -376,7 +349,7 @@ func TestImportDirNotExist(t *testing.T) {
 }
 
 func TestImportVendor(t *testing.T) {
-	MustHaveGoBuild(t) // really must just have source
+	testenv.MustHaveGoBuild(t) // really must just have source
 	ctxt := Default
 	ctxt.GOPATH = ""
 	p, err := ctxt.Import("golang_org/x/net/http2/hpack", filepath.Join(ctxt.GOROOT, "src/net/http"), 0)
@@ -390,7 +363,7 @@ func TestImportVendor(t *testing.T) {
 }
 
 func TestImportVendorFailure(t *testing.T) {
-	MustHaveGoBuild(t) // really must just have source
+	testenv.MustHaveGoBuild(t) // really must just have source
 	ctxt := Default
 	ctxt.GOPATH = ""
 	p, err := ctxt.Import("x.com/y/z", filepath.Join(ctxt.GOROOT, "src/net/http"), 0)
@@ -405,7 +378,7 @@ func TestImportVendorFailure(t *testing.T) {
 }
 
 func TestImportVendorParentFailure(t *testing.T) {
-	MustHaveGoBuild(t) // really must just have source
+	testenv.MustHaveGoBuild(t) // really must just have source
 	ctxt := Default
 	ctxt.GOPATH = ""
 	// This import should fail because the vendor/golang.org/x/net/http2 directory has no source code.
@@ -422,25 +395,31 @@ func TestImportVendorParentFailure(t *testing.T) {
 	}
 }
 
-// HasGoBuild reports whether the current system can build programs with ``go build''
-// and then run them with os.StartProcess or exec.Command.
-func HasGoBuild() bool {
-	switch runtime.GOOS {
-	case "android", "nacl":
-		return false
-	case "darwin":
-		if strings.HasPrefix(runtime.GOARCH, "arm") {
-			return false
-		}
+func TestImportDirTarget(t *testing.T) {
+	testenv.MustHaveGoBuild(t) // really must just have source
+	ctxt := Default
+	ctxt.GOPATH = ""
+	p, err := ctxt.ImportDir(filepath.Join(ctxt.GOROOT, "src/path"), 0)
+	if err != nil {
+		t.Fatal(err)
 	}
-	return true
+	if p.PkgTargetRoot == "" || p.PkgObj == "" {
+		t.Errorf("p.PkgTargetRoot == %q, p.PkgObj == %q, want non-empty", p.PkgTargetRoot, p.PkgObj)
+	}
 }
 
-// MustHaveGoBuild checks that the current system can build programs with ``go build''
-// and then run them with os.StartProcess or exec.Command.
-// If not, MustHaveGoBuild calls t.Skip with an explanation.
-func MustHaveGoBuild(t *testing.T) {
-	if !HasGoBuild() {
-		t.Skipf("skipping test: 'go build' not available on %s/%s", runtime.GOOS, runtime.GOARCH)
+// TestIssue23594 prevents go/build from regressing and populating Package.Doc
+// from comments in test files.
+func TestIssue23594(t *testing.T) {
+	// Package testdata/doc contains regular and external test files
+	// with comments attached to their package declarations. The names of the files
+	// ensure that we see the comments from the test files first.
+	p, err := ImportDir("testdata/doc", 0)
+	if err != nil {
+		t.Fatalf("could not import testdata: %v", err)
+	}
+
+	if p.Doc != "Correct" {
+		t.Fatalf("incorrectly set .Doc to %q", p.Doc)
 	}
 }
