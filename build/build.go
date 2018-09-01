@@ -37,6 +37,14 @@ type Context struct {
 	UseAllFiles bool   // use files regardless of +build lines, file names
 	Compiler    string // compiler to assume when computing target paths
 
+	// RequiredTags lists tags that the must exist in a build tag in order for
+	// the file to be included in the build.  If RequiredTags is empty, no tags
+	// are required.  Note that this is mostly useful in filtering the list of
+	// files in a single directory.  Using required tags across an entire
+	// compile step will likely exclude much, if not all of the standard library
+	// files.
+	RequiredTags []string
+
 	// The build and release tags specify build constraints
 	// that should be considered satisfied when processing +build lines.
 	// Clients creating a new context may customize BuildTags, which
@@ -1326,7 +1334,8 @@ func (ctxt *Context) shouldBuild(content []byte, allTags map[string]bool, binary
 
 	// Pass 2.  Process each line in the run.
 	p = content
-	allok := true
+	hasReq := len(ctxt.RequiredTags) > 0
+	allok := !hasReq
 	for len(p) > 0 {
 		line := p
 		if i := bytes.IndexByte(line, '\n'); i >= 0 {
@@ -1348,12 +1357,22 @@ func (ctxt *Context) shouldBuild(content []byte, allTags map[string]bool, binary
 			if f[0] == "+build" {
 				ok := false
 				for _, tok := range f[1:] {
-					if ctxt.match(tok, allTags) {
-						ok = true
+					tags := map[string]bool{}
+					if ctxt.match(tok, tags) {
+						if containsAll(tags, ctxt.RequiredTags) {
+							ok = true
+						}
 					}
+					merge(allTags, tags)
 				}
-				if !ok {
-					allok = false
+				if !hasReq {
+					if !ok {
+						allok = false
+					}
+				} else {
+					if ok {
+						allok = true
+					}
 				}
 			}
 		}
@@ -1364,6 +1383,25 @@ func (ctxt *Context) shouldBuild(content []byte, allTags map[string]bool, binary
 	}
 
 	return allok
+}
+
+func merge(to, from map[string]bool) {
+	if to == nil {
+		return
+	}
+	for k, v := range from {
+		to[k] = v
+	}
+}
+
+func containsAll(m map[string]bool, vals []string) bool {
+	// yes this is N^2,  but N is small.
+	for _, v := range vals {
+		if !m[v] {
+			return false
+		}
+	}
+	return true
 }
 
 // saveCgo saves the information from the #cgo lines in the import "C" comment.

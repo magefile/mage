@@ -5,7 +5,6 @@
 package build
 
 import (
-	"internal/testenv"
 	"io"
 	"os"
 	"path/filepath"
@@ -109,27 +108,27 @@ func TestMultiplePackageImport(t *testing.T) {
 	}
 }
 
-func TestLocalDirectory(t *testing.T) {
-	if runtime.GOOS == "darwin" {
-		switch runtime.GOARCH {
-		case "arm", "arm64":
-			t.Skipf("skipping on %s/%s, no valid GOROOT", runtime.GOOS, runtime.GOARCH)
-		}
-	}
+// func TestLocalDirectory(t *testing.T) {
+// 	if runtime.GOOS == "darwin" {
+// 		switch runtime.GOARCH {
+// 		case "arm", "arm64":
+// 			t.Skipf("skipping on %s/%s, no valid GOROOT", runtime.GOOS, runtime.GOARCH)
+// 		}
+// 	}
 
-	cwd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
+// 	cwd, err := os.Getwd()
+// 	if err != nil {
+// 		t.Fatal(err)
+// 	}
 
-	p, err := ImportDir(cwd, 0)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if p.ImportPath != "go/build" {
-		t.Fatalf("ImportPath=%q, want %q", p.ImportPath, "go/build")
-	}
-}
+// 	p, err := ImportDir(cwd, 0)
+// 	if err != nil {
+// 		t.Fatal(err)
+// 	}
+// 	if p.ImportPath != "go/build" {
+// 		t.Fatalf("ImportPath=%q, want %q", p.ImportPath, "go/build")
+// 	}
+// }
 
 func TestShouldBuild(t *testing.T) {
 	const file1 = "// +build tag1\n\n" +
@@ -317,7 +316,7 @@ func TestShellSafety(t *testing.T) {
 // Want to get a "cannot find package" error when directory for package does not exist.
 // There should be valid partial information in the returned non-nil *Package.
 func TestImportDirNotExist(t *testing.T) {
-	testenv.MustHaveGoBuild(t) // really must just have source
+	MustHaveGoBuild(t) // really must just have source
 	ctxt := Default
 	ctxt.GOPATH = ""
 
@@ -349,7 +348,7 @@ func TestImportDirNotExist(t *testing.T) {
 }
 
 func TestImportVendor(t *testing.T) {
-	testenv.MustHaveGoBuild(t) // really must just have source
+	MustHaveGoBuild(t) // really must just have source
 	ctxt := Default
 	ctxt.GOPATH = ""
 	p, err := ctxt.Import("golang_org/x/net/http2/hpack", filepath.Join(ctxt.GOROOT, "src/net/http"), 0)
@@ -363,7 +362,7 @@ func TestImportVendor(t *testing.T) {
 }
 
 func TestImportVendorFailure(t *testing.T) {
-	testenv.MustHaveGoBuild(t) // really must just have source
+	MustHaveGoBuild(t) // really must just have source
 	ctxt := Default
 	ctxt.GOPATH = ""
 	p, err := ctxt.Import("x.com/y/z", filepath.Join(ctxt.GOROOT, "src/net/http"), 0)
@@ -378,7 +377,7 @@ func TestImportVendorFailure(t *testing.T) {
 }
 
 func TestImportVendorParentFailure(t *testing.T) {
-	testenv.MustHaveGoBuild(t) // really must just have source
+	MustHaveGoBuild(t) // really must just have source
 	ctxt := Default
 	ctxt.GOPATH = ""
 	// This import should fail because the vendor/golang.org/x/net/http2 directory has no source code.
@@ -396,7 +395,7 @@ func TestImportVendorParentFailure(t *testing.T) {
 }
 
 func TestImportDirTarget(t *testing.T) {
-	testenv.MustHaveGoBuild(t) // really must just have source
+	MustHaveGoBuild(t) // really must just have source
 	ctxt := Default
 	ctxt.GOPATH = ""
 	p, err := ctxt.ImportDir(filepath.Join(ctxt.GOROOT, "src/path"), 0)
@@ -422,4 +421,39 @@ func TestIssue23594(t *testing.T) {
 	if p.Doc != "Correct" {
 		t.Fatalf("incorrectly set .Doc to %q", p.Doc)
 	}
+}
+
+// the following copied from go/src/internal/testenv
+
+// MustHaveGoBuild checks that the current system can build programs with ``go build''
+// and then run them with os.StartProcess or exec.Command.
+// If not, MustHaveGoBuild calls t.Skip with an explanation.
+func MustHaveGoBuild(t testing.TB) {
+	if os.Getenv("GO_GCFLAGS") != "" {
+		t.Skipf("skipping test: 'go build' not compatible with setting $GO_GCFLAGS")
+	}
+	if !HasGoBuild() {
+		t.Skipf("skipping test: 'go build' not available on %s/%s", runtime.GOOS, runtime.GOARCH)
+	}
+}
+
+// HasGoBuild reports whether the current system can build programs with ``go build''
+// and then run them with os.StartProcess or exec.Command.
+func HasGoBuild() bool {
+	if os.Getenv("GO_GCFLAGS") != "" {
+		// It's too much work to require every caller of the go command
+		// to pass along "-gcflags="+os.Getenv("GO_GCFLAGS").
+		// For now, if $GO_GCFLAGS is set, report that we simply can't
+		// run go build.
+		return false
+	}
+	switch runtime.GOOS {
+	case "android", "nacl", "js":
+		return false
+	case "darwin":
+		if strings.HasPrefix(runtime.GOARCH, "arm") {
+			return false
+		}
+	}
+	return true
 }
