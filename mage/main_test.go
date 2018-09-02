@@ -648,7 +648,7 @@ func TestGoCmd(t *testing.T) {
 
 	buf := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
-	if err := Compile(name, buf, stderr, []string{}); err != nil {
+	if err := Compile(name, buf, stderr, []string{}, false); err != nil {
 		t.Log("stderr: ", stderr.String())
 		t.Fatal(err)
 	}

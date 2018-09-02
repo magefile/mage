@@ -17,7 +17,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"text/tabwriter"
 	"text/template"
 	"time"
 	"unicode"
@@ -167,39 +166,41 @@ func Parse(stderr, stdout io.Writer, args []string) (inv Invocation, cmd Command
 	var showVersion bool
 	fs.BoolVar(&showVersion, "version", false, "show version info for the mage binary")
 
-	// Categorize commands and options.
-	commands := []string{"clean", "init", "l", "h", "version"}
-	options := []string{"f", "keep", "t", "v", "compile", "debug"}
-
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
-
-	printUsage := func(flagname string) {
-		f := fs.Lookup(flagname)
-		fmt.Fprintf(w, "  -%s\t\t%s\n", f.Name, f.Usage)
-	}
-
 	var mageInit bool
 	fs.BoolVar(&mageInit, "init", false, "create a starting template if no mage files exist")
 	var clean bool
 	fs.BoolVar(&clean, "clean", false, "clean out old generated binaries from CACHE_DIR")
 	var compileOutPath string
-	fs.StringVar(&compileOutPath, "compile", "", "path to which to output a static binary")
+	fs.StringVar(&compileOutPath, "compile", "", "output a static binary to the given path")
+	var goCmd string
+	fs.StringVar(&goCmd, "gocmd", "", "use the given go binary to compile the output")
 
 	fs.Usage = func() {
-		fmt.Fprintln(w, "mage [options] [target]")
-		fmt.Fprintln(w, "")
-		fmt.Fprintln(w, "Commands:")
-		for _, cmd := range commands {
-			printUsage(cmd)
-		}
+		fmt.Fprint(stdout, `
+mage [options] [target]
 
-		fmt.Fprintln(w, "")
-		fmt.Fprintln(w, "Options:")
-		fmt.Fprintln(w, "  -h\t\tshow description of a target")
-		for _, opt := range options {
-			printUsage(opt)
-		}
-		w.Flush()
+Mage is a make-like command runner.  See https://magefile.org for full docs.
+
+Commands:
+  -clean    clean out old generated binaries from CACHE_DIR
+  -compile <string>
+            output a static binary to the given path
+  -init     create a starting template if no mage files exist
+  -l        list mage targets in this directory
+  -h        show this help
+  -version  show version info for the mage binary
+
+Options:
+  -debug  turn on debug messages (implies -keep)
+  -h      show description of a target
+  -f      force recreation of compiled magefile
+  -keep   keep intermediate mage files around after running
+  -gocmd <string>
+          use the given go binary to compile the output (default: "go")
+  -t <string>
+          timeout in duration parsable format (e.g. 5m30s)
+  -v      show verbose output when running mage targets
+`[1:])
 	}
 	err = fs.Parse(args)
 	if err == flag.ErrHelp {
@@ -252,6 +253,12 @@ func Parse(stderr, stdout io.Writer, args []string) (inv Invocation, cmd Command
 	// MAGE_VERBOSE has been set. If so, we're going to use it for the value of MAGE_VERBOSE.
 	if !inv.Verbose {
 		inv.Verbose = mg.Verbose()
+	}
+
+	if goCmd != "" {
+		if err := os.Setenv(mg.GoCmdEnv, goCmd); err != nil {
+			return inv, cmd, fmt.Errorf("failed to set gocmd: %v", err)
+		}
 	}
 
 	if numFlags > 1 {
@@ -373,7 +380,7 @@ func Magefiles(dir string) ([]string, error) {
 	// use the build directory for the specific go binary we're running.  We
 	// divide the world into two epochs - 1.11 and later, where we have go
 	// modules, and 1.10 and prior, where there are no modules.
-	cmd := exec.Command("go", "version")
+	cmd := exec.Command(mg.GoCmd(), "version")
 	out, stderr := &bytes.Buffer{}, &bytes.Buffer{}
 	cmd.Stdout = out
 	cmd.Stderr = stderr

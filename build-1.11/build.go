@@ -25,6 +25,8 @@ import (
 	"strings"
 	"unicode"
 	"unicode/utf8"
+
+	"github.com/magefile/mage/mg"
 )
 
 // A Context specifies the supporting context for a build.
@@ -1013,7 +1015,7 @@ func (ctxt *Context) importGo(p *Package, path, srcDir string, mode ImportMode, 
 		abs = d
 	}
 
-	cmd := exec.Command("go", "list", "-compiler="+ctxt.Compiler, "-tags="+strings.Join(ctxt.BuildTags, ","), "-installsuffix="+ctxt.InstallSuffix, "-f={{.Dir}}\n{{.ImportPath}}\n{{.Root}}\n{{.Goroot}}\n", path)
+	cmd := exec.Command(mg.GoCmd(), "list", "-compiler="+ctxt.Compiler, "-tags="+strings.Join(ctxt.BuildTags, ","), "-installsuffix="+ctxt.InstallSuffix, "-f={{.Dir}}\n{{.ImportPath}}\n{{.Root}}\n{{.Goroot}}\n", path)
 	cmd.Dir = srcDir
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
