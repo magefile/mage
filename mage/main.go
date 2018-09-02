@@ -12,15 +12,18 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 	"text/tabwriter"
 	"text/template"
 	"time"
 	"unicode"
 
-	"github.com/magefile/mage/build"
+	build "github.com/magefile/mage/build-1.10"
+	buildmod "github.com/magefile/mage/build-1.11"
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/parse"
 	"github.com/magefile/mage/sh"
@@ -62,6 +65,7 @@ var (
 // Command tracks invocations of mage that run without targets or other flags.
 type Command int
 
+// The various command types
 const (
 	None          Command = iota
 	Version               // report the current version of mage
@@ -361,14 +365,57 @@ type data struct {
 	Aliases      map[string]string
 }
 
+// Yeah, if we get to go2, this will need to be revisited. I think that's ok.
+var goVerReg = regexp.MustCompile(`1\.[0-9]+`)
+
 // Magefiles returns the list of magefiles in dir.
 func Magefiles(dir string) ([]string, error) {
-	ctx := build.Default
+	// use the build directory for the specific go binary we're running.  We
+	// divide the world into two epochs - 1.11 and later, where we have go
+	// modules, and 1.10 and prior, where there are no modules.
+	cmd := exec.Command("go", "version")
+	out, stderr := &bytes.Buffer{}, &bytes.Buffer{}
+	cmd.Stdout = out
+	cmd.Stderr = stderr
+	if err := cmd.Run(); err != nil {
+		return nil, fmt.Errorf("failed to run `go version`: %s", stderr)
+	}
+	v := goVerReg.FindString(out.String())
+	if v == "" {
+		return nil, fmt.Errorf("failed to get version from go version output: %s", out)
+	}
+	minor, err := strconv.Atoi(v[2:])
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse minor version from go version output: %s", out)
+	}
+	// yes, these two blocks are exactly the same aside from the build context,
+	// but we need to access struct fields so... let's just copy and paste and
+	// move on.
+	if minor < 11 {
+		// go 1.10 and before
+		ctx := build.Default
+		ctx.RequiredTags = []string{"mage"}
+		ctx.BuildTags = []string{"mage"}
+		p, err := ctx.ImportDir(dir, 0)
+		if err != nil {
+			if _, ok := err.(*build.NoGoError); ok {
+				debug.Print("no go files found by build")
+				return []string{}, nil
+			}
+			return nil, err
+		}
+		for i := range p.GoFiles {
+			p.GoFiles[i] = filepath.Join(dir, p.GoFiles[i])
+		}
+		return p.GoFiles, nil
+	}
+	// Go 1.11+
+	ctx := buildmod.Default
 	ctx.RequiredTags = []string{"mage"}
 	ctx.BuildTags = []string{"mage"}
 	p, err := ctx.ImportDir(dir, 0)
 	if err != nil {
-		if _, ok := err.(*build.NoGoError); ok {
+		if _, ok := err.(*buildmod.NoGoError); ok {
 			debug.Print("no go files found by build")
 			return []string{}, nil
 		}

@@ -16,6 +16,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"os/exec"
 	pathpkg "path"
 	"path/filepath"
 	"runtime"
@@ -145,7 +146,7 @@ func (ctxt *Context) hasSubdir(root, dir string) (rel string, ok bool) {
 
 	// Try using paths we received.
 	if rel, ok = hasSubdir(root, dir); ok {
-		return rel, ok
+		return
 	}
 
 	// Try expanding symlinks and comparing
@@ -155,10 +156,10 @@ func (ctxt *Context) hasSubdir(root, dir string) (rel string, ok bool) {
 	dirSym, _ := filepath.EvalSymlinks(dir)
 
 	if rel, ok = hasSubdir(rootSym, dir); ok {
-		return rel, ok
+		return
 	}
 	if rel, ok = hasSubdir(root, dirSym); ok {
-		return rel, ok
+		return
 	}
 	return hasSubdir(rootSym, dirSym)
 }
@@ -246,7 +247,7 @@ func (ctxt *Context) gopath() []string {
 // that do not exist.
 func (ctxt *Context) SrcDirs() []string {
 	var all []string
-	if ctxt.GOROOT != "" {
+	if ctxt.GOROOT != "" && ctxt.Compiler != "gccgo" {
 		dir := ctxt.joinPath(ctxt.GOROOT, "src")
 		if ctxt.isDir(dir) {
 			all = append(all, dir)
@@ -285,6 +286,8 @@ func defaultGOPATH() string {
 	return ""
 }
 
+var defaultReleaseTags []string
+
 func defaultContext() Context {
 	var c Context
 
@@ -300,7 +303,12 @@ func defaultContext() Context {
 	// say "+build go1.x", and code that should only be built before Go 1.x
 	// (perhaps it is the stub to use in that case) should say "+build !go1.x".
 	// NOTE: If you add to this list, also update the doc comment in doc.go.
-	c.ReleaseTags = []string{"go1.1", "go1.2", "go1.3", "go1.4", "go1.5", "go1.6", "go1.7", "go1.8", "go1.9"}
+	const version = 11 // go1.11
+	for i := 1; i <= version; i++ {
+		c.ReleaseTags = append(c.ReleaseTags, "go1."+strconv.Itoa(i))
+	}
+
+	defaultReleaseTags = append([]string{}, c.ReleaseTags...) // our own private copy
 
 	env := os.Getenv("CGO_ENABLED")
 	if env == "" {
@@ -543,12 +551,13 @@ func (ctxt *Context) Import(path string, srcDir string, mode ImportMode) (*Packa
 		inTestdata := func(sub string) bool {
 			return strings.Contains(sub, "/testdata/") || strings.HasSuffix(sub, "/testdata") || strings.HasPrefix(sub, "testdata/") || sub == "testdata"
 		}
-		if ctxt.GOROOT != "" {
+		if ctxt.GOROOT != "" && ctxt.Compiler != "gccgo" {
 			root := ctxt.joinPath(ctxt.GOROOT, "src")
 			if sub, ok := ctxt.hasSubdir(root, p.Dir); ok && !inTestdata(sub) {
 				p.Goroot = true
 				p.ImportPath = sub
 				p.Root = ctxt.GOROOT
+				setPkga() // p.ImportPath changed
 				goto Found
 			}
 		}
@@ -559,7 +568,7 @@ func (ctxt *Context) Import(path string, srcDir string, mode ImportMode) (*Packa
 				// We found a potential import path for dir,
 				// but check that using it wouldn't find something
 				// else first.
-				if ctxt.GOROOT != "" {
+				if ctxt.GOROOT != "" && ctxt.Compiler != "gccgo" {
 					if dir := ctxt.joinPath(ctxt.GOROOT, "src", sub); ctxt.isDir(dir) {
 						p.ConflictDir = dir
 						goto Found
@@ -576,6 +585,7 @@ func (ctxt *Context) Import(path string, srcDir string, mode ImportMode) (*Packa
 				// Record it.
 				p.ImportPath = sub
 				p.Root = root
+				setPkga() // p.ImportPath changed
 				goto Found
 			}
 		}
@@ -586,13 +596,19 @@ func (ctxt *Context) Import(path string, srcDir string, mode ImportMode) (*Packa
 			return p, fmt.Errorf("import %q: cannot import absolute path", path)
 		}
 
+		gopath := ctxt.gopath() // needed by both importGo and below; avoid computing twice
+		if err := ctxt.importGo(p, path, srcDir, mode, gopath); err == nil {
+			goto Found
+		} else if err != errNoModules {
+			return p, err
+		}
+
 		// tried records the location of unsuccessful package lookups
 		var tried struct {
 			vendor []string
 			goroot string
 			gopath []string
 		}
-		gopath := ctxt.gopath()
 
 		// Vendor directories get first chance to satisfy import.
 		if mode&IgnoreVendor == 0 && srcDir != "" {
@@ -623,7 +639,7 @@ func (ctxt *Context) Import(path string, srcDir string, mode ImportMode) (*Packa
 				}
 				return false
 			}
-			if searchVendor(ctxt.GOROOT, true) {
+			if ctxt.Compiler != "gccgo" && searchVendor(ctxt.GOROOT, true) {
 				goto Found
 			}
 			for _, root := range gopath {
@@ -636,15 +652,23 @@ func (ctxt *Context) Import(path string, srcDir string, mode ImportMode) (*Packa
 		// Determine directory from import path.
 		if ctxt.GOROOT != "" {
 			dir := ctxt.joinPath(ctxt.GOROOT, "src", path)
-			isDir := ctxt.isDir(dir)
-			binaryOnly = !isDir && mode&AllowBinary != 0 && pkga != "" && ctxt.isFile(ctxt.joinPath(ctxt.GOROOT, pkga))
-			if isDir || binaryOnly {
-				p.Dir = dir
-				p.Goroot = true
-				p.Root = ctxt.GOROOT
-				goto Found
+			if ctxt.Compiler != "gccgo" {
+				isDir := ctxt.isDir(dir)
+				binaryOnly = !isDir && mode&AllowBinary != 0 && pkga != "" && ctxt.isFile(ctxt.joinPath(ctxt.GOROOT, pkga))
+				if isDir || binaryOnly {
+					p.Dir = dir
+					p.Goroot = true
+					p.Root = ctxt.GOROOT
+					goto Found
+				}
 			}
 			tried.goroot = dir
+		}
+		if ctxt.Compiler == "gccgo" && isStandardPackage(path) {
+			p.Dir = ctxt.joinPath(ctxt.GOROOT, "src", path)
+			p.Goroot = true
+			p.Root = ctxt.GOROOT
+			goto Found
 		}
 		for _, root := range gopath {
 			dir := ctxt.joinPath(root, "src", path)
@@ -707,6 +731,11 @@ Found:
 	}
 	if binaryOnly && (mode&AllowBinary) != 0 {
 		return p, pkgerr
+	}
+
+	if ctxt.Compiler == "gccgo" && p.Goroot {
+		// gccgo has no sources for GOROOT packages.
+		return p, nil
 	}
 
 	dirs, err := ctxt.readDir(p.Dir)
@@ -816,7 +845,8 @@ Found:
 			})
 			p.InvalidGoFiles = append(p.InvalidGoFiles, name)
 		}
-		if pf.Doc != nil && p.Doc == "" {
+		// Grab the first package comment as docs, provided it is not from a test file.
+		if pf.Doc != nil && p.Doc == "" && !isTest && !isXTest {
 			p.Doc = doc.Synopsis(pf.Doc.Text())
 		}
 
@@ -917,6 +947,116 @@ Found:
 	}
 
 	return p, pkgerr
+}
+
+var errNoModules = errors.New("not using modules")
+
+// importGo checks whether it can use the go command to find the directory for path.
+// If using the go command is not appopriate, importGo returns errNoModules.
+// Otherwise, importGo tries using the go command and reports whether that succeeded.
+// Using the go command lets build.Import and build.Context.Import find code
+// in Go modules. In the long term we want tools to use go/packages (currently golang.org/x/tools/go/packages),
+// which will also use the go command.
+// Invoking the go command here is not very efficient in that it computes information
+// about the requested package and all dependencies and then only reports about the requested package.
+// Then we reinvoke it for every dependency. But this is still better than not working at all.
+// See golang.org/issue/26504.
+func (ctxt *Context) importGo(p *Package, path, srcDir string, mode ImportMode, gopath []string) error {
+	const debugImportGo = false
+
+	// To invoke the go command, we must know the source directory,
+	// we must not being doing special things like AllowBinary or IgnoreVendor,
+	// and all the file system callbacks must be nil (we're meant to use the local file system).
+	if srcDir == "" || mode&AllowBinary != 0 || mode&IgnoreVendor != 0 ||
+		ctxt.JoinPath != nil || ctxt.SplitPathList != nil || ctxt.IsAbsPath != nil || ctxt.IsDir != nil || ctxt.HasSubdir != nil || ctxt.ReadDir != nil || ctxt.OpenFile != nil || !equal(ctxt.ReleaseTags, defaultReleaseTags) {
+		return errNoModules
+	}
+
+	// If modules are not enabled, then the in-process code works fine and we should keep using it.
+	switch os.Getenv("GO111MODULE") {
+	case "off":
+		return errNoModules
+	case "on":
+		// ok
+	default: // "", "auto", anything else
+		// Automatic mode: no module use in $GOPATH/src.
+		for _, root := range gopath {
+			sub, ok := ctxt.hasSubdir(root, srcDir)
+			if ok && strings.HasPrefix(sub, "src/") {
+				return errNoModules
+			}
+		}
+	}
+
+	// For efficiency, if path is a standard library package, let the usual lookup code handle it.
+	if ctxt.GOROOT != "" {
+		dir := ctxt.joinPath(ctxt.GOROOT, "src", path)
+		if ctxt.isDir(dir) {
+			return errNoModules
+		}
+	}
+
+	// Look to see if there is a go.mod.
+	abs, err := filepath.Abs(srcDir)
+	if err != nil {
+		return errNoModules
+	}
+	for {
+		info, err := os.Stat(filepath.Join(abs, "go.mod"))
+		if err == nil && !info.IsDir() {
+			break
+		}
+		d := filepath.Dir(abs)
+		if len(d) >= len(abs) {
+			return errNoModules // reached top of file system, no go.mod
+		}
+		abs = d
+	}
+
+	cmd := exec.Command("go", "list", "-compiler="+ctxt.Compiler, "-tags="+strings.Join(ctxt.BuildTags, ","), "-installsuffix="+ctxt.InstallSuffix, "-f={{.Dir}}\n{{.ImportPath}}\n{{.Root}}\n{{.Goroot}}\n", path)
+	cmd.Dir = srcDir
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	cgo := "0"
+	if ctxt.CgoEnabled {
+		cgo = "1"
+	}
+	cmd.Env = append(os.Environ(),
+		"GOOS="+ctxt.GOOS,
+		"GOARCH="+ctxt.GOARCH,
+		"GOROOT="+ctxt.GOROOT,
+		"GOPATH="+ctxt.GOPATH,
+		"CGO_ENABLED="+cgo,
+	)
+
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("go/build: importGo %s: %v\n%s\n", path, err, stderr.String())
+	}
+
+	f := strings.Split(stdout.String(), "\n")
+	if len(f) != 5 || f[4] != "" {
+		return fmt.Errorf("go/build: importGo %s: unexpected output:\n%s\n", path, stdout.String())
+	}
+
+	p.Dir = f[0]
+	p.ImportPath = f[1]
+	p.Root = f[2]
+	p.Goroot = f[3] == "true"
+	return nil
+}
+
+func equal(x, y []string) bool {
+	if len(x) != len(y) {
+		return false
+	}
+	for i, xi := range x {
+		if xi != y[i] {
+			return false
+		}
+	}
+	return true
 }
 
 // hasGoFiles reports whether dir contains any files with names ending in .go.
@@ -1052,8 +1192,7 @@ func parseWord(data []byte) (word, rest []byte) {
 // read some or all of the file's content.
 func (ctxt *Context) MatchFile(dir, name string) (match bool, err error) {
 	match, _, _, err = ctxt.matchFile(dir, name, nil, nil)
-	return match, err
-
+	return
 }
 
 // matchFile determines whether the file with the given name in the given directory
@@ -1067,7 +1206,7 @@ func (ctxt *Context) MatchFile(dir, name string) (match bool, err error) {
 func (ctxt *Context) matchFile(dir, name string, allTags map[string]bool, binaryOnly *bool) (match bool, data []byte, filename string, err error) {
 	if strings.HasPrefix(name, "_") ||
 		strings.HasPrefix(name, ".") {
-		return match, data, filename, err
+		return
 	}
 
 	i := strings.LastIndex(name, ".")
@@ -1077,7 +1216,7 @@ func (ctxt *Context) matchFile(dir, name string, allTags map[string]bool, binary
 	ext := name[i:]
 
 	if !ctxt.goodOSArchFile(name, allTags) && !ctxt.UseAllFiles {
-		return match, data, filename, err
+		return
 	}
 
 	switch ext {
@@ -1086,16 +1225,16 @@ func (ctxt *Context) matchFile(dir, name string, allTags map[string]bool, binary
 	case ".syso":
 		// binary, no reading
 		match = true
-		return match, data, filename, err
+		return
 	default:
 		// skip
-		return match, data, filename, err
+		return
 	}
 
 	filename = ctxt.joinPath(dir, name)
 	f, err := ctxt.openFile(filename)
 	if err != nil {
-		return match, data, filename, err
+		return
 	}
 
 	if strings.HasSuffix(filename, ".go") {
@@ -1110,20 +1249,20 @@ func (ctxt *Context) matchFile(dir, name string, allTags map[string]bool, binary
 	f.Close()
 	if err != nil {
 		err = fmt.Errorf("read %s: %v", filename, err)
-		return match, data, filename, err
+		return
 	}
 
 	// Look for +build comments to accept or reject the file.
 	var sawBinaryOnly bool
 	if !ctxt.shouldBuild(data, allTags, &sawBinaryOnly) && !ctxt.UseAllFiles {
-		return match, data, filename, err
+		return
 	}
 
 	if binaryOnly != nil && sawBinaryOnly {
 		*binaryOnly = true
 	}
 	match = true
-	return match, data, filename, err
+	return
 }
 
 func cleanImports(m map[string][]token.Position) ([]string, map[string][]token.Position) {
@@ -1205,33 +1344,34 @@ func (ctxt *Context) shouldBuild(content []byte, allTags map[string]bool, binary
 			p = p[len(p):]
 		}
 		line = bytes.TrimSpace(line)
-		if bytes.HasPrefix(line, slashslash) {
-			if bytes.Equal(line, binaryOnlyComment) {
-				sawBinaryOnly = true
-			}
-			line = bytes.TrimSpace(line[len(slashslash):])
-			if len(line) > 0 && line[0] == '+' {
-				// Looks like a comment +line.
-				f := strings.Fields(string(line))
-				if f[0] == "+build" {
-					ok := false
-					for _, tok := range f[1:] {
-						tags := map[string]bool{}
-						if ctxt.match(tok, tags) {
-							if containsAll(tags, ctxt.RequiredTags) {
-								ok = true
-							}
+		if !bytes.HasPrefix(line, slashslash) {
+			continue
+		}
+		if bytes.Equal(line, binaryOnlyComment) {
+			sawBinaryOnly = true
+		}
+		line = bytes.TrimSpace(line[len(slashslash):])
+		if len(line) > 0 && line[0] == '+' {
+			// Looks like a comment +line.
+			f := strings.Fields(string(line))
+			if f[0] == "+build" {
+				ok := false
+				for _, tok := range f[1:] {
+					tags := map[string]bool{}
+					if ctxt.match(tok, tags) {
+						if containsAll(tags, ctxt.RequiredTags) {
+							ok = true
 						}
-						merge(allTags, tags)
 					}
-					if !hasReq {
-						if !ok {
-							allok = false
-						}
-					} else {
-						if ok {
-							allok = true
-						}
+					merge(allTags, tags)
+				}
+				if !hasReq {
+					if !ok {
+						allok = false
+					}
+				} else {
+					if ok {
+						allok = true
 					}
 				}
 			}
@@ -1262,15 +1402,6 @@ func containsAll(m map[string]bool, vals []string) bool {
 		}
 	}
 	return true
-}
-
-func contains(list []string, s string) bool {
-	for _, l := range list {
-		if l == s {
-			return true
-		}
-	}
-	return false
 }
 
 // saveCgo saves the information from the #cgo lines in the import "C" comment.
@@ -1412,7 +1543,8 @@ func (ctxt *Context) makePathsAbsolute(args []string, srcDir string) {
 // See golang.org/issue/6038.
 // The @ is for OS X. See golang.org/issue/13720.
 // The % is for Jenkins. See golang.org/issue/16959.
-const safeString = "+-.,/0123456789=ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz:$@% "
+// The ! is because module paths may use them. See golang.org/issue/26716.
+const safeString = "+-.,/0123456789=ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz:$@%! "
 
 func safeCgoName(s string) bool {
 	if s == "" {
@@ -1593,32 +1725,10 @@ func (ctxt *Context) goodOSArchFile(name string, allTags map[string]bool) bool {
 	}
 	n := len(l)
 	if n >= 2 && knownOS[l[n-2]] && knownArch[l[n-1]] {
-		if allTags != nil {
-			allTags[l[n-2]] = true
-			allTags[l[n-1]] = true
-		}
-		if l[n-1] != ctxt.GOARCH {
-			return false
-		}
-		if ctxt.GOOS == "android" && l[n-2] == "linux" {
-			return true
-		}
-		return l[n-2] == ctxt.GOOS
+		return ctxt.match(l[n-1], allTags) && ctxt.match(l[n-2], allTags)
 	}
-	if n >= 1 && knownOS[l[n-1]] {
-		if allTags != nil {
-			allTags[l[n-1]] = true
-		}
-		if ctxt.GOOS == "android" && l[n-1] == "linux" {
-			return true
-		}
-		return l[n-1] == ctxt.GOOS
-	}
-	if n >= 1 && knownArch[l[n-1]] {
-		if allTags != nil {
-			allTags[l[n-1]] = true
-		}
-		return l[n-1] == ctxt.GOARCH
+	if n >= 1 && (knownOS[l[n-1]] || knownArch[l[n-1]]) {
+		return ctxt.match(l[n-1], allTags)
 	}
 	return true
 }
@@ -1636,7 +1746,7 @@ func init() {
 }
 
 // ToolDir is the directory containing build tools.
-var ToolDir = filepath.Join(runtime.GOROOT(), "pkg/tool/"+runtime.GOOS+"_"+runtime.GOARCH)
+var ToolDir = getToolDir()
 
 // IsLocalImport reports whether the import path is
 // a local import path, like ".", "..", "./foo", or "../foo".

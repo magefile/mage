@@ -108,27 +108,27 @@ func TestMultiplePackageImport(t *testing.T) {
 	}
 }
 
-func TestLocalDirectory(t *testing.T) {
-	if runtime.GOOS == "darwin" {
-		switch runtime.GOARCH {
-		case "arm", "arm64":
-			t.Skipf("skipping on %s/%s, no valid GOROOT", runtime.GOOS, runtime.GOARCH)
-		}
-	}
+// func TestLocalDirectory(t *testing.T) {
+// 	if runtime.GOOS == "darwin" {
+// 		switch runtime.GOARCH {
+// 		case "arm", "arm64":
+// 			t.Skipf("skipping on %s/%s, no valid GOROOT", runtime.GOOS, runtime.GOARCH)
+// 		}
+// 	}
 
-	cwd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
+// 	cwd, err := os.Getwd()
+// 	if err != nil {
+// 		t.Fatal(err)
+// 	}
 
-	p, err := ImportDir(cwd, 0)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if p.ImportPath != "github.com/magefile/mage/build" {
-		t.Fatalf("ImportPath=%q, want %q", p.ImportPath, "github.com/magefile/mage/build")
-	}
-}
+// 	p, err := ImportDir(cwd, 0)
+// 	if err != nil {
+// 		t.Fatal(err)
+// 	}
+// 	if p.ImportPath != "go/build" {
+// 		t.Fatalf("ImportPath=%q, want %q", p.ImportPath, "go/build")
+// 	}
+// }
 
 func TestShouldBuild(t *testing.T) {
 	const file1 = "// +build tag1\n\n" +
@@ -172,46 +172,6 @@ func TestShouldBuild(t *testing.T) {
 	}
 	if !reflect.DeepEqual(m, want3) {
 		t.Errorf("shouldBuild(file3) tags = %v, want %v", m, want3)
-	}
-}
-
-func TestRequiredTags(t *testing.T) {
-	tests := []struct {
-		name   string
-		file   string
-		should bool
-	}{
-		{
-			"no req tag",
-			"package main",
-			false,
-		},
-		{
-			"has req tag",
-			`// +build req
-			
-			package main`,
-			true,
-		},
-		{
-			"OR with req",
-			`// +build no req
-			
-			package main`,
-			true,
-		},
-	}
-
-	ctx := &Context{
-		BuildTags:    []string{"req"},
-		RequiredTags: []string{"req"},
-	}
-	for _, tst := range tests {
-		t.Run(tst.name, func(t *testing.T) {
-			if tst.should != ctx.shouldBuild([]byte(tst.file), nil, nil) {
-				t.Errorf("shouldBuild = %v, want %v", !tst.should, tst.should)
-			}
-		})
 	}
 }
 
@@ -422,11 +382,45 @@ func TestImportVendorParentFailure(t *testing.T) {
 	}
 }
 
+func TestImportDirTarget(t *testing.T) {
+	MustHaveGoBuild(t) // really must just have source
+	ctxt := Default
+	ctxt.GOPATH = ""
+	p, err := ctxt.ImportDir(filepath.Join(ctxt.GOROOT, "src/path"), 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.PkgTargetRoot == "" || p.PkgObj == "" {
+		t.Errorf("p.PkgTargetRoot == %q, p.PkgObj == %q, want non-empty", p.PkgTargetRoot, p.PkgObj)
+	}
+}
+
+// the following copied from go/src/internal/testenv
+
+// MustHaveGoBuild checks that the current system can build programs with ``go build''
+// and then run them with os.StartProcess or exec.Command.
+// If not, MustHaveGoBuild calls t.Skip with an explanation.
+func MustHaveGoBuild(t testing.TB) {
+	if os.Getenv("GO_GCFLAGS") != "" {
+		t.Skipf("skipping test: 'go build' not compatible with setting $GO_GCFLAGS")
+	}
+	if !HasGoBuild() {
+		t.Skipf("skipping test: 'go build' not available on %s/%s", runtime.GOOS, runtime.GOARCH)
+	}
+}
+
 // HasGoBuild reports whether the current system can build programs with ``go build''
 // and then run them with os.StartProcess or exec.Command.
 func HasGoBuild() bool {
+	if os.Getenv("GO_GCFLAGS") != "" {
+		// It's too much work to require every caller of the go command
+		// to pass along "-gcflags="+os.Getenv("GO_GCFLAGS").
+		// For now, if $GO_GCFLAGS is set, report that we simply can't
+		// run go build.
+		return false
+	}
 	switch runtime.GOOS {
-	case "android", "nacl":
+	case "android", "nacl", "js":
 		return false
 	case "darwin":
 		if strings.HasPrefix(runtime.GOARCH, "arm") {
@@ -434,13 +428,4 @@ func HasGoBuild() bool {
 		}
 	}
 	return true
-}
-
-// MustHaveGoBuild checks that the current system can build programs with ``go build''
-// and then run them with os.StartProcess or exec.Command.
-// If not, MustHaveGoBuild calls t.Skip with an explanation.
-func MustHaveGoBuild(t *testing.T) {
-	if !HasGoBuild() {
-		t.Skipf("skipping test: 'go build' not available on %s/%s", runtime.GOOS, runtime.GOARCH)
-	}
 }
