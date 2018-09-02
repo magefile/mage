@@ -12,15 +12,18 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 	"text/tabwriter"
 	"text/template"
 	"time"
 	"unicode"
 
-	"github.com/magefile/mage/build"
+	build "github.com/magefile/mage/build-1.10"
+	buildmod "github.com/magefile/mage/build-1.11"
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/parse"
 	"github.com/magefile/mage/sh"
@@ -62,6 +65,7 @@ var (
 // Command tracks invocations of mage that run without targets or other flags.
 type Command int
 
+// The various command types
 const (
 	None          Command = iota
 	Version               // report the current version of mage
@@ -361,9 +365,27 @@ type data struct {
 	Aliases      map[string]string
 }
 
+// Yeah, if we get to go2, this will need to be revisited. I think that's ok.
+var goVerReg = regexp.MustCompile(`1\.[0-9]+`)
+
 // Magefiles returns the list of magefiles in dir.
 func Magefiles(dir string) ([]string, error) {
+	ver, err := sh.Output("go", "version")
+	if err != nil {
+		return nil, err
+	}
+	v := goVerReg.FindString(ver)
+	if v == "" {
+		return nil, fmt.Errorf("failed to get version from go version output: %v", ver)
+	}
+	minor, err := strconv.Atoi(v[2:])
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse minor version from go version output: %v", ver)
+	}
 	ctx := build.Default
+	if minor >= 11 {
+		ctx = buildmod.Default
+	}
 	ctx.RequiredTags = []string{"mage"}
 	ctx.BuildTags = []string{"mage"}
 	p, err := ctx.ImportDir(dir, 0)
