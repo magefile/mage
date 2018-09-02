@@ -375,25 +375,36 @@ type data struct {
 // Yeah, if we get to go2, this will need to be revisited. I think that's ok.
 var goVerReg = regexp.MustCompile(`1\.[0-9]+`)
 
-// Magefiles returns the list of magefiles in dir.
-func Magefiles(dir string) ([]string, error) {
-	// use the build directory for the specific go binary we're running.  We
-	// divide the world into two epochs - 1.11 and later, where we have go
-	// modules, and 1.10 and prior, where there are no modules.
+func goVersion() (string, error) {
 	cmd := exec.Command(mg.GoCmd(), "version")
 	out, stderr := &bytes.Buffer{}, &bytes.Buffer{}
 	cmd.Stdout = out
 	cmd.Stderr = stderr
 	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("failed to run `go version`: %s", stderr)
+		if s := stderr.String(); s != "" {
+			return "", fmt.Errorf("failed to run `go version`: %s", s)
+		}
+		return "", fmt.Errorf("failed to run `go version`: %v", err)
 	}
-	v := goVerReg.FindString(out.String())
+	return out.String(), nil
+}
+
+// Magefiles returns the list of magefiles in dir.
+func Magefiles(dir string) ([]string, error) {
+	// use the build directory for the specific go binary we're running.  We
+	// divide the world into two epochs - 1.11 and later, where we have go
+	// modules, and 1.10 and prior, where there are no modules.
+	ver, err := goVersion()
+	if err != nil {
+		return nil, err
+	}
+	v := goVerReg.FindString(ver)
 	if v == "" {
-		return nil, fmt.Errorf("failed to get version from go version output: %s", out)
+		return nil, fmt.Errorf("failed to get version from go version: %s", ver)
 	}
 	minor, err := strconv.Atoi(v[2:])
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse minor version from go version output: %s", out)
+		return nil, fmt.Errorf("failed to parse minor version from go version: %s", ver)
 	}
 	// yes, these two blocks are exactly the same aside from the build context,
 	// but we need to access struct fields so... let's just copy and paste and
@@ -510,7 +521,11 @@ func ExeName(files []string) (string, error) {
 	// binary.
 	hashes = append(hashes, fmt.Sprintf("%x", sha1.Sum([]byte(tpl))))
 	sort.Strings(hashes)
-	hash := sha1.Sum([]byte(strings.Join(hashes, "") + magicRebuildKey))
+	ver, err := goVersion()
+	if err != nil {
+		return "", err
+	}
+	hash := sha1.Sum([]byte(strings.Join(hashes, "") + magicRebuildKey + ver))
 	filename := fmt.Sprintf("%x", hash)
 
 	out := filepath.Join(mg.CacheDir(), filename)
