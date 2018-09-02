@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/magefile/mage/build"
+	"github.com/magefile/mage/build-1.10"
 	"github.com/magefile/mage/mg"
 )
 
