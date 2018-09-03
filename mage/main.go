@@ -57,7 +57,7 @@ var debug = log.New(ioutil.Discard, "DEBUG: ", 0)
 var (
 	commitHash string
 	timestamp  string
-	gitTag     = "v2"
+	gitTag     = "unknown"
 )
 
 //go:generate stringer -type=Command
