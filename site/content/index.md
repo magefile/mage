@@ -36,7 +36,7 @@ You may also install a binary release from our
 
 ## Demo
 
-{{< youtube GOqbD0lF-iA >}}
+{{< youtube Hoga60EF_1U >}}
 
 ## Discussion
 

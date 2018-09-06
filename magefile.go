@@ -52,7 +52,7 @@ func Install() error {
 // which will create a new tag with that name.
 func Release() (err error) {
 	if os.Getenv("TAG") == "" {
-		return errors.New("MSG and TAG environment variables are required")
+		return errors.New("TAG environment variables are required")
 	}
 	if err := sh.RunV("git", "tag", "-a", "$TAG"); err != nil {
 		return err
