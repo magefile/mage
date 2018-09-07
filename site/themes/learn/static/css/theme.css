@@ -410,6 +410,8 @@ textarea:focus, input[type="email"]:focus, input[type="number"]:focus, input[typ
 }
 #body-inner {
     margin-bottom: 5rem;
+    margin: auto;
+    max-width: 800px;
 }
 #chapter {
     display: flex;
