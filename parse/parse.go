@@ -14,6 +14,7 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/magefile/mage/mg"
 	mgTypes "github.com/magefile/mage/types"
 )
 
@@ -317,7 +318,7 @@ func getPackage(path string, files []string, fset *token.FileSet) (*ast.Package,
 func makeInfo(dir string, fset *token.FileSet, files map[string]*ast.File) (types.Info, error) {
 	goroot := os.Getenv("GOROOT")
 	if goroot == "" {
-		c := exec.Command("go", "env", "GOROOT")
+		c := exec.Command(mg.GoCmd(), "env", "GOROOT")
 		b, err := c.Output()
 		if err != nil {
 			return types.Info{}, fmt.Errorf("failed to get GOROOT from 'go env': %v", err)

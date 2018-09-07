@@ -14,3 +14,7 @@ Set to "1" or "true" to turn on debug mode (like running with -debug)
 ## MAGEFILE_CACHE
 
 Sets the directory where mage will store binaries compiled from magefiles.
+
+## MAGEFILE_GOCMD
+
+Sets the binary that mage will use to compile with (default is "go").

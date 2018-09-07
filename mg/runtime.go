@@ -19,6 +19,11 @@ const VerboseEnv = "MAGEFILE_VERBOSE"
 // debug mode when running mage.
 const DebugEnv = "MAGEFILE_DEBUG"
 
+// GoCmdEnv is the environment variable that indicates the user requested
+// verbose mode when running a magefile.
+const GoCmdEnv = "MAGEFILE_GOCMD"
+
+
 // Verbose reports whether a magefile was run with the verbose flag.
 func Verbose() bool {
 	b, _ := strconv.ParseBool(os.Getenv(VerboseEnv))
@@ -29,6 +34,15 @@ func Verbose() bool {
 func Debug() bool {
 	b, _ := strconv.ParseBool(os.Getenv(VerboseEnv))
 	return b
+}
+
+// GoCmd reports the command that Mage will use to build go code.  By default mage runs
+// the "go" binary in the PATH.
+func GoCmd() string {
+	if cmd := os.Getenv(GoCmdEnv); cmd != "" {
+		return cmd
+	}
+	return "go"
 }
 
 // CacheDir returns the directory where mage caches compiled binaries.  It
