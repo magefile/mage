@@ -54,9 +54,10 @@ var debug = log.New(ioutil.Discard, "DEBUG: ", 0)
 
 // set by ldflags when you "mage build"
 var (
-	commitHash string
-	timestamp  string
-	gitTag     = "unknown"
+	commitHash  = "<not set>"
+	timestamp   = "<not set>"
+	gitTag      = "<not set>"
+	builtWithGo = "<not set>"
 )
 
 //go:generate stringer -type=Command
@@ -116,15 +117,10 @@ func ParseAndRun(dir string, stdout, stderr io.Writer, stdin io.Reader, args []s
 
 	switch cmd {
 	case Version:
-		if timestamp == "" {
-			timestamp = "<not set>"
-		}
-		if commitHash == "" {
-			commitHash = "<not set>"
-		}
 		log.Println("Mage Build Tool", gitTag)
 		log.Println("Build Date:", timestamp)
 		log.Println("Commit:", commitHash)
+		log.Println("built with:", builtWithGo)
 		return 0
 	case Init:
 		if err := generateInit(dir); err != nil {
@@ -400,7 +396,9 @@ func Magefiles(dir string) ([]string, error) {
 	}
 	v := goVerReg.FindString(ver)
 	if v == "" {
-		return nil, fmt.Errorf("failed to get version from go version: %s", ver)
+		log.Println("warning, compiling with unknown go version:", ver)
+		log.Println("assuming go 1.11+ rules")
+		v = "1.11"
 	}
 	minor, err := strconv.Atoi(v[2:])
 	if err != nil {

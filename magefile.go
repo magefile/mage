@@ -29,6 +29,7 @@ func Install() error {
 	if runtime.GOOS == "windows" {
 		name += ".exe"
 	}
+
 	gocmd := mg.GoCmd()
 	gopath, err := sh.Output(gocmd, "env", "GOPATH")
 	if err != nil {
@@ -77,13 +78,18 @@ func Clean() error {
 }
 
 func flags() (string, error) {
+	goVer, err := sh.Output(mg.GoCmd(), "version")
+	if err != nil {
+		return "", fmt.Errorf("can't determine go version: %v", err)
+	}
+
 	timestamp := time.Now().Format(time.RFC3339)
 	hash := hash()
 	tag := tag()
 	if tag == "" {
 		tag = "dev"
 	}
-	return fmt.Sprintf(`-X "github.com/magefile/mage/mage.timestamp=%s" -X "github.com/magefile/mage/mage.commitHash=%s" -X "github.com/magefile/mage/mage.gitTag=%s"`, timestamp, hash, tag), nil
+	return fmt.Sprintf(`-X "github.com/magefile/mage/mage.timestamp=%s" -X "github.com/magefile/mage/mage.commitHash=%s" -X "github.com/magefile/mage/mage.gitTag=%s" -X "github.com/magefile/mage/mage.builtWithGo=%s"`, timestamp, hash, tag, goVer), nil
 }
 
 // tag returns the git tag for the current branch or "" if none.
