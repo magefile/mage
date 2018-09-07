@@ -1,6 +1,6 @@
 {{ partial "header.html" . }}
 
-<div><strong>Posted:</strong> {{.Params.date}}</div>
+<div><strong>Posted:</strong> {{.Date.Format "January 2, 2006"}}</div>
 {{if .Params.author}}<div><strong>By: </strong>{{with .Params.authorLink}}<a href="{{.}}">{{end}}{{.Params.author}}{{if .Params.authorLink}}</a>{{end}}</div>{{end}}
 
 <div width=600>
