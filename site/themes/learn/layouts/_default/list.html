@@ -1,12 +1,11 @@
 {{ partial "header.html" . }}
+<body>
 
-{{ .Content }}
 
-<footer class=" footline" >
-	{{with .Params.LastModifierDisplayName}}
-	    <i class='fa fa-user'></i> <a href="mailto:{{ $.Params.LastModifierEmail }}">{{ . }}</a> {{with $.Date}} <i class='fa fa-calendar'></i> {{ .Format "02/01/2006" }}{{end}}
-	    </div>
-	{{end}}
-</footer>
+  <ul class="posts">
+      {{ range .Data.Pages }}
+      <li><span><a href="{{ .Permalink }}">{{ .Title }}</a><time class="pull-right post-list">{{ .Date.Format "Mon, Jan 2, 2006" }}</h4></time></span></span></li>
+      {{ end }}
+  </ul>
 
 {{ partial "footer.html" . }}
