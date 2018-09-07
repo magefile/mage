@@ -25,12 +25,6 @@ weight = 1
 languageName = "English"
 
 [[Languages.en.menu.shortcuts]] 
-name = "<i class='fa fa-megaphone'></i> Blog"
-# identifier = "ds"
-url = "/blog"
-weight = 1
-
-[[Languages.en.menu.shortcuts]] 
 name = "<i class='fa fa-github'></i> Github repo"
 # identifier = "ds"
 url = "https://github.com/magefile/mage"
