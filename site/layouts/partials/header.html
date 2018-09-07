@@ -44,7 +44,7 @@
         <div id="overlay"></div>
         <div class="padding highlightable sticky-parent">
               {{if not .IsHome}}
-              <div class="sticky-spacer">
+              <div>
                 <div id="top-bar">
                 {{ if and (or .IsPage .IsSection) .Site.Params.editURL }}
                   {{ $File := .File }}

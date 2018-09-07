@@ -13,7 +13,7 @@ Set to "1" or "true" to turn on debug mode (like running with -debug)
 
 ## MAGEFILE_CACHE
 
-Sets the directory where mage will store binaries compiled from magefiles.
+Sets the directory where mage will store binaries compiled from magefiles (default is $HOME/.magefile)
 
 ## MAGEFILE_GOCMD
 

@@ -18,6 +18,7 @@ customized by setting the MAGEFILE_CACHE environment variable.
 
 ## Go Environment
 
-Mage itself requires no dependencies to run. However, because it is compiling
-go code, you must have a valid go environment set up on your machine.  Mage is
-compatible with any go 1.x environment.
+Mage itself requires no dependencies to run. However, because it is compiling go
+code, you must have a valid go environment set up on your machine.  Mage is
+compatible with any go 1.7+ environment (earlier versions may work but are not
+tested).
