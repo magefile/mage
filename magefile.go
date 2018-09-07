@@ -20,11 +20,6 @@ import (
 
 // Runs "go install" for mage.  This generates the version info the binary.
 func Install() error {
-	ldf, err := flags()
-	if err != nil {
-		return err
-	}
-
 	name := "mage"
 	if runtime.GOOS == "windows" {
 		name += ".exe"
@@ -48,7 +43,7 @@ func Install() error {
 	// install` turns into a no-op, and `go install -a` fails on people's
 	// machines that have go installed in a non-writeable directory (such as
 	// normal OS installs in /usr/bin)
-	return sh.RunV(gocmd, "build", "-o", path, "-ldflags="+ldf, "github.com/magefile/mage")
+	return sh.RunV(gocmd, "build", "-o", path, "-ldflags="+flags(), "github.com/magefile/mage")
 }
 
 // Generates a new release.  Expects the TAG environment variable to be set,
@@ -77,19 +72,14 @@ func Clean() error {
 	return sh.Rm("dist")
 }
 
-func flags() (string, error) {
-	goVer, err := sh.Output(mg.GoCmd(), "version")
-	if err != nil {
-		return "", fmt.Errorf("can't determine go version: %v", err)
-	}
-
+func flags() string {
 	timestamp := time.Now().Format(time.RFC3339)
 	hash := hash()
 	tag := tag()
 	if tag == "" {
 		tag = "dev"
 	}
-	return fmt.Sprintf(`-X "github.com/magefile/mage/mage.timestamp=%s" -X "github.com/magefile/mage/mage.commitHash=%s" -X "github.com/magefile/mage/mage.gitTag=%s" -X "github.com/magefile/mage/mage.builtWithGo=%s"`, timestamp, hash, tag, goVer), nil
+	return fmt.Sprintf(`-X "github.com/magefile/mage/mage.timestamp=%s" -X "github.com/magefile/mage/mage.commitHash=%s" -X "github.com/magefile/mage/mage.gitTag=%s"`, timestamp, hash, tag)
 }
 
 // tag returns the git tag for the current branch or "" if none.

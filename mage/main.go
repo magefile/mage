@@ -54,10 +54,9 @@ var debug = log.New(ioutil.Discard, "DEBUG: ", 0)
 
 // set by ldflags when you "mage build"
 var (
-	commitHash  = "<not set>"
-	timestamp   = "<not set>"
-	gitTag      = "<not set>"
-	builtWithGo = "<not set>"
+	commitHash = "<not set>"
+	timestamp  = "<not set>"
+	gitTag     = "<not set>"
 )
 
 //go:generate stringer -type=Command
@@ -120,7 +119,7 @@ func ParseAndRun(dir string, stdout, stderr io.Writer, stdin io.Reader, args []s
 		log.Println("Mage Build Tool", gitTag)
 		log.Println("Build Date:", timestamp)
 		log.Println("Commit:", commitHash)
-		log.Println("built with:", builtWithGo)
+		log.Println("built with:", runtime.Version())
 		return 0
 	case Init:
 		if err := generateInit(dir); err != nil {
