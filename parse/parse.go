@@ -4,19 +4,23 @@ import (
 	"errors"
 	"fmt"
 	"go/ast"
-	"go/build"
 	"go/doc"
 	"go/parser"
 	"go/token"
-	"go/types"
+	"io/ioutil"
 	"log"
 	"os"
-	"os/exec"
 	"strings"
 
-	"github.com/magefile/mage/mg"
 	mgTypes "github.com/magefile/mage/types"
 )
+
+var debug = log.New(ioutil.Discard, "DEBUG: ", 0)
+
+// EnableDebug turns on debug logging.
+func EnableDebug() {
+	debug.SetOutput(os.Stderr)
+}
 
 // PkgInfo contains inforamtion about a package of files according to mage's
 // parsing rules.
@@ -93,18 +97,14 @@ func (f Function) TemplateString() string {
 
 // Package parses a package
 func Package(path string, files []string) (*PkgInfo, error) {
+	debug.Println("parsing package files")
 	fset := token.NewFileSet()
-
 	pkg, err := getPackage(path, files, fset)
 	if err != nil {
 		return nil, err
 	}
 
-	info, err := makeInfo(path, fset, pkg.Files)
-	if err != nil {
-		return nil, err
-	}
-
+	debug.Println("getting doc info")
 	p := doc.New(pkg, "./", 0)
 	pi := &PkgInfo{
 		Description: toOneLine(p.Doc),
@@ -128,7 +128,7 @@ typeloop:
 			if !ast.IsExported(f.Name) {
 				continue
 			}
-			if typ := voidOrError(f.Decl.Type, info); typ != mgTypes.InvalidType {
+			if typ := voidOrError(f.Decl.Type); typ != mgTypes.InvalidType {
 				pi.Funcs = append(pi.Funcs, Function{
 					Name:      f.Name,
 					Receiver:  f.Recv,
@@ -140,16 +140,20 @@ typeloop:
 			}
 		}
 	}
+	debug.Printf("found %d functions", len(p.Funcs))
 	for _, f := range p.Funcs {
+		debug.Println("checking func", f.Name)
 		if f.Recv != "" {
+			debug.Printf("skipping method %s.%s", f.Recv, f.Name)
 			// skip methods
 			continue
 		}
 		if !ast.IsExported(f.Name) {
+			debug.Printf("skipping non-exported function %s", f.Name)
 			// skip non-exported functions
 			continue
 		}
-		if typ := voidOrError(f.Decl.Type, info); typ != mgTypes.InvalidType {
+		if typ := voidOrError(f.Decl.Type); typ != mgTypes.InvalidType {
 			pi.Funcs = append(pi.Funcs, Function{
 				Name:      f.Name,
 				Comment:   toOneLine(f.Doc),
@@ -157,6 +161,8 @@ typeloop:
 				IsError:   typ == mgTypes.ErrorType || typ == mgTypes.ContextErrorType,
 				IsContext: typ == mgTypes.ContextVoidType || typ == mgTypes.ContextErrorType,
 			})
+		} else {
+			debug.Printf("skipping function with invalid signature func %s(%v)(%v)", f.Name, fieldNames(f.Decl.Type.Params.List), fieldNames(f.Decl.Type.Results.List))
 		}
 	}
 
@@ -171,10 +177,31 @@ typeloop:
 		return nil, errors.New(msg)
 	}
 
-	setDefault(p, pi, info)
-	setAliases(p, pi, info)
+	setDefault(p, pi)
+	setAliases(p, pi)
 
 	return pi, nil
+}
+
+func fieldNames(list []*ast.Field) string {
+	if len(list) == 0 {
+		return ""
+	}
+	args := make([]string, 0, len(list))
+	for _, f := range list {
+		names := make([]string, 0, len(f.Names))
+		for _, n := range f.Names {
+			if n.Name != "" {
+				names = append(names, n.Name)
+			}
+		}
+		nms := strings.Join(names, ", ")
+		if nms != "" {
+			nms += " "
+		}
+		args = append(args, nms+fmt.Sprint(f.Type))
+	}
+	return strings.Join(args, ", ")
 }
 
 // checkDupes checks a package for duplicate target names.
@@ -212,7 +239,7 @@ func sanitizeSynopsis(f *doc.Func) string {
 	return synopsis
 }
 
-func setDefault(p *doc.Package, pi *PkgInfo, info types.Info) {
+func setDefault(p *doc.Package, pi *PkgInfo) {
 	for _, v := range p.Vars {
 		for x, name := range v.Names {
 			if name != "Default" {
@@ -240,7 +267,7 @@ func setDefault(p *doc.Package, pi *PkgInfo, info types.Info) {
 	}
 }
 
-func setAliases(p *doc.Package, pi *PkgInfo, info types.Info) {
+func setAliases(p *doc.Package, pi *PkgInfo) {
 	for _, v := range p.Vars {
 		for x, name := range v.Names {
 			if name != "Aliases" {
@@ -315,105 +342,46 @@ func getPackage(path string, files []string, fset *token.FileSet) (*ast.Package,
 	return nil, fmt.Errorf("no non-test packages found in %s", path)
 }
 
-func makeInfo(dir string, fset *token.FileSet, files map[string]*ast.File) (types.Info, error) {
-	goroot := os.Getenv("GOROOT")
-	if goroot == "" {
-		c := exec.Command(mg.GoCmd(), "env", "GOROOT")
-		b, err := c.Output()
-		if err != nil {
-			return types.Info{}, fmt.Errorf("failed to get GOROOT from 'go env': %v", err)
-		}
-		goroot = strings.TrimSpace(string(b))
-		if goroot == "" {
-			return types.Info{}, fmt.Errorf("could not determine GOROOT")
-		}
+func hasContextParam(ft *ast.FuncType) bool {
+	if ft.Params.NumFields() != 1 {
+		return false
 	}
-
-	build.Default.GOROOT = goroot
-
-	cfg := types.Config{
-		Importer: getImporter(fset),
-	}
-
-	info := types.Info{
-		Types: make(map[ast.Expr]types.TypeAndValue),
-		Defs:  make(map[*ast.Ident]types.Object),
-		Uses:  make(map[*ast.Ident]types.Object),
-	}
-
-	fs := make([]*ast.File, 0, len(files))
-	for _, v := range files {
-		fs = append(fs, v)
-	}
-
-	_, err := cfg.Check(dir, fset, fs, &info)
-	if err != nil {
-		return info, fmt.Errorf("failed to check types in directory: %v", err)
-	}
-	return info, nil
+	ret := ft.Params.List[0]
+	return fmt.Sprint(ret.Type) == "context.Context"
 }
 
-// errorOrVoid filters the list of functions to only those that return only an
-// error or have no return value, and have no parameters.
-func errorOrVoid(fns []*ast.FuncDecl, info types.Info) []*ast.FuncDecl {
-	fds := []*ast.FuncDecl{}
-
-	for _, fn := range fns {
-		if voidOrError(fn.Type, info) != mgTypes.InvalidType {
-			fds = append(fds, fn)
-		}
-	}
-	return fds
-}
-
-func hasContextParam(ft *ast.FuncType, info types.Info) bool {
-	if ft.Params.NumFields() == 1 {
-		ret := ft.Params.List[0]
-		t := info.TypeOf(ret.Type)
-		if t != nil && t.String() == "context.Context" {
-			return true
-		}
-	}
-	return false
-}
-
-func hasVoidReturn(ft *ast.FuncType, info types.Info) bool {
+func hasVoidReturn(ft *ast.FuncType) bool {
 	res := ft.Results
-	if res.NumFields() == 0 {
-		return true
-	}
-	return false
+	return res.NumFields() == 0
 }
 
-func hasErrorReturn(ft *ast.FuncType, info types.Info) bool {
+func hasErrorReturn(ft *ast.FuncType) bool {
 	res := ft.Results
-	if res.NumFields() == 1 {
-		ret := res.List[0]
-		if len(ret.Names) > 1 {
-			return false
-		}
-		t := info.TypeOf(ret.Type)
-		if t != nil && t.String() == "error" {
-			return true
-		}
+	if res.NumFields() != 1 {
+		return false
 	}
-	return false
+	ret := res.List[0]
+	if len(ret.Names) > 1 {
+		return false
+	}
+	return fmt.Sprint(ret.Type) == "error"
 }
 
-func voidOrError(ft *ast.FuncType, info types.Info) mgTypes.FuncType {
-	if hasContextParam(ft, info) {
-		if hasVoidReturn(ft, info) {
+func voidOrError(ft *ast.FuncType) mgTypes.FuncType {
+	if hasContextParam(ft) {
+		if hasVoidReturn(ft) {
 			return mgTypes.ContextVoidType
 		}
-		if hasErrorReturn(ft, info) {
+		if hasErrorReturn(ft) {
 			return mgTypes.ContextErrorType
 		}
 	}
+	debug.Println("num params", ft.Params.NumFields())
 	if ft.Params.NumFields() == 0 {
-		if hasVoidReturn(ft, info) {
+		if hasVoidReturn(ft) {
 			return mgTypes.VoidType
 		}
-		if hasErrorReturn(ft, info) {
+		if hasErrorReturn(ft) {
 			return mgTypes.ErrorType
 		}
 	}

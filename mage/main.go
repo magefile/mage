@@ -15,14 +15,11 @@ import (
 	"regexp"
 	"runtime"
 	"sort"
-	"strconv"
 	"strings"
 	"text/template"
 	"time"
 	"unicode"
 
-	build "github.com/magefile/mage/build-1.10"
-	buildmod "github.com/magefile/mage/build-1.11"
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/parse"
 	"github.com/magefile/mage/sh"
@@ -315,7 +312,11 @@ func Invoke(inv Invocation) int {
 	for i := range files {
 		fnames = append(fnames, filepath.Base(files[i]))
 	}
-
+	if inv.Debug {
+		debug.Println("enabling debug in parse")
+		parse.EnableDebug()
+	}
+	debug.Println("parsing files")
 	info, err := parse.Package(inv.Dir, fnames)
 	if err != nil {
 		log.Println("Error parsing magefiles:", err)
@@ -386,60 +387,36 @@ func goVersion() (string, error) {
 
 // Magefiles returns the list of magefiles in dir.
 func Magefiles(dir string) ([]string, error) {
-	// use the build directory for the specific go binary we're running.  We
-	// divide the world into two epochs - 1.11 and later, where we have go
-	// modules, and 1.10 and prior, where there are no modules.
-	ver, err := goVersion()
-	if err != nil {
+	fail := func(err error) ([]string, error) {
 		return nil, err
 	}
-	v := goVerReg.FindString(ver)
-	if v == "" {
-		log.Println("warning, compiling with unknown go version:", ver)
-		log.Println("assuming go 1.11+ rules")
-		v = "1.11"
-	}
-	minor, err := strconv.Atoi(v[2:])
+
+	debug.Println("getting all non-mage files")
+
+	// // first, grab all the files with no build tags specified.. this is actually
+	// // our exclude list of things without the mage build tag.
+	s, err := sh.Output(mg.GoCmd(), "list", "-find", "-e", "-f", `{{join .GoFiles "||"}}`)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse minor version from go version: %s", ver)
+		fail(fmt.Errorf("failed to list non-mage gofiles: %v", err))
 	}
-	// yes, these two blocks are exactly the same aside from the build context,
-	// but we need to access struct fields so... let's just copy and paste and
-	// move on.
-	if minor < 11 {
-		// go 1.10 and before
-		ctx := build.Default
-		ctx.RequiredTags = []string{"mage"}
-		ctx.BuildTags = []string{"mage"}
-		p, err := ctx.ImportDir(dir, 0)
-		if err != nil {
-			if _, ok := err.(*build.NoGoError); ok {
-				debug.Print("no go files found by build")
-				return []string{}, nil
-			}
-			return nil, err
-		}
-		for i := range p.GoFiles {
-			p.GoFiles[i] = filepath.Join(dir, p.GoFiles[i])
-		}
-		return p.GoFiles, nil
+
+	exclude := map[string]bool{}
+	for _, f := range strings.Split(s, "||") {
+		debug.Println("marked file as non-mage:", f)
+		exclude[f] = true
 	}
-	// Go 1.11+
-	ctx := buildmod.Default
-	ctx.RequiredTags = []string{"mage"}
-	ctx.BuildTags = []string{"mage"}
-	p, err := ctx.ImportDir(dir, 0)
+	debug.Println("getting all files plus mage files")
+	s, err = sh.Output(mg.GoCmd(), "list", "-tags=mage", "-find", "-e", "-f", `{{join .GoFiles "||"}}`)
 	if err != nil {
-		if _, ok := err.(*buildmod.NoGoError); ok {
-			debug.Print("no go files found by build")
-			return []string{}, nil
+		fail(fmt.Errorf("failed to list non-mage gofiles: %v", err))
+	}
+	files := []string{}
+	for _, f := range strings.Split(s, "||") {
+		if !exclude[f] {
+			files = append(files, f)
 		}
-		return nil, err
 	}
-	for i := range p.GoFiles {
-		p.GoFiles[i] = filepath.Join(dir, p.GoFiles[i])
-	}
-	return p.GoFiles, nil
+	return files, nil
 }
 
 // Compile uses the go tool to compile the files into an executable at path.
@@ -450,6 +427,7 @@ func Compile(path string, stdout, stderr io.Writer, gofiles []string, isdebug bo
 		runDebug(mg.GoCmd(), "version")
 		runDebug(mg.GoCmd(), "env")
 	}
+	debug.Printf("running %s build -o %s %s", mg.GoCmd(), path, strings.Join(gofiles, ", "))
 	c := exec.Command(mg.GoCmd(), append([]string{"build", "-o", path}, gofiles...)...)
 	c.Env = os.Environ()
 	c.Stderr = stderr
