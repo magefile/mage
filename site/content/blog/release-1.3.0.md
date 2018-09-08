@@ -6,11 +6,12 @@ author = "Nate Finch"
 authorLink = "twitter.com/natethefinch"
 +++
 
-As Brad Fitzpatrick would say, mage 1.3.0 is the best release of Mage ever! This
-comes quick on the heels of gophercon, so I have been motivated to move some
-interesting new features through.  1.2.4 added real support for go modules
-(though it needs some more polish).  This release adds a feature that I think
-will become more useful as more projects use Mage.  
+As Brad Fitzpatrick would say, [Mage
+1.3.0](https://github.com/magefile/mage/releases/tag/1.3.0) is the best release
+of Mage ever! This comes quick on the heels of gophercon, so I have been
+motivated to move some interesting new features through.  1.2.4 added real
+support for go modules (though it needs some more polish).  This release adds a
+feature that I think will become more useful as more projects use Mage.  
 
 As you may or may not know (it hasn't been well advertised), it's now extremely
 easy to run multiple go versions side by side.  You can `go get
