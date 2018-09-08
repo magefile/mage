@@ -9,7 +9,8 @@ constraints (aside from requiring the mage tag).  It then parses those files to
 find the build targets, generates a main file for the command, and compiles a
 binary from those files.  The magefiles are hashed so that if they remain
 unchanged, the same compiled binary will be reused next time, to avoid the
-generation overhead.
+generation overhead.  As of Mage 1.3.0, the version of Go used to compile the
+binary is also used in the hash.
 
 ## Binary Cache
 
