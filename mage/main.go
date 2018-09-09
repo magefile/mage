@@ -270,7 +270,7 @@ Options:
 func Invoke(inv Invocation) int {
 	log := log.New(inv.Stderr, "", 0)
 
-	files, err := Magefiles(inv.Dir)
+	files, err := Magefiles(inv)
 	if err != nil {
 		log.Println("Error determining list of magefiles:", err)
 		return 1
@@ -292,17 +292,17 @@ func Invoke(inv Invocation) int {
 	debug.Println("output exe is ", exePath)
 
 	_, err = os.Stat(exePath)
-	if err == nil {
+	switch {
+	case err == nil:
 		if inv.Force {
 			debug.Println("ignoring existing executable")
 		} else {
 			debug.Println("Running existing exe")
 			return RunCompiled(inv, exePath)
 		}
-	}
-	if os.IsNotExist(err) {
+	case os.IsNotExist(err):
 		debug.Println("no existing exe, creating new")
-	} else {
+	default:
 		debug.Printf("error reading existing exe at %v: %v", exePath, err)
 		debug.Println("creating new exe")
 	}
@@ -313,7 +313,6 @@ func Invoke(inv Invocation) int {
 		fnames = append(fnames, filepath.Base(files[i]))
 	}
 	if inv.Debug {
-		debug.Println("enabling debug in parse")
 		parse.EnableDebug()
 	}
 	debug.Println("parsing files")
@@ -386,7 +385,7 @@ func goVersion() (string, error) {
 }
 
 // Magefiles returns the list of magefiles in dir.
-func Magefiles(dir string) ([]string, error) {
+func Magefiles(inv Invocation) ([]string, error) {
 	fail := func(err error) ([]string, error) {
 		return nil, err
 	}
@@ -395,23 +394,31 @@ func Magefiles(dir string) ([]string, error) {
 
 	// // first, grab all the files with no build tags specified.. this is actually
 	// // our exclude list of things without the mage build tag.
-	s, err := sh.Output(mg.GoCmd(), "list", "-find", "-e", "-f", `{{join .GoFiles "||"}}`)
+	cmd := exec.Command(mg.GoCmd(), "list", "-find", "-e", "-f", `{{join .GoFiles "||"}}`)
+	if inv.Debug {
+		cmd.Stderr = inv.Stderr
+	}
+	list, err := cmd.Output()
 	if err != nil {
 		fail(fmt.Errorf("failed to list non-mage gofiles: %v", err))
 	}
 
 	exclude := map[string]bool{}
-	for _, f := range strings.Split(s, "||") {
+	for _, f := range strings.Split(string(list), "||") {
 		debug.Println("marked file as non-mage:", f)
 		exclude[f] = true
 	}
 	debug.Println("getting all files plus mage files")
-	s, err = sh.Output(mg.GoCmd(), "list", "-tags=mage", "-find", "-e", "-f", `{{join .GoFiles "||"}}`)
+	cmd = exec.Command(mg.GoCmd(), "list", "-tags=mage", "-find", "-e", "-f", `{{join .GoFiles "||"}}`)
+	if inv.Debug {
+		cmd.Stderr = inv.Stderr
+	}
+	list, err = cmd.Output()
 	if err != nil {
-		fail(fmt.Errorf("failed to list non-mage gofiles: %v", err))
+		fail(fmt.Errorf("failed to list mage gofiles: %v", err))
 	}
 	files := []string{}
-	for _, f := range strings.Split(s, "||") {
+	for _, f := range strings.Split(string(list), "||") {
 		if !exclude[f] {
 			files = append(files, f)
 		}

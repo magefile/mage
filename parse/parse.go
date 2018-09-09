@@ -97,14 +97,12 @@ func (f Function) TemplateString() string {
 
 // Package parses a package
 func Package(path string, files []string) (*PkgInfo, error) {
-	debug.Println("parsing package files")
 	fset := token.NewFileSet()
 	pkg, err := getPackage(path, files, fset)
 	if err != nil {
 		return nil, err
 	}
 
-	debug.Println("getting doc info")
 	p := doc.New(pkg, "./", 0)
 	pi := &PkgInfo{
 		Description: toOneLine(p.Doc),
@@ -140,9 +138,7 @@ typeloop:
 			}
 		}
 	}
-	debug.Printf("found %d functions", len(p.Funcs))
 	for _, f := range p.Funcs {
-		debug.Println("checking func", f.Name)
 		if f.Recv != "" {
 			debug.Printf("skipping method %s.%s", f.Recv, f.Name)
 			// skip methods
@@ -154,6 +150,7 @@ typeloop:
 			continue
 		}
 		if typ := voidOrError(f.Decl.Type); typ != mgTypes.InvalidType {
+			debug.Printf("found target %v", f.Name)
 			pi.Funcs = append(pi.Funcs, Function{
 				Name:      f.Name,
 				Comment:   toOneLine(f.Doc),
@@ -376,7 +373,6 @@ func voidOrError(ft *ast.FuncType) mgTypes.FuncType {
 			return mgTypes.ContextErrorType
 		}
 	}
-	debug.Println("num params", ft.Params.NumFields())
 	if ft.Params.NumFields() == 0 {
 		if hasVoidReturn(ft) {
 			return mgTypes.VoidType
