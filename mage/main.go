@@ -15,14 +15,11 @@ import (
 	"regexp"
 	"runtime"
 	"sort"
-	"strconv"
 	"strings"
 	"text/template"
 	"time"
 	"unicode"
 
-	build "github.com/magefile/mage/build-1.10"
-	buildmod "github.com/magefile/mage/build-1.11"
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/parse"
 	"github.com/magefile/mage/sh"
@@ -273,7 +270,7 @@ Options:
 func Invoke(inv Invocation) int {
 	log := log.New(inv.Stderr, "", 0)
 
-	files, err := Magefiles(inv.Dir)
+	files, err := Magefiles(inv)
 	if err != nil {
 		log.Println("Error determining list of magefiles:", err)
 		return 1
@@ -286,7 +283,7 @@ func Invoke(inv Invocation) int {
 	debug.Printf("found magefiles: %s", strings.Join(files, ", "))
 	exePath, err := ExeName(files)
 	if err != nil {
-		log.Println("Error:", err)
+		log.Println("Error getting exe name:", err)
 		return 1
 	}
 	if inv.CompileOut != "" {
@@ -295,17 +292,17 @@ func Invoke(inv Invocation) int {
 	debug.Println("output exe is ", exePath)
 
 	_, err = os.Stat(exePath)
-	if err == nil {
+	switch {
+	case err == nil:
 		if inv.Force {
 			debug.Println("ignoring existing executable")
 		} else {
 			debug.Println("Running existing exe")
 			return RunCompiled(inv, exePath)
 		}
-	}
-	if os.IsNotExist(err) {
+	case os.IsNotExist(err):
 		debug.Println("no existing exe, creating new")
-	} else {
+	default:
 		debug.Printf("error reading existing exe at %v: %v", exePath, err)
 		debug.Println("creating new exe")
 	}
@@ -315,7 +312,10 @@ func Invoke(inv Invocation) int {
 	for i := range files {
 		fnames = append(fnames, filepath.Base(files[i]))
 	}
-
+	if inv.Debug {
+		parse.EnableDebug()
+	}
+	debug.Println("parsing files")
 	info, err := parse.Package(inv.Dir, fnames)
 	if err != nil {
 		log.Println("Error parsing magefiles:", err)
@@ -336,7 +336,7 @@ func Invoke(inv Invocation) int {
 		}()
 	}
 	files = append(files, main)
-	if err := Compile(exePath, inv.Stdout, inv.Stderr, files, inv.Debug); err != nil {
+	if err := Compile(inv, exePath, files); err != nil {
 		log.Println("Error:", err)
 		return 1
 	}
@@ -385,75 +385,70 @@ func goVersion() (string, error) {
 }
 
 // Magefiles returns the list of magefiles in dir.
-func Magefiles(dir string) ([]string, error) {
-	// use the build directory for the specific go binary we're running.  We
-	// divide the world into two epochs - 1.11 and later, where we have go
-	// modules, and 1.10 and prior, where there are no modules.
-	ver, err := goVersion()
-	if err != nil {
+func Magefiles(inv Invocation) ([]string, error) {
+	fail := func(err error) ([]string, error) {
 		return nil, err
 	}
-	v := goVerReg.FindString(ver)
-	if v == "" {
-		log.Println("warning, compiling with unknown go version:", ver)
-		log.Println("assuming go 1.11+ rules")
-		v = "1.11"
+
+	debug.Println("getting all non-mage files in", inv.Dir)
+	// // first, grab all the files with no build tags specified.. this is actually
+	// // our exclude list of things without the mage build tag.
+	cmd := exec.Command(mg.GoCmd(), "list", "-e", "-f", `{{join .GoFiles "||"}}`)
+
+	if inv.Debug {
+		cmd.Stderr = inv.Stderr
 	}
-	minor, err := strconv.Atoi(v[2:])
+	cmd.Dir = inv.Dir
+	b, err := cmd.Output()
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse minor version from go version: %s", ver)
+		fail(fmt.Errorf("failed to list non-mage gofiles: %v", err))
 	}
-	// yes, these two blocks are exactly the same aside from the build context,
-	// but we need to access struct fields so... let's just copy and paste and
-	// move on.
-	if minor < 11 {
-		// go 1.10 and before
-		ctx := build.Default
-		ctx.RequiredTags = []string{"mage"}
-		ctx.BuildTags = []string{"mage"}
-		p, err := ctx.ImportDir(dir, 0)
-		if err != nil {
-			if _, ok := err.(*build.NoGoError); ok {
-				debug.Print("no go files found by build")
-				return []string{}, nil
-			}
-			return nil, err
+	list := strings.TrimSpace(string(b))
+	debug.Println("found non-mage files", list)
+	exclude := map[string]bool{}
+	for _, f := range strings.Split(list, "||") {
+		if f != "" {
+			debug.Printf("marked file as non-mage: %q", f)
+			exclude[f] = true
 		}
-		for i := range p.GoFiles {
-			p.GoFiles[i] = filepath.Join(dir, p.GoFiles[i])
-		}
-		return p.GoFiles, nil
 	}
-	// Go 1.11+
-	ctx := buildmod.Default
-	ctx.RequiredTags = []string{"mage"}
-	ctx.BuildTags = []string{"mage"}
-	p, err := ctx.ImportDir(dir, 0)
+	debug.Println("getting all files plus mage files")
+	cmd = exec.Command(mg.GoCmd(), "list", "-tags=mage", "-e", "-f", `{{join .GoFiles "||"}}`)
+	if inv.Debug {
+		cmd.Stderr = inv.Stderr
+	}
+	cmd.Dir = inv.Dir
+	b, err = cmd.Output()
+	list = strings.TrimSpace(string(b))
+
 	if err != nil {
-		if _, ok := err.(*buildmod.NoGoError); ok {
-			debug.Print("no go files found by build")
-			return []string{}, nil
+		fail(fmt.Errorf("failed to list mage gofiles: %v", err))
+	}
+	files := []string{}
+	for _, f := range strings.Split(list, "||") {
+		if f != "" && !exclude[f] {
+			files = append(files, f)
 		}
-		return nil, err
 	}
-	for i := range p.GoFiles {
-		p.GoFiles[i] = filepath.Join(dir, p.GoFiles[i])
+	for i := range files {
+		files[i] = filepath.Join(inv.Dir, files[i])
 	}
-	return p.GoFiles, nil
+	return files, nil
 }
 
 // Compile uses the go tool to compile the files into an executable at path.
-func Compile(path string, stdout, stderr io.Writer, gofiles []string, isdebug bool) error {
+func Compile(inv Invocation, path string, gofiles []string) error {
 	debug.Println("compiling to", path)
 	debug.Println("compiling using gocmd:", mg.GoCmd())
-	if isdebug {
+	if inv.Debug {
 		runDebug(mg.GoCmd(), "version")
 		runDebug(mg.GoCmd(), "env")
 	}
+	debug.Printf("running %s build -o %s %s", mg.GoCmd(), path, strings.Join(gofiles, ", "))
 	c := exec.Command(mg.GoCmd(), append([]string{"build", "-o", path}, gofiles...)...)
 	c.Env = os.Environ()
-	c.Stderr = stderr
-	c.Stdout = stdout
+	c.Stderr = inv.Stderr
+	c.Stdout = inv.Stdout
 	err := c.Run()
 	if err != nil {
 		return errors.New("error compiling magefiles")
@@ -535,7 +530,7 @@ func ExeName(files []string) (string, error) {
 func hashFile(fn string) (string, error) {
 	f, err := os.Open(fn)
 	if err != nil {
-		return "", fmt.Errorf("can't open input file: %v", err)
+		return "", fmt.Errorf("can't open input file for hashing: %#v", err)
 	}
 	defer f.Close()
 
