@@ -393,7 +393,7 @@ func Magefiles(inv Invocation) ([]string, error) {
 	debug.Println("getting all non-mage files in", inv.Dir)
 	// // first, grab all the files with no build tags specified.. this is actually
 	// // our exclude list of things without the mage build tag.
-	cmd := exec.Command(mg.GoCmd(), "list", "-find", "-e", "-f", `{{join .GoFiles "||"}}`)
+	cmd := exec.Command(mg.GoCmd(), "list", "-e", "-f", `{{join .GoFiles "||"}}`)
 
 	if inv.Debug {
 		cmd.Stderr = inv.Stderr
@@ -413,7 +413,7 @@ func Magefiles(inv Invocation) ([]string, error) {
 		}
 	}
 	debug.Println("getting all files plus mage files")
-	cmd = exec.Command(mg.GoCmd(), "list", "-tags=mage", "-find", "-e", "-f", `{{join .GoFiles "||"}}`)
+	cmd = exec.Command(mg.GoCmd(), "list", "-tags=mage", "-e", "-f", `{{join .GoFiles "||"}}`)
 	if inv.Debug {
 		cmd.Stderr = inv.Stderr
 	}
