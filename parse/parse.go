@@ -159,7 +159,7 @@ typeloop:
 				IsContext: typ == mgTypes.ContextVoidType || typ == mgTypes.ContextErrorType,
 			})
 		} else {
-			debug.Printf("skipping function with invalid signature func %s(%v)(%v)", f.Name, fieldNames(f.Decl.Type.Params.List), fieldNames(f.Decl.Type.Results.List))
+			debug.Printf("skipping function with invalid signature func %s(%v)(%v)", f.Name, fieldNames(f.Decl.Type.Params), fieldNames(f.Decl.Type.Results))
 		}
 	}
 
@@ -180,7 +180,11 @@ typeloop:
 	return pi, nil
 }
 
-func fieldNames(list []*ast.Field) string {
+func fieldNames(flist *ast.FieldList) string {
+	if flist == nil {
+		return ""
+	}
+	list := flist.List
 	if len(list) == 0 {
 		return ""
 	}
@@ -344,7 +348,18 @@ func hasContextParam(ft *ast.FuncType) bool {
 		return false
 	}
 	ret := ft.Params.List[0]
-	return fmt.Sprint(ret.Type) == "context.Context"
+	sel, ok := ret.Type.(*ast.SelectorExpr)
+	if !ok {
+		return false
+	}
+	pkg, ok := sel.X.(*ast.Ident)
+	if !ok {
+		return false
+	}
+	if pkg.Name != "context" {
+		return false
+	}
+	return sel.Sel.Name == "Context"
 }
 
 func hasVoidReturn(ft *ast.FuncType) bool {

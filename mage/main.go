@@ -283,7 +283,7 @@ func Invoke(inv Invocation) int {
 	debug.Printf("found magefiles: %s", strings.Join(files, ", "))
 	exePath, err := ExeName(files)
 	if err != nil {
-		log.Println("Error:", err)
+		log.Println("Error getting exe name:", err)
 		return 1
 	}
 	if inv.CompileOut != "" {
@@ -336,7 +336,7 @@ func Invoke(inv Invocation) int {
 		}()
 	}
 	files = append(files, main)
-	if err := Compile(exePath, inv.Stdout, inv.Stderr, files, inv.Debug); err != nil {
+	if err := Compile(inv, exePath, files); err != nil {
 		log.Println("Error:", err)
 		return 1
 	}
@@ -390,55 +390,65 @@ func Magefiles(inv Invocation) ([]string, error) {
 		return nil, err
 	}
 
-	debug.Println("getting all non-mage files")
-
+	debug.Println("getting all non-mage files in", inv.Dir)
 	// // first, grab all the files with no build tags specified.. this is actually
 	// // our exclude list of things without the mage build tag.
 	cmd := exec.Command(mg.GoCmd(), "list", "-find", "-e", "-f", `{{join .GoFiles "||"}}`)
+
 	if inv.Debug {
 		cmd.Stderr = inv.Stderr
 	}
-	list, err := cmd.Output()
+	cmd.Dir = inv.Dir
+	b, err := cmd.Output()
 	if err != nil {
 		fail(fmt.Errorf("failed to list non-mage gofiles: %v", err))
 	}
-
+	list := strings.TrimSpace(string(b))
+	debug.Println("found non-mage files", list)
 	exclude := map[string]bool{}
-	for _, f := range strings.Split(string(list), "||") {
-		debug.Println("marked file as non-mage:", f)
-		exclude[f] = true
+	for _, f := range strings.Split(list, "||") {
+		if f != "" {
+			debug.Printf("marked file as non-mage: %q", f)
+			exclude[f] = true
+		}
 	}
 	debug.Println("getting all files plus mage files")
 	cmd = exec.Command(mg.GoCmd(), "list", "-tags=mage", "-find", "-e", "-f", `{{join .GoFiles "||"}}`)
 	if inv.Debug {
 		cmd.Stderr = inv.Stderr
 	}
-	list, err = cmd.Output()
+	cmd.Dir = inv.Dir
+	b, err = cmd.Output()
+	list = strings.TrimSpace(string(b))
+
 	if err != nil {
 		fail(fmt.Errorf("failed to list mage gofiles: %v", err))
 	}
 	files := []string{}
-	for _, f := range strings.Split(string(list), "||") {
-		if !exclude[f] {
+	for _, f := range strings.Split(list, "||") {
+		if f != "" && !exclude[f] {
 			files = append(files, f)
 		}
+	}
+	for i := range files {
+		files[i] = filepath.Join(inv.Dir, files[i])
 	}
 	return files, nil
 }
 
 // Compile uses the go tool to compile the files into an executable at path.
-func Compile(path string, stdout, stderr io.Writer, gofiles []string, isdebug bool) error {
+func Compile(inv Invocation, path string, gofiles []string) error {
 	debug.Println("compiling to", path)
 	debug.Println("compiling using gocmd:", mg.GoCmd())
-	if isdebug {
+	if inv.Debug {
 		runDebug(mg.GoCmd(), "version")
 		runDebug(mg.GoCmd(), "env")
 	}
 	debug.Printf("running %s build -o %s %s", mg.GoCmd(), path, strings.Join(gofiles, ", "))
 	c := exec.Command(mg.GoCmd(), append([]string{"build", "-o", path}, gofiles...)...)
 	c.Env = os.Environ()
-	c.Stderr = stderr
-	c.Stdout = stdout
+	c.Stderr = inv.Stderr
+	c.Stdout = inv.Stdout
 	err := c.Run()
 	if err != nil {
 		return errors.New("error compiling magefiles")
@@ -520,7 +530,7 @@ func ExeName(files []string) (string, error) {
 func hashFile(fn string) (string, error) {
 	f, err := os.Open(fn)
 	if err != nil {
-		return "", fmt.Errorf("can't open input file: %v", err)
+		return "", fmt.Errorf("can't open input file for hashing: %#v", err)
 	}
 	defer f.Close()
 

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
+	"go/build"
 	"go/parser"
 	"go/token"
 	"io/ioutil"
@@ -11,11 +12,11 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/magefile/mage/build-1.10"
 	"github.com/magefile/mage/mg"
 )
 
@@ -49,6 +50,36 @@ func testmain(m *testing.M) int {
 	}
 	defer os.RemoveAll(dir)
 	return m.Run()
+}
+
+func TestListMagefilesMain(t *testing.T) {
+	buf := &bytes.Buffer{}
+	files, err := Magefiles(Invocation{
+		Dir:    "testdata/mixed_main_files",
+		Stderr: buf,
+	})
+	if err != nil {
+		t.Errorf("error from magefile list: %v: %s", err, buf)
+	}
+	expected := []string{"testdata/mixed_main_files/mage_helpers.go", "testdata/mixed_main_files/magefile.go"}
+	if !reflect.DeepEqual(files, expected) {
+		t.Fatalf("expected %q but got %q", expected, files)
+	}
+}
+
+func TestListMagefilesLib(t *testing.T) {
+	buf := &bytes.Buffer{}
+	files, err := Magefiles(Invocation{
+		Dir:    "testdata/mixed_lib_files",
+		Stderr: buf,
+	})
+	if err != nil {
+		t.Errorf("error from magefile list: %v: %s", err, buf)
+	}
+	expected := []string{"testdata/mixed_lib_files/mage_helpers.go", "testdata/mixed_lib_files/magefile.go"}
+	if !reflect.DeepEqual(files, expected) {
+		t.Fatalf("expected %q but got %q", expected, files)
+	}
 }
 
 func TestGoRun(t *testing.T) {
@@ -258,12 +289,12 @@ func TestPanicsErr(t *testing.T) {
 func TestHashTemplate(t *testing.T) {
 	templ := tpl
 	defer func() { tpl = templ }()
-	name, err := ExeName([]string{"./testdata/func.go", "./testdata/command.go"})
+	name, err := ExeName([]string{"testdata/func.go", "testdata/command.go"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	tpl = "some other template"
-	changed, err := ExeName([]string{"./testdata/func.go", "./testdata/command.go"})
+	changed, err := ExeName([]string{"testdata/func.go", "testdata/command.go"})
 	if changed == name {
 		t.Fatal("expected executable name to chage if template changed")
 	}
@@ -449,16 +480,17 @@ func TestParse(t *testing.T) {
 // Test the timeout option
 func TestTimeout(t *testing.T) {
 	stderr := &bytes.Buffer{}
+	stdout := &bytes.Buffer{}
 	inv := Invocation{
-		Dir:     "./testdata/context",
-		Stdout:  ioutil.Discard,
+		Dir:     "testdata/context",
+		Stdout:  stdout,
 		Stderr:  stderr,
 		Args:    []string{"timeout"},
 		Timeout: time.Duration(100 * time.Millisecond),
 	}
 	code := Invoke(inv)
 	if code != 1 {
-		t.Fatalf("expected 1, but got %v", code)
+		t.Fatalf("expected 1, but got %v, stderr: %q, stdout: %q", code, stderr, stdout)
 	}
 	actual := stderr.String()
 	expected := "Error: context deadline exceeded\n"
@@ -632,6 +664,7 @@ func TestGoCmd(t *testing.T) {
 	if err := os.Setenv(testExeEnv, textOutput); err != nil {
 		t.Fatal(err)
 	}
+	t.Logf("setting %q as gocmd", os.Args[0])
 	if err := os.Setenv(mg.GoCmdEnv, os.Args[0]); err != nil {
 		t.Fatal(err)
 	}
@@ -648,11 +681,17 @@ func TestGoCmd(t *testing.T) {
 
 	buf := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
-	if err := Compile(name, buf, stderr, []string{}, false); err != nil {
+	inv := Invocation{
+		Dir:    name,
+		Stderr: stderr,
+		Stdout: buf,
+		Debug:  false,
+	}
+	if err := Compile(inv, name, []string{}); err != nil {
 		t.Log("stderr: ", stderr.String())
 		t.Fatal(err)
 	}
 	if buf.String() != textOutput {
-		t.Fatal("We didn't run the custom go cmd: ", buf.String())
+		t.Fatalf("We didn't run the custom go cmd. Expected output %q, but got %q", textOutput, buf)
 	}
 }
