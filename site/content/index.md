@@ -36,7 +36,7 @@ You may also install a binary release from our
 
 ## Demo
 
-{{< youtube GOqbD0lF-iA >}}
+{{< youtube Hoga60EF_1U >}}
 
 ## Discussion
 
@@ -53,27 +53,28 @@ plugin.  Every tool you use with Go can be used with Magefiles.
 ```
 mage [options] [target]
 
+Mage is a make-like command runner.  See https://magefile.org for full docs.
+
 Commands:
-  -clean   	clean out old generated binaries from CACHE_DIR
+  -clean    clean out old generated binaries from CACHE_DIR
+  -compile <string>
+            output a static binary to the given path
   -init     create a starting template if no mage files exist
   -l        list mage targets in this directory
   -h        show this help
   -version  show version info for the mage binary
 
 Options:
-  -h     show description of a target
-  -f     force recreation of compiled magefile
-  -keep  keep intermediate mage files around after running
-  -t     timeout in duration parsable format (e.g. 5m30s)
-  -v     show verbose output when running mage targets
-  -compile <string> 	
-         path to which to output a static binary
+  -debug  turn on debug messages (implies -keep)
+  -h      show description of a target
+  -f      force recreation of compiled magefile
+  -keep   keep intermediate mage files around after running
+  -gocmd <string>
+          use the given go binary to compile the output (default: "go")
+  -t <string>
+          timeout in duration parsable format (e.g. 5m30s)
+  -v      show verbose output when running mage targets
 ```
-
-## Environment Variables
-
-You may set MAGE_VERBOSE=1 to always enable verbose logging in your magefiles,
-without having to remember to pass -v every time.
 
 ## Why?
 

@@ -35,7 +35,7 @@
     src: url("../fonts/Work_Sans_500.eot?#iefix") format("embedded-opentype"), url("../fonts/Work_Sans_500.woff") format("woff"), url("../fonts/Work_Sans_500.woff2") format("woff2"), url("../fonts/Work_Sans_500.svg#WorkSans") format("svg"), url("../fonts/Work_Sans_500.ttf") format("truetype");
 }
 body {
-    background: #fff;
+    background: #f5f5f5;
     color: #777;
 }
 body #chapter h1 {
@@ -314,7 +314,6 @@ textarea:focus, input[type="email"]:focus, input[type="number"]:focus, input[typ
     text-indent: 0.2rem;
 }
 #main {
-    background: #f7f7f7;
     margin: 0 0 1.563rem 0;
 }
 #body {
@@ -407,9 +406,16 @@ textarea:focus, input[type="email"]:focus, input[type="number"]:focus, input[typ
 }
 #body .nav.nav-next {
     right: 0;
+
 }
 #body-inner {
     margin-bottom: 5rem;
+    background-color: #fff;
+    margin: auto;
+    max-width: 900px;
+    padding-left: 20px;
+    padding-bottom: 5px;
+    padding-right: 20px;
 }
 #chapter {
     display: flex;

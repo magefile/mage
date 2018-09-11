@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
+	"go/build"
 	"go/parser"
 	"go/token"
 	"io/ioutil"
@@ -11,15 +12,24 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
+	"regexp"
+	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/magefile/mage/build"
 	"github.com/magefile/mage/mg"
 )
 
+const testExeEnv = "MAGE_TEST_STRING"
+
 func TestMain(m *testing.M) {
+	if s := os.Getenv(testExeEnv); s != "" {
+		fmt.Fprint(os.Stdout, s)
+		os.Exit(0)
+	}
 	os.Exit(testmain(m))
 }
 
@@ -43,6 +53,36 @@ func testmain(m *testing.M) int {
 	}
 	defer os.RemoveAll(dir)
 	return m.Run()
+}
+
+func TestListMagefilesMain(t *testing.T) {
+	buf := &bytes.Buffer{}
+	files, err := Magefiles(Invocation{
+		Dir:    "testdata/mixed_main_files",
+		Stderr: buf,
+	})
+	if err != nil {
+		t.Errorf("error from magefile list: %v: %s", err, buf)
+	}
+	expected := []string{"testdata/mixed_main_files/mage_helpers.go", "testdata/mixed_main_files/magefile.go"}
+	if !reflect.DeepEqual(files, expected) {
+		t.Fatalf("expected %q but got %q", expected, files)
+	}
+}
+
+func TestListMagefilesLib(t *testing.T) {
+	buf := &bytes.Buffer{}
+	files, err := Magefiles(Invocation{
+		Dir:    "testdata/mixed_lib_files",
+		Stderr: buf,
+	})
+	if err != nil {
+		t.Errorf("error from magefile list: %v: %s", err, buf)
+	}
+	expected := []string{"testdata/mixed_lib_files/mage_helpers.go", "testdata/mixed_lib_files/magefile.go"}
+	if !reflect.DeepEqual(files, expected) {
+		t.Fatalf("expected %q but got %q", expected, files)
+	}
 }
 
 func TestGoRun(t *testing.T) {
@@ -95,10 +135,9 @@ func TestVerbose(t *testing.T) {
 }
 
 func TestVerboseEnv(t *testing.T) {
-	os.Setenv("MAGE_VERBOSE", "true")
-
+	os.Setenv("MAGEFILE_VERBOSE", "true")
 	stdout := &bytes.Buffer{}
-	inv, _, err := Parse(stdout, []string{})
+	inv, _, err := Parse(ioutil.Discard, stdout, []string{})
 	if err != nil {
 		t.Fatal("unexpected error", err)
 	}
@@ -109,7 +148,7 @@ func TestVerboseEnv(t *testing.T) {
 		t.Fatalf("expected %t, but got %t ", expected, inv.Verbose)
 	}
 
-	os.Unsetenv("MAGE_VERBOSE")
+	os.Unsetenv("MAGEFILE_VERBOSE")
 }
 
 func TestList(t *testing.T) {
@@ -127,6 +166,8 @@ func TestList(t *testing.T) {
 	}
 	actual := stdout.String()
 	expected := `
+This is a comment on the package which should get turned into output with the list of targets.
+
 Targets:
   somePig*       This is the synopsis for SomePig.
   testVerbose    
@@ -251,12 +292,12 @@ func TestPanicsErr(t *testing.T) {
 func TestHashTemplate(t *testing.T) {
 	templ := tpl
 	defer func() { tpl = templ }()
-	name, err := ExeName([]string{"./testdata/func.go", "./testdata/command.go"})
+	name, err := ExeName([]string{"testdata/func.go", "testdata/command.go"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	tpl = "some other template"
-	changed, err := ExeName([]string{"./testdata/func.go", "./testdata/command.go"})
+	changed, err := ExeName([]string{"testdata/func.go", "testdata/command.go"})
 	if changed == name {
 		t.Fatal("expected executable name to chage if template changed")
 	}
@@ -420,7 +461,7 @@ func TestBadSecondTargets(t *testing.T) {
 
 func TestParse(t *testing.T) {
 	buf := &bytes.Buffer{}
-	inv, cmd, err := Parse(buf, []string{"-v", "build"})
+	inv, cmd, err := Parse(ioutil.Discard, buf, []string{"-v", "build"})
 	if err != nil {
 		t.Fatal("unexpected error", err)
 	}
@@ -442,16 +483,17 @@ func TestParse(t *testing.T) {
 // Test the timeout option
 func TestTimeout(t *testing.T) {
 	stderr := &bytes.Buffer{}
+	stdout := &bytes.Buffer{}
 	inv := Invocation{
-		Dir:     "./testdata/context",
-		Stdout:  ioutil.Discard,
+		Dir:     "testdata/context",
+		Stdout:  stdout,
 		Stderr:  stderr,
 		Args:    []string{"timeout"},
 		Timeout: time.Duration(100 * time.Millisecond),
 	}
 	code := Invoke(inv)
 	if code != 1 {
-		t.Fatalf("expected 1, but got %v", code)
+		t.Fatalf("expected 1, but got %v, stderr: %q, stdout: %q", code, stderr, stdout)
 	}
 	actual := stderr.String()
 	expected := "Error: context deadline exceeded\n"
@@ -462,12 +504,12 @@ func TestTimeout(t *testing.T) {
 }
 func TestParseHelp(t *testing.T) {
 	buf := &bytes.Buffer{}
-	_, _, err := Parse(buf, []string{"-h"})
+	_, _, err := Parse(ioutil.Discard, buf, []string{"-h"})
 	if err != flag.ErrHelp {
 		t.Fatal("unexpected error", err)
 	}
 	buf2 := &bytes.Buffer{}
-	_, _, err = Parse(buf2, []string{"--help"})
+	_, _, err = Parse(ioutil.Discard, buf2, []string{"--help"})
 	if err != flag.ErrHelp {
 		t.Fatal("unexpected error", err)
 	}
@@ -483,7 +525,7 @@ func TestHelpTarget(t *testing.T) {
 	inv := Invocation{
 		Dir:    "./testdata",
 		Stdout: stdout,
-		Stderr: os.Stderr,
+		Stderr: ioutil.Discard,
 		Args:   []string{"panics"},
 		Help:   true,
 	}
@@ -503,7 +545,7 @@ func TestHelpAlias(t *testing.T) {
 	inv := Invocation{
 		Dir:    "./testdata/alias",
 		Stdout: stdout,
-		Stderr: os.Stderr,
+		Stderr: ioutil.Discard,
 		Args:   []string{"status"},
 		Help:   true,
 	}
@@ -519,7 +561,7 @@ func TestHelpAlias(t *testing.T) {
 	inv = Invocation{
 		Dir:    "./testdata/alias",
 		Stdout: stdout,
-		Stderr: os.Stderr,
+		Stderr: ioutil.Discard,
 		Args:   []string{"checkout"},
 		Help:   true,
 	}
@@ -566,6 +608,7 @@ func TestAlias(t *testing.T) {
 
 func TestInvalidAlias(t *testing.T) {
 	stderr := &bytes.Buffer{}
+	log.SetOutput(ioutil.Discard)
 	inv := Invocation{
 		Dir:    "./testdata/invalid_alias",
 		Stdout: ioutil.Discard,
@@ -601,11 +644,11 @@ func TestClean(t *testing.T) {
 	}
 
 	buf := &bytes.Buffer{}
-	_, cmd, err := Parse(buf, []string{"-clean"})
+	_, cmd, err := Parse(ioutil.Discard, buf, []string{"-clean"})
 	if cmd != Clean {
 		t.Errorf("Expected 'clean' command but got %v", cmd)
 	}
-	code := ParseAndRun(dir, os.Stdin, os.Stderr, buf, []string{"-clean"})
+	code := ParseAndRun(dir, ioutil.Discard, ioutil.Discard, buf, []string{"-clean"})
 	if code != 0 {
 		t.Errorf("expected 0, but got %v", code)
 	}
@@ -618,4 +661,105 @@ func TestClean(t *testing.T) {
 	if len(files) != 0 {
 		t.Errorf("expected '-clean' to remove files from CACHE_DIR, but still have %v", files)
 	}
+}
+
+func TestGoCmd(t *testing.T) {
+	textOutput := "TestGoCmd"
+	if err := os.Setenv(testExeEnv, textOutput); err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("setting %q as gocmd", os.Args[0])
+	if err := os.Setenv(mg.GoCmdEnv, os.Args[0]); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Unsetenv(mg.GoCmdEnv)
+
+	// fake out the compiled file, since the code checks for it.
+	f, err := ioutil.TempFile("", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	name := f.Name()
+	dir := filepath.Dir(name)
+	defer os.Remove(name)
+	f.Close()
+
+	buf := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:    dir,
+		Stderr: stderr,
+		Stdout: buf,
+		Debug:  false,
+	}
+	if err := Compile(inv, name, []string{}); err != nil {
+		t.Log("stderr: ", stderr.String())
+		t.Fatal(err)
+	}
+	if buf.String() != textOutput {
+		t.Fatalf("We didn't run the custom go cmd. Expected output %q, but got %q", textOutput, buf)
+	}
+}
+
+var runtimeVer = regexp.MustCompile(`go1\.([0-9]+)`)
+
+func TestGoModules(t *testing.T) {
+	matches := runtimeVer.FindStringSubmatch(runtime.Version())
+	if len(matches) < 2 || minorVer(t, matches[1]) < 11 {
+		t.Skipf("Skipping Go modules test because go version %q is less than go1.11", runtime.Version())
+	}
+	dir, err := ioutil.TempDir("", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+	err = ioutil.WriteFile(filepath.Join(dir, "magefile.go"), []byte(`//+build mage
+
+package main
+
+import "golang.org/x/text/unicode/norm"
+
+func Test() {
+	print("unicode version: " + norm.Version)
+}
+`), 0600)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	cmd := exec.Command("go", "mod", "init", "app")
+	cmd.Dir = dir
+	cmd.Env = os.Environ()
+	cmd.Stderr = stderr
+	cmd.Stdout = stdout
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("Error running go mod init: %v\nStdout: %s\nStderr: %s", err, stdout, stderr)
+	}
+	stderr.Reset()
+	stdout.Reset()
+	code := Invoke(Invocation{
+		Dir:    dir,
+		Stderr: stderr,
+		Stdout: stdout,
+	})
+	if code != 0 {
+		t.Fatalf("exited with code %d. \nStdout: %s\nStderr: %s", code, stdout, stderr)
+	}
+	expected := `
+Targets:
+  test    
+`[1:]
+	if output := stdout.String(); output != expected {
+		t.Fatalf("expected output %q, but got %q", expected, output)
+	}
+}
+
+func minorVer(t *testing.T, v string) int {
+	a, err := strconv.Atoi(v)
+	if err != nil {
+		t.Fatal("unexpected non-numeric version", v)
+	}
+	return a
 }

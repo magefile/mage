@@ -20,6 +20,7 @@ func main() {
 	// These functions are local variables to avoid name conflicts with 
 	// magefiles.
 	list := func() error {
+		{{with .Description}}fmt.Println(` + "`{{.}}\n`" + `){{end}}
 		{{- $default := .Default}}
 		w := tabwriter.NewWriter(os.Stdout, 0, 4, 4, ' ', 0)
 		fmt.Println("Targets:")
@@ -142,7 +143,10 @@ func main() {
 		switch strings.ToLower(os.Args[1]) {
 			{{range .Funcs}}case "{{lower .TemplateName}}":
 				fmt.Print("mage {{lower .TemplateName}}:\n\n")
-				{{if ne .Comment ""}}fmt.Println({{printf "%q" .Comment}}){{end}}
+				{{if ne .Comment "" -}}
+				fmt.Println({{printf "%q" .Comment}})
+				fmt.Println()
+				{{end}}
 				var aliases []string
 				{{- $name := .Name -}}
 				{{range $alias, $func := $.Aliases}}
