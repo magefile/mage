@@ -712,21 +712,22 @@ func TestGoModules(t *testing.T) {
 	}
 	defer os.RemoveAll(dir)
 	err = ioutil.WriteFile(filepath.Join(dir, "magefile.go"), []byte(`
-//+build mage
-
-package main
-
-import "golang.org/x/text/unicode/norm"
-
-func Test() {
-	print("unicode version: " + norm.Version)
-}
-`[1:]), 0600)
+	//+build mage
+	
+	package main
+	
+	import "golang.org/x/text/unicode/norm"
+	
+	func Test() {
+		print("unicode version: " + norm.Version)
+	}
+	`[1:]), 0600)
 	if err != nil {
 		t.Fatal(err)
 	}
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
+	debug.SetOutput(stderr)
 	code := Invoke(Invocation{
 		Dir:    dir,
 		Stderr: stderr,
@@ -737,8 +738,8 @@ func Test() {
 		t.Fatalf("exited with code %d. Stderr: %q, Stdout: %q", code, stderr, stdout)
 	}
 	expected := `
-Targets:
-  test    
+	Targets:
+	test    
 `[1:]
 	if output := stdout.String(); output != expected {
 		t.Fatalf("expected output %q, but got %q", expected, output)
