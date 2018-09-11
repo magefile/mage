@@ -756,6 +756,53 @@ Targets:
 	}
 }
 
+func TestRawGoModules(t *testing.T) {
+	matches := runtimeVer.FindStringSubmatch(runtime.Version())
+	if len(matches) < 2 || minorVer(t, matches[1]) < 11 {
+		t.Skipf("Skipping Go modules test because go version %q is less than go1.11", runtime.Version())
+	}
+	dir, err := ioutil.TempDir("", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+	err = ioutil.WriteFile(filepath.Join(dir, "magefile.go"), []byte(`
+package main
+
+import "golang.org/x/text/unicode/norm"
+
+func main(){}
+
+func Test() {
+	print("unicode version: " + norm.Version)
+}
+`), 0600)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	cmd := exec.Command("go", "mod", "init", "app")
+	cmd.Dir = dir
+	cmd.Env = os.Environ()
+	cmd.Stderr = stderr
+	cmd.Stdout = stdout
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("Error running go mod init: %v\nStdout: %s\nStderr: %s", err, stdout, stderr)
+	}
+	stderr.Reset()
+	stdout.Reset()
+	cmd = exec.Command("go", "build", filepath.Join(dir, "magefile.go"))
+	cmd.Dir = dir
+	cmd.Env = os.Environ()
+	cmd.Stderr = stderr
+	cmd.Stdout = stdout
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("Error running go mod init: %v\nStdout: %s\nStderr: %s", err, stdout, stderr)
+	}
+}
+
 func minorVer(t *testing.T, v string) int {
 	a, err := strconv.Atoi(v)
 	if err != nil {
