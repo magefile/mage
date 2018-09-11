@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"time"
@@ -46,16 +47,20 @@ func Install() error {
 	return sh.RunV(gocmd, "build", "-o", path, "-ldflags="+flags(), "github.com/magefile/mage")
 }
 
+var releaseTag = regexp.MustCompile(`^v1\.[0-9]+\.[0-9]+$`)
+
 // Generates a new release.  Expects the TAG environment variable to be set,
 // which will create a new tag with that name.
 func Release() (err error) {
-	if os.Getenv("TAG") == "" {
-		return errors.New("TAG environment variables are required")
+	tag := os.Getenv("TAG")
+	if !releaseTag.MatchString(tag) {
+		return errors.New("TAG environment variable must be in semver v1.x.x format, but was " + tag)
 	}
-	if err := sh.RunV("git", "tag", "-a", "$TAG"); err != nil {
+
+	if err := sh.RunV("git", "tag", "-a", tag, "-m", tag); err != nil {
 		return err
 	}
-	if err := sh.RunV("git", "push", "origin", "$TAG"); err != nil {
+	if err := sh.RunV("git", "push", "origin", tag); err != nil {
 		return err
 	}
 	defer func() {
