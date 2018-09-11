@@ -731,6 +731,7 @@ func Test() {
 		Dir:    dir,
 		Stderr: stderr,
 		Stdout: stdout,
+		Debug:  true,
 	})
 	if code != 0 {
 		t.Fatalf("exited with code %d. Stderr: %q, Stdout: %q", code, stderr, stdout)
