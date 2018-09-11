@@ -461,18 +461,28 @@ func TestBadSecondTargets(t *testing.T) {
 
 func TestParse(t *testing.T) {
 	buf := &bytes.Buffer{}
-	inv, cmd, err := Parse(ioutil.Discard, buf, []string{"-v", "build"})
+	inv, cmd, err := Parse(ioutil.Discard, buf, []string{"-v", "-debug", "-gocmd=foo", "-d", "dir", "build", "deploy"})
 	if err != nil {
 		t.Fatal("unexpected error", err)
 	}
 	if cmd == Init {
-		t.Fatal("init should be false but was true")
+		t.Error("init should be false but was true")
 	}
 	if cmd == Version {
-		t.Fatal("showVersion should be false but was true")
+		t.Error("showVersion should be false but was true")
 	}
-	if len(inv.Args) != 1 && inv.Args[0] != "build" {
-		t.Fatalf("expected args to be %q but got %q", []string{"build"}, inv.Args)
+	if inv.Debug != true {
+		t.Error("debug should be true")
+	}
+	if inv.Dir != "dir" {
+		t.Errorf("Expected dir to be \"dir\" but was %q", inv.Dir)
+	}
+	if mg.GoCmd() != "foo" {
+		t.Errorf("Expected gocmd to be \"foo\" but was %q", mg.GoCmd())
+	}
+	expected := []string{"build", "deploy"}
+	if !reflect.DeepEqual(inv.Args, expected) {
+		t.Fatalf("expected args to be %q but got %q", expected, inv.Args)
 	}
 	if s := buf.String(); s != "" {
 		t.Fatalf("expected no stdout output but got %q", s)
@@ -648,7 +658,7 @@ func TestClean(t *testing.T) {
 	if cmd != Clean {
 		t.Errorf("Expected 'clean' command but got %v", cmd)
 	}
-	code := ParseAndRun(dir, ioutil.Discard, ioutil.Discard, buf, []string{"-clean"})
+	code := ParseAndRun(ioutil.Discard, ioutil.Discard, buf, []string{"-clean", "-d", dir})
 	if code != 0 {
 		t.Errorf("expected 0, but got %v", code)
 	}

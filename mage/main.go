@@ -74,7 +74,7 @@ const (
 // function to allow it to be used from other programs, specifically so you can
 // go run a simple file that run's mage's Main.
 func Main() int {
-	return ParseAndRun(".", os.Stdout, os.Stderr, os.Stdin, os.Args[1:])
+	return ParseAndRun(os.Stdout, os.Stderr, os.Stdin, os.Args[1:])
 }
 
 // Invocation contains the args for invoking a run of Mage.
@@ -97,10 +97,9 @@ type Invocation struct {
 // ParseAndRun parses the command line, and then compiles and runs the mage
 // files in the given directory with the given args (do not include the command
 // name in the args).
-func ParseAndRun(dir string, stdout, stderr io.Writer, stdin io.Reader, args []string) int {
+func ParseAndRun(stdout, stderr io.Writer, stdin io.Reader, args []string) int {
 	log := log.New(stderr, "", 0)
 	inv, cmd, err := Parse(stderr, stdout, args)
-	inv.Dir = dir
 	inv.Stderr = stderr
 	inv.Stdin = stdin
 	if err == flag.ErrHelp {
@@ -119,7 +118,7 @@ func ParseAndRun(dir string, stdout, stderr io.Writer, stdin io.Reader, args []s
 		log.Println("built with:", runtime.Version())
 		return 0
 	case Init:
-		if err := generateInit(dir); err != nil {
+		if err := generateInit(inv.Dir); err != nil {
 			log.Println("Error:", err)
 			return 1
 		}
@@ -155,6 +154,7 @@ func Parse(stderr, stdout io.Writer, args []string) (inv Invocation, cmd Command
 	fs.BoolVar(&inv.Help, "h", false, "show this help")
 	fs.DurationVar(&inv.Timeout, "t", 0, "timeout in duration parsable format (e.g. 5m30s)")
 	fs.BoolVar(&inv.Keep, "keep", false, "keep intermediate mage files around after running")
+	fs.StringVar(&inv.Dir, "d", ".", "run magefiles in the given directory")
 	var showVersion bool
 	fs.BoolVar(&showVersion, "version", false, "show version info for the mage binary")
 
@@ -183,6 +183,8 @@ Commands:
   -version  show version info for the mage binary
 
 Options:
+  -d <string> 
+          run magefiles in the given directory (default ".")
   -debug  turn on debug messages (implies -keep)
   -h      show description of a target
   -f      force recreation of compiled magefile

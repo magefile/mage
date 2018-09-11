@@ -65,6 +65,8 @@ Commands:
   -version  show version info for the mage binary
 
 Options:
+  -d <string> 
+          run magefiles in the given directory (default ".")
   -debug  turn on debug messages (implies -keep)
   -h      show description of a target
   -f      force recreation of compiled magefile
