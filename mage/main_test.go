@@ -15,6 +15,7 @@ import (
 	"reflect"
 	"regexp"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -702,8 +703,8 @@ var runtimeVer = regexp.MustCompile(`go1\.([0-9]+)`)
 
 func TestGoModules(t *testing.T) {
 	matches := runtimeVer.FindStringSubmatch(runtime.Version())
-	if len(matches) < 2 || matches[1] < "11" {
-		t.Skipf("Skipping Go modules test because go version %q is less than 1.11", runtime.Version())
+	if len(matches) < 2 || minorVer(t, matches[1]) < 11 {
+		t.Skipf("Skipping Go modules test because go version %q is less than go1.11", runtime.Version())
 	}
 	dir, err := ioutil.TempDir("", "")
 	if err != nil {
@@ -741,4 +742,12 @@ Targets:
 	if output := stdout.String(); output != expected {
 		t.Fatalf("expected output %q, but got %q", expected, output)
 	}
+}
+
+func minorVer(t *testing.T, v string) int {
+	a, err := strconv.Atoi(v)
+	if err != nil {
+		t.Fatal("unexpected non-numeric version", v)
+	}
+	return a
 }
