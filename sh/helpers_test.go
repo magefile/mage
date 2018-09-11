@@ -4,30 +4,12 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
-	"math/rand"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/magefile/mage/sh"
 )
-
-func makeTestFile(dir string, name string) (string, error) {
-	fname := filepath.Join(dir, name)
-	f, err := os.Create(fname)
-	if err != nil {
-		return fname, fmt.Errorf("can't create test file %s: %v", fname, err)
-	}
-	n := rand.Intn(255) + 1
-	for i := 0; i < n; i++ {
-		f.Write([]byte("All work and no play makes Jack a dull boy.\n"))
-	}
-	err = f.Close()
-	if err != nil {
-		return fname, fmt.Errorf("error closing test file %s: %v", fname, err)
-	}
-	return fname, nil
-}
 
 // compareFiles checks that two files are identical for testing purposes. That means they have the same length,
 // the same contents, and the same permissions. It does NOT mean they have the same timestamp, as that is expected
@@ -55,8 +37,7 @@ func compareFiles(file1 string, file2 string) error {
 	if err != nil {
 		return fmt.Errorf("can't read %s: %v", file2, err)
 	}
-	cmp := bytes.Compare(f1bytes, f2bytes)
-	if cmp != 0 {
+	if !bytes.Equal(f1bytes, f2bytes) {
 		return fmt.Errorf("files %s and %s have different contents", file1, file2)
 	}
 	return nil
@@ -64,10 +45,9 @@ func compareFiles(file1 string, file2 string) error {
 
 func TestHelpers(t *testing.T) {
 
-	mytmpdir, err := ioutil.TempDir(os.TempDir(), "mage")
+	mytmpdir, err := ioutil.TempDir("", "mage")
 	if err != nil {
-		t.Errorf("can't create test directory: %v", err)
-		return
+		t.Fatalf("can't create test directory: %v", err)
 	}
 	defer func() {
 		derr := os.RemoveAll(mytmpdir)
@@ -75,9 +55,10 @@ func TestHelpers(t *testing.T) {
 			fmt.Printf("error cleaning up after TestHelpers: %v", derr)
 		}
 	}()
-	srcname, err := makeTestFile(mytmpdir, "test1.txt")
+	srcname := filepath.Join(mytmpdir, "test1.txt")
+	err = ioutil.WriteFile(srcname, []byte("All work and no play makes Jack a dull boy."), 0644)
 	if err != nil {
-		t.Error(err)
+		t.Fatalf("can't create test file %s: %v", srcname, err)
 	}
 	destname := filepath.Join(mytmpdir, "test2.txt")
 
