@@ -7,7 +7,7 @@ authorLink = "twitter.com/natethefinch"
 +++
 
 As Brad Fitzpatrick would say, [Mage
-1.3.0](https://github.com/magefile/mage/releases/tag/1.3.0) is the best release
+1.3.0](https://github.com/magefile/mage/releases/tag/v1.3.0) is the best release
 of Mage ever! This comes quick on the heels of gophercon, so I have been
 motivated to move some interesting new features through.  1.2.4 added real
 support for go modules (though it needs some more polish).  This release adds a
@@ -41,8 +41,8 @@ something) that wacky things may happen.
 One important change is that the version of go used to compile the magefile
 binary is now part of the hash that determines whether we need to recompile the
 binary.  So, if you run the exact same magefile with two different versions of
-go, it'll create two different files in your magefile cache.  (yes, there's a
-binary cache, see https://magefile.org/howitworks/).
+go, it'll create two different files in your magefile cache. (yes, there's a
+binary cache, see [https://magefile.org/howitworks](https://magefile.org/howitworks/)).
 
 Also in this version, we now print out the version of Go used to compile Mage
 itself when you run `mage -version`.  This is important because mage compiled
