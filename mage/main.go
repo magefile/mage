@@ -444,11 +444,17 @@ func Compile(inv Invocation, path string, gofiles []string) error {
 		runDebug(mg.GoCmd(), "version")
 		runDebug(mg.GoCmd(), "env")
 	}
+
+	// strip off the path since we're setting the path in the build command
+	for i := range gofiles {
+		gofiles[i] = filepath.Base(gofiles[i])
+	}
 	debug.Printf("running %s build -o %s %s", mg.GoCmd(), path, strings.Join(gofiles, ", "))
 	c := exec.Command(mg.GoCmd(), append([]string{"build", "-o", path}, gofiles...)...)
 	c.Env = os.Environ()
 	c.Stderr = inv.Stderr
 	c.Stdout = inv.Stdout
+	c.Dir = inv.Dir
 	err := c.Run()
 	if err != nil {
 		return errors.New("error compiling magefiles")

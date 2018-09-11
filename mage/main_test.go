@@ -525,7 +525,7 @@ func TestHelpTarget(t *testing.T) {
 	inv := Invocation{
 		Dir:    "./testdata",
 		Stdout: stdout,
-		Stderr: os.Stderr,
+		Stderr: ioutil.Discard,
 		Args:   []string{"panics"},
 		Help:   true,
 	}
@@ -545,7 +545,7 @@ func TestHelpAlias(t *testing.T) {
 	inv := Invocation{
 		Dir:    "./testdata/alias",
 		Stdout: stdout,
-		Stderr: os.Stderr,
+		Stderr: ioutil.Discard,
 		Args:   []string{"status"},
 		Help:   true,
 	}
@@ -561,7 +561,7 @@ func TestHelpAlias(t *testing.T) {
 	inv = Invocation{
 		Dir:    "./testdata/alias",
 		Stdout: stdout,
-		Stderr: os.Stderr,
+		Stderr: ioutil.Discard,
 		Args:   []string{"checkout"},
 		Help:   true,
 	}
@@ -608,6 +608,7 @@ func TestAlias(t *testing.T) {
 
 func TestInvalidAlias(t *testing.T) {
 	stderr := &bytes.Buffer{}
+	log.SetOutput(ioutil.Discard)
 	inv := Invocation{
 		Dir:    "./testdata/invalid_alias",
 		Stdout: ioutil.Discard,
@@ -647,7 +648,7 @@ func TestClean(t *testing.T) {
 	if cmd != Clean {
 		t.Errorf("Expected 'clean' command but got %v", cmd)
 	}
-	code := ParseAndRun(dir, os.Stdin, os.Stderr, buf, []string{"-clean"})
+	code := ParseAndRun(dir, ioutil.Discard, ioutil.Discard, buf, []string{"-clean"})
 	if code != 0 {
 		t.Errorf("expected 0, but got %v", code)
 	}
@@ -679,13 +680,14 @@ func TestGoCmd(t *testing.T) {
 		t.Fatal(err)
 	}
 	name := f.Name()
+	dir := filepath.Dir(name)
 	defer os.Remove(name)
 	f.Close()
 
 	buf := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
 	inv := Invocation{
-		Dir:    name,
+		Dir:    dir,
 		Stderr: stderr,
 		Stdout: buf,
 		Debug:  false,
@@ -702,7 +704,6 @@ func TestGoCmd(t *testing.T) {
 var runtimeVer = regexp.MustCompile(`go1\.([0-9]+)`)
 
 func TestGoModules(t *testing.T) {
-	t.Skip("let's not for right now")
 	matches := runtimeVer.FindStringSubmatch(runtime.Version())
 	if len(matches) < 2 || minorVer(t, matches[1]) < 11 {
 		t.Skipf("Skipping Go modules test because go version %q is less than go1.11", runtime.Version())
@@ -738,12 +739,10 @@ func Test() {
 	}
 	stderr.Reset()
 	stdout.Reset()
-	debug.SetOutput(stderr)
 	code := Invoke(Invocation{
 		Dir:    dir,
 		Stderr: stderr,
 		Stdout: stdout,
-		Debug:  true,
 	})
 	if code != 0 {
 		t.Fatalf("exited with code %d. \nStdout: %s\nStderr: %s", code, stdout, stderr)
@@ -754,53 +753,6 @@ Targets:
 `[1:]
 	if output := stdout.String(); output != expected {
 		t.Fatalf("expected output %q, but got %q", expected, output)
-	}
-}
-
-func TestRawGoModules(t *testing.T) {
-	matches := runtimeVer.FindStringSubmatch(runtime.Version())
-	if len(matches) < 2 || minorVer(t, matches[1]) < 11 {
-		t.Skipf("Skipping Go modules test because go version %q is less than go1.11", runtime.Version())
-	}
-	dir, err := ioutil.TempDir("", "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(dir)
-	err = ioutil.WriteFile(filepath.Join(dir, "magefile.go"), []byte(`
-package main
-
-import "golang.org/x/text/unicode/norm"
-
-func main(){}
-
-func Test() {
-	print("unicode version: " + norm.Version)
-}
-`), 0600)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	stdout := &bytes.Buffer{}
-	stderr := &bytes.Buffer{}
-	cmd := exec.Command("go", "mod", "init", "app")
-	cmd.Dir = dir
-	cmd.Env = os.Environ()
-	cmd.Stderr = stderr
-	cmd.Stdout = stdout
-	if err := cmd.Run(); err != nil {
-		t.Fatalf("Error running go mod init: %v\nStdout: %s\nStderr: %s", err, stdout, stderr)
-	}
-	stderr.Reset()
-	stdout.Reset()
-	cmd = exec.Command("go", "build", filepath.Join(dir, "magefile.go"))
-	cmd.Dir = dir
-	cmd.Env = os.Environ()
-	cmd.Stderr = stderr
-	cmd.Stdout = stdout
-	if err := cmd.Run(); err != nil {
-		t.Fatalf("Error running go mod init: %v\nStdout: %s\nStderr: %s", err, stdout, stderr)
 	}
 }
 
