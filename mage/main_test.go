@@ -13,6 +13,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"regexp"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -693,5 +695,50 @@ func TestGoCmd(t *testing.T) {
 	}
 	if buf.String() != textOutput {
 		t.Fatalf("We didn't run the custom go cmd. Expected output %q, but got %q", textOutput, buf)
+	}
+}
+
+var runtimeVer = regexp.MustCompile(`go1\.([0-9]+)`)
+
+func TestGoModules(t *testing.T) {
+	matches := runtimeVer.FindStringSubmatch(runtime.Version())
+	if len(matches) < 2 || matches[1] < "11" {
+		t.Skipf("Skipping Go modules test because go version %q is less than 1.11", runtime.Version())
+	}
+	dir, err := ioutil.TempDir("", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+	err = ioutil.WriteFile(filepath.Join(dir, "magefile.go"), []byte(`
+//+build mage
+
+package main
+
+import "golang.org/x/text/unicode/norm"
+
+func Test() {
+	print("unicode version: " + norm.Version)
+}
+`[1:]), 0600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	code := Invoke(Invocation{
+		Dir:    dir,
+		Stderr: stderr,
+		Stdout: stdout,
+	})
+	if code != 0 {
+		t.Fatalf("exited with code %d. Stderr: %q, Stdout: %q", code, stderr, stdout)
+	}
+	expected := `
+Targets:
+  test    
+`[1:]
+	if output := stdout.String(); output != expected {
+		t.Fatalf("expected output %q, but got %q", expected, output)
 	}
 }
