@@ -711,8 +711,7 @@ func TestGoModules(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(dir)
-	err = ioutil.WriteFile(filepath.Join(dir, "magefile.go"), []byte(`
-	//+build mage
+	err = ioutil.WriteFile(filepath.Join(dir, "magefile.go"), []byte(`//+build mage
 	
 	package main
 	
@@ -721,7 +720,7 @@ func TestGoModules(t *testing.T) {
 	func Test() {
 		print("unicode version: " + norm.Version)
 	}
-	`[1:]), 0600)
+	`), 0600)
 	if err != nil {
 		t.Fatal(err)
 	}
