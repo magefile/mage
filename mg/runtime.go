@@ -23,7 +23,6 @@ const DebugEnv = "MAGEFILE_DEBUG"
 // verbose mode when running a magefile.
 const GoCmdEnv = "MAGEFILE_GOCMD"
 
-
 // Verbose reports whether a magefile was run with the verbose flag.
 func Verbose() bool {
 	b, _ := strconv.ParseBool(os.Getenv(VerboseEnv))

@@ -12,7 +12,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"runtime"
 	"sort"
 	"strings"
@@ -74,7 +73,7 @@ const (
 // function to allow it to be used from other programs, specifically so you can
 // go run a simple file that run's mage's Main.
 func Main() int {
-	return ParseAndRun(".", os.Stdout, os.Stderr, os.Stdin, os.Args[1:])
+	return ParseAndRun(os.Stdout, os.Stderr, os.Stdin, os.Args[1:])
 }
 
 // Invocation contains the args for invoking a run of Mage.
@@ -92,15 +91,16 @@ type Invocation struct {
 	Stderr     io.Writer     // writer to write stderr messages to
 	Stdin      io.Reader     // reader to read stdin from
 	Args       []string      // args to pass to the compiled binary
+	GoCmd      string        // the go binary command to run
+	CacheDir   string        // the directory where we should store compiled binaries
 }
 
 // ParseAndRun parses the command line, and then compiles and runs the mage
 // files in the given directory with the given args (do not include the command
 // name in the args).
-func ParseAndRun(dir string, stdout, stderr io.Writer, stdin io.Reader, args []string) int {
+func ParseAndRun(stdout, stderr io.Writer, stdin io.Reader, args []string) int {
 	log := log.New(stderr, "", 0)
 	inv, cmd, err := Parse(stderr, stdout, args)
-	inv.Dir = dir
 	inv.Stderr = stderr
 	inv.Stdin = stdin
 	if err == flag.ErrHelp {
@@ -119,19 +119,18 @@ func ParseAndRun(dir string, stdout, stderr io.Writer, stdin io.Reader, args []s
 		log.Println("built with:", runtime.Version())
 		return 0
 	case Init:
-		if err := generateInit(dir); err != nil {
+		if err := generateInit(inv.Dir); err != nil {
 			log.Println("Error:", err)
 			return 1
 		}
 		log.Println(initFile, "created")
 		return 0
 	case Clean:
-		dir := mg.CacheDir()
-		if err := removeContents(dir); err != nil {
+		if err := removeContents(inv.CacheDir); err != nil {
 			log.Println("Error:", err)
 			return 1
 		}
-		log.Println(dir, "cleaned")
+		log.Println(inv.CacheDir, "cleaned")
 		return 0
 	case CompileStatic:
 		return Invoke(inv)
@@ -148,13 +147,14 @@ func Parse(stderr, stdout io.Writer, args []string) (inv Invocation, cmd Command
 	inv.Stdout = stdout
 	fs := flag.FlagSet{}
 	fs.SetOutput(stdout)
-	fs.BoolVar(&inv.Debug, "debug", false, "turn on debug messages (implies -keep)")
 	fs.BoolVar(&inv.Force, "f", false, "force recreation of compiled magefile")
-	fs.BoolVar(&inv.Verbose, "v", false, "show verbose output when running mage targets")
+	fs.BoolVar(&inv.Debug, "debug", mg.Debug(), "turn on debug messages (implies -keep)")
+	fs.BoolVar(&inv.Verbose, "v", mg.Verbose(), "show verbose output when running mage targets")
 	fs.BoolVar(&inv.List, "l", false, "list mage targets in this directory")
 	fs.BoolVar(&inv.Help, "h", false, "show this help")
 	fs.DurationVar(&inv.Timeout, "t", 0, "timeout in duration parsable format (e.g. 5m30s)")
 	fs.BoolVar(&inv.Keep, "keep", false, "keep intermediate mage files around after running")
+	fs.StringVar(&inv.Dir, "d", ".", "run magefiles in the given directory")
 	var showVersion bool
 	fs.BoolVar(&showVersion, "version", false, "show version info for the mage binary")
 
@@ -164,8 +164,7 @@ func Parse(stderr, stdout io.Writer, args []string) (inv Invocation, cmd Command
 	fs.BoolVar(&clean, "clean", false, "clean out old generated binaries from CACHE_DIR")
 	var compileOutPath string
 	fs.StringVar(&compileOutPath, "compile", "", "output a static binary to the given path")
-	var goCmd string
-	fs.StringVar(&goCmd, "gocmd", "", "use the given go binary to compile the output")
+	fs.StringVar(&inv.GoCmd, "gocmd", mg.GoCmd(), "use the given go binary to compile the output")
 
 	fs.Usage = func() {
 		fmt.Fprint(stdout, `
@@ -183,6 +182,8 @@ Commands:
   -version  show version info for the mage binary
 
 Options:
+  -d <string> 
+          run magefiles in the given directory (default ".")
   -debug  turn on debug messages (implies -keep)
   -h      show description of a target
   -f      force recreation of compiled magefile
@@ -231,27 +232,12 @@ Options:
 		numFlags++
 	}
 
-	if !inv.Debug {
-		inv.Debug = mg.Debug()
-	} else {
-		os.Setenv(mg.DebugEnv, "1")
-	}
 	if inv.Debug {
 		debug.SetOutput(stderr)
 		inv.Keep = true
 	}
 
-	// If verbose is still false, we're going to peek at the environment variable to see if
-	// MAGE_VERBOSE has been set. If so, we're going to use it for the value of MAGE_VERBOSE.
-	if !inv.Verbose {
-		inv.Verbose = mg.Verbose()
-	}
-
-	if goCmd != "" {
-		if err := os.Setenv(mg.GoCmdEnv, goCmd); err != nil {
-			return inv, cmd, fmt.Errorf("failed to set gocmd: %v", err)
-		}
-	}
+	inv.CacheDir = mg.CacheDir()
 
 	if numFlags > 1 {
 		debug.Printf("%d commands defined", numFlags)
@@ -269,8 +255,17 @@ Options:
 // Invoke runs Mage with the given arguments.
 func Invoke(inv Invocation) int {
 	log := log.New(inv.Stderr, "", 0)
+	if inv.GoCmd == "" {
+		inv.GoCmd = "go"
+	}
+	if inv.Dir == "" {
+		inv.Dir = "."
+	}
+	if inv.CacheDir == "" {
+		inv.CacheDir = mg.CacheDir()
+	}
 
-	files, err := Magefiles(inv)
+	files, err := Magefiles(inv.Dir, inv.GoCmd, inv.Stderr, inv.Debug)
 	if err != nil {
 		log.Println("Error determining list of magefiles:", err)
 		return 1
@@ -281,7 +276,7 @@ func Invoke(inv Invocation) int {
 		return 1
 	}
 	debug.Printf("found magefiles: %s", strings.Join(files, ", "))
-	exePath, err := ExeName(files)
+	exePath, err := ExeName(inv.GoCmd, inv.CacheDir, files)
 	if err != nil {
 		log.Println("Error getting exe name:", err)
 		return 1
@@ -336,7 +331,7 @@ func Invoke(inv Invocation) int {
 		}()
 	}
 	files = append(files, main)
-	if err := Compile(inv, exePath, files); err != nil {
+	if err := Compile(inv.Dir, inv.GoCmd, exePath, files, inv.Debug, inv.Stderr, inv.Stdout); err != nil {
 		log.Println("Error:", err)
 		return 1
 	}
@@ -367,11 +362,8 @@ type data struct {
 	Aliases      map[string]string
 }
 
-// Yeah, if we get to go2, this will need to be revisited. I think that's ok.
-var goVerReg = regexp.MustCompile(`1\.[0-9]+`)
-
-func goVersion() (string, error) {
-	cmd := exec.Command(mg.GoCmd(), "version")
+func goVersion(gocmd string) (string, error) {
+	cmd := exec.Command(gocmd, "version")
 	out, stderr := &bytes.Buffer{}, &bytes.Buffer{}
 	cmd.Stdout = out
 	cmd.Stderr = stderr
@@ -385,20 +377,20 @@ func goVersion() (string, error) {
 }
 
 // Magefiles returns the list of magefiles in dir.
-func Magefiles(inv Invocation) ([]string, error) {
+func Magefiles(magePath, goCmd string, stderr io.Writer, isDebug bool) ([]string, error) {
 	fail := func(err error) ([]string, error) {
 		return nil, err
 	}
 
-	debug.Println("getting all non-mage files in", inv.Dir)
+	debug.Println("getting all non-mage files in", magePath)
 	// // first, grab all the files with no build tags specified.. this is actually
 	// // our exclude list of things without the mage build tag.
-	cmd := exec.Command(mg.GoCmd(), "list", "-e", "-f", `{{join .GoFiles "||"}}`)
+	cmd := exec.Command(goCmd, "list", "-e", "-f", `{{join .GoFiles "||"}}`)
 
-	if inv.Debug {
-		cmd.Stderr = inv.Stderr
+	if isDebug {
+		cmd.Stderr = stderr
 	}
-	cmd.Dir = inv.Dir
+	cmd.Dir = magePath
 	b, err := cmd.Output()
 	if err != nil {
 		fail(fmt.Errorf("failed to list non-mage gofiles: %v", err))
@@ -413,11 +405,11 @@ func Magefiles(inv Invocation) ([]string, error) {
 		}
 	}
 	debug.Println("getting all files plus mage files")
-	cmd = exec.Command(mg.GoCmd(), "list", "-tags=mage", "-e", "-f", `{{join .GoFiles "||"}}`)
-	if inv.Debug {
-		cmd.Stderr = inv.Stderr
+	cmd = exec.Command(goCmd, "list", "-tags=mage", "-e", "-f", `{{join .GoFiles "||"}}`)
+	if isDebug {
+		cmd.Stderr = stderr
 	}
-	cmd.Dir = inv.Dir
+	cmd.Dir = magePath
 	b, err = cmd.Output()
 	list = strings.TrimSpace(string(b))
 
@@ -431,35 +423,35 @@ func Magefiles(inv Invocation) ([]string, error) {
 		}
 	}
 	for i := range files {
-		files[i] = filepath.Join(inv.Dir, files[i])
+		files[i] = filepath.Join(magePath, files[i])
 	}
 	return files, nil
 }
 
 // Compile uses the go tool to compile the files into an executable at path.
-func Compile(inv Invocation, path string, gofiles []string) error {
-	debug.Println("compiling to", path)
-	debug.Println("compiling using gocmd:", mg.GoCmd())
-	if inv.Debug {
-		runDebug(mg.GoCmd(), "version")
-		runDebug(mg.GoCmd(), "env")
+func Compile(magePath, goCmd, compileTo string, gofiles []string, isDebug bool, stderr, stdout io.Writer) error {
+	debug.Println("compiling to", compileTo)
+	debug.Println("compiling using gocmd:", goCmd)
+	if isDebug {
+		runDebug(goCmd, "version")
+		runDebug(goCmd, "env")
 	}
 
 	// strip off the path since we're setting the path in the build command
 	for i := range gofiles {
 		gofiles[i] = filepath.Base(gofiles[i])
 	}
-	debug.Printf("running %s build -o %s %s", mg.GoCmd(), path, strings.Join(gofiles, ", "))
-	c := exec.Command(mg.GoCmd(), append([]string{"build", "-o", path}, gofiles...)...)
+	debug.Printf("running %s build -o %s %s", goCmd, compileTo, strings.Join(gofiles, ", "))
+	c := exec.Command(goCmd, append([]string{"build", "-o", compileTo}, gofiles...)...)
 	c.Env = os.Environ()
-	c.Stderr = inv.Stderr
-	c.Stdout = inv.Stdout
-	c.Dir = inv.Dir
+	c.Stderr = stderr
+	c.Stdout = stdout
+	c.Dir = magePath
 	err := c.Run()
 	if err != nil {
 		return errors.New("error compiling magefiles")
 	}
-	if _, err := os.Stat(path); err != nil {
+	if _, err := os.Stat(compileTo); err != nil {
 		return errors.New("failed to find compiled magefile")
 	}
 	return nil
@@ -506,7 +498,7 @@ func GenerateMainfile(path string, info *parse.PkgInfo) error {
 
 // ExeName reports the executable filename that this version of Mage would
 // create for the given magefiles.
-func ExeName(files []string) (string, error) {
+func ExeName(goCmd, cacheDir string, files []string) (string, error) {
 	var hashes []string
 	for _, s := range files {
 		h, err := hashFile(s)
@@ -519,14 +511,14 @@ func ExeName(files []string) (string, error) {
 	// binary.
 	hashes = append(hashes, fmt.Sprintf("%x", sha1.Sum([]byte(tpl))))
 	sort.Strings(hashes)
-	ver, err := goVersion()
+	ver, err := goVersion(goCmd)
 	if err != nil {
 		return "", err
 	}
 	hash := sha1.Sum([]byte(strings.Join(hashes, "") + magicRebuildKey + ver))
 	filename := fmt.Sprintf("%x", hash)
 
-	out := filepath.Join(mg.CacheDir(), filename)
+	out := filepath.Join(cacheDir, filename)
 	if runtime.GOOS == "windows" {
 		out += ".exe"
 	}
@@ -569,6 +561,7 @@ func RunCompiled(inv Invocation, exePath string) int {
 	c.Stderr = inv.Stderr
 	c.Stdout = inv.Stdout
 	c.Stdin = inv.Stdin
+	c.Dir = inv.Dir
 	c.Env = os.Environ()
 	if inv.Verbose {
 		c.Env = append(c.Env, "MAGEFILE_VERBOSE=1")
