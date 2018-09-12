@@ -36,31 +36,21 @@ func TestMain(m *testing.M) {
 func testmain(m *testing.M) int {
 	// ensure we write our temporary binaries to a directory that we'll delete
 	// after running tests.
-	dir := "./testing"
-	abs, err := filepath.Abs(dir)
+	dir, err := ioutil.TempDir("", "")
 	if err != nil {
 		log.Fatal(err)
 	}
-	if err := os.Setenv(mg.CacheEnv, abs); err != nil {
+	defer os.RemoveAll(dir)
+	if err := os.Setenv(mg.CacheEnv, dir); err != nil {
 		log.Fatal(err)
 	}
-	if err := os.Mkdir(dir, 0700); err != nil {
-		if os.IsExist(err) {
-			os.RemoveAll(dir)
-		} else {
-			log.Fatal(err)
-		}
-	}
-	defer os.RemoveAll(dir)
+	defer os.Unsetenv(mg.CacheEnv)
 	return m.Run()
 }
 
 func TestListMagefilesMain(t *testing.T) {
 	buf := &bytes.Buffer{}
-	files, err := Magefiles(Invocation{
-		Dir:    "testdata/mixed_main_files",
-		Stderr: buf,
-	})
+	files, err := Magefiles("testdata/mixed_main_files", "go", buf, false)
 	if err != nil {
 		t.Errorf("error from magefile list: %v: %s", err, buf)
 	}
@@ -72,10 +62,7 @@ func TestListMagefilesMain(t *testing.T) {
 
 func TestListMagefilesLib(t *testing.T) {
 	buf := &bytes.Buffer{}
-	files, err := Magefiles(Invocation{
-		Dir:    "testdata/mixed_lib_files",
-		Stderr: buf,
-	})
+	files, err := Magefiles("testdata/mixed_lib_files", "go", buf, false)
 	if err != nil {
 		t.Errorf("error from magefile list: %v: %s", err, buf)
 	}
@@ -136,6 +123,7 @@ func TestVerbose(t *testing.T) {
 
 func TestVerboseEnv(t *testing.T) {
 	os.Setenv("MAGEFILE_VERBOSE", "true")
+	defer os.Unsetenv("MAGEFILE_VERBOSE")
 	stdout := &bytes.Buffer{}
 	inv, _, err := Parse(ioutil.Discard, stdout, []string{})
 	if err != nil {
@@ -148,7 +136,6 @@ func TestVerboseEnv(t *testing.T) {
 		t.Fatalf("expected %t, but got %t ", expected, inv.Verbose)
 	}
 
-	os.Unsetenv("MAGEFILE_VERBOSE")
 }
 
 func TestList(t *testing.T) {
@@ -292,12 +279,15 @@ func TestPanicsErr(t *testing.T) {
 func TestHashTemplate(t *testing.T) {
 	templ := tpl
 	defer func() { tpl = templ }()
-	name, err := ExeName([]string{"testdata/func.go", "testdata/command.go"})
+	name, err := ExeName("go", mg.CacheDir(), []string{"testdata/func.go", "testdata/command.go"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	tpl = "some other template"
-	changed, err := ExeName([]string{"testdata/func.go", "testdata/command.go"})
+	changed, err := ExeName("go", mg.CacheDir(), []string{"testdata/func.go", "testdata/command.go"})
+	if err != nil {
+		t.Fatal(err)
+	}
 	if changed == name {
 		t.Fatal("expected executable name to chage if template changed")
 	}
@@ -477,8 +467,8 @@ func TestParse(t *testing.T) {
 	if inv.Dir != "dir" {
 		t.Errorf("Expected dir to be \"dir\" but was %q", inv.Dir)
 	}
-	if mg.GoCmd() != "foo" {
-		t.Errorf("Expected gocmd to be \"foo\" but was %q", mg.GoCmd())
+	if inv.GoCmd != "foo" {
+		t.Errorf("Expected gocmd to be \"foo\" but was %q", inv.GoCmd)
 	}
 	expected := []string{"build", "deploy"}
 	if !reflect.DeepEqual(inv.Args, expected) {
@@ -589,15 +579,18 @@ func TestHelpAlias(t *testing.T) {
 
 func TestAlias(t *testing.T) {
 	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	debug.SetOutput(stderr)
 	inv := Invocation{
-		Dir:    "./testdata/alias",
+		Dir:    "testdata/alias",
 		Stdout: stdout,
 		Stderr: ioutil.Discard,
 		Args:   []string{"status"},
+		Debug:  true,
 	}
 	code := Invoke(inv)
 	if code != 0 {
-		t.Errorf("expected to exit with code 0, but got %v", code)
+		t.Errorf("expected to exit with code 0, but got %v\noutput:\n%s\nstderr:\n%s", code, stdout, stderr)
 	}
 	actual := stdout.String()
 	expected := "alias!\n"
@@ -637,14 +630,8 @@ func TestInvalidAlias(t *testing.T) {
 }
 
 func TestClean(t *testing.T) {
-	TestGoRun(t) // make sure we've got something in the CACHE_DIR
-	dir := "./testing"
-	abs, err := filepath.Abs(dir)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	files, err := ioutil.ReadDir(abs)
+	TestAlias(t) // make sure we've got something in the CACHE_DIR
+	files, err := ioutil.ReadDir(mg.CacheDir())
 	if err != nil {
 		t.Error("issue reading file:", err)
 	}
@@ -653,17 +640,19 @@ func TestClean(t *testing.T) {
 		t.Error("Need at least 1 cached binaries to test --clean")
 	}
 
-	buf := &bytes.Buffer{}
-	_, cmd, err := Parse(ioutil.Discard, buf, []string{"-clean"})
+	_, cmd, err := Parse(ioutil.Discard, ioutil.Discard, []string{"-clean"})
+	if err != nil {
+		t.Fatal(err)
+	}
 	if cmd != Clean {
 		t.Errorf("Expected 'clean' command but got %v", cmd)
 	}
-	code := ParseAndRun(ioutil.Discard, ioutil.Discard, buf, []string{"-clean", "-d", dir})
+	code := ParseAndRun(ioutil.Discard, ioutil.Discard, &bytes.Buffer{}, []string{"-clean"})
 	if code != 0 {
 		t.Errorf("expected 0, but got %v", code)
 	}
 
-	files, err = ioutil.ReadDir(abs)
+	files, err = ioutil.ReadDir(mg.CacheDir())
 	if err != nil {
 		t.Error("issue reading file:", err)
 	}
@@ -678,11 +667,7 @@ func TestGoCmd(t *testing.T) {
 	if err := os.Setenv(testExeEnv, textOutput); err != nil {
 		t.Fatal(err)
 	}
-	t.Logf("setting %q as gocmd", os.Args[0])
-	if err := os.Setenv(mg.GoCmdEnv, os.Args[0]); err != nil {
-		t.Fatal(err)
-	}
-	defer os.Unsetenv(mg.GoCmdEnv)
+	defer os.Unsetenv(testExeEnv)
 
 	// fake out the compiled file, since the code checks for it.
 	f, err := ioutil.TempFile("", "")
@@ -696,13 +681,7 @@ func TestGoCmd(t *testing.T) {
 
 	buf := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
-	inv := Invocation{
-		Dir:    dir,
-		Stderr: stderr,
-		Stdout: buf,
-		Debug:  false,
-	}
-	if err := Compile(inv, name, []string{}); err != nil {
+	if err := Compile(dir, os.Args[0], name, []string{}, false, stderr, buf); err != nil {
 		t.Log("stderr: ", stderr.String())
 		t.Fatal(err)
 	}
