@@ -561,6 +561,7 @@ func RunCompiled(inv Invocation, exePath string) int {
 	c.Stderr = inv.Stderr
 	c.Stdout = inv.Stdout
 	c.Stdin = inv.Stdin
+	c.Dir = inv.Dir
 	c.Env = os.Environ()
 	if inv.Verbose {
 		c.Env = append(c.Env, "MAGEFILE_VERBOSE=1")
