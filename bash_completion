@@ -1,7 +1,7 @@
 _mage() {
 	# Get the partial word typed by the user.
 	local PARTIAL_WORD
-	PARTIAL_WORD="$(echo "$2" | tr '[:upper:]' '[:lower:]')"
+	PARTIAL_WORD="$2"
 
 	# Narrow in on a category of completions to offer.
 	local CATEGORY
