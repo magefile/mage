@@ -11,6 +11,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"reflect"
 	"regexp"
@@ -648,6 +649,15 @@ func TestInvalidAlias(t *testing.T) {
 }
 
 func TestClean(t *testing.T) {
+	_, err := ioutil.ReadDir(path.Join(mg.CacheDir(), "foo"))
+	if err == nil {
+		t.Error("expected missing cache dir but found one")
+	}
+	code := ParseAndRun(ioutil.Discard, ioutil.Discard, &bytes.Buffer{}, []string{"-clean"})
+	if code != 0 {
+		t.Errorf("expected 0, but got %v", code)
+	}
+
 	TestAlias(t) // make sure we've got something in the CACHE_DIR
 	files, err := ioutil.ReadDir(mg.CacheDir())
 	if err != nil {
@@ -665,7 +675,7 @@ func TestClean(t *testing.T) {
 	if cmd != Clean {
 		t.Errorf("Expected 'clean' command but got %v", cmd)
 	}
-	code := ParseAndRun(ioutil.Discard, ioutil.Discard, &bytes.Buffer{}, []string{"-clean"})
+	code = ParseAndRun(ioutil.Discard, ioutil.Discard, &bytes.Buffer{}, []string{"-clean"})
 	if code != 0 {
 		t.Errorf("expected 0, but got %v", code)
 	}
