@@ -593,6 +593,9 @@ func removeContents(dir string) error {
 	debug.Println("removing all files in", dir)
 	files, err := ioutil.ReadDir(dir)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
 		return err
 	}
 	for _, f := range files {
