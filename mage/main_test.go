@@ -11,7 +11,6 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"path"
 	"path/filepath"
 	"reflect"
 	"regexp"
@@ -649,9 +648,8 @@ func TestInvalidAlias(t *testing.T) {
 }
 
 func TestClean(t *testing.T) {
-	_, err := ioutil.ReadDir(path.Join(mg.CacheDir(), "foo"))
-	if err == nil {
-		t.Error("expected missing cache dir but found one")
+	if err := os.RemoveAll(mg.CacheDir()); err != nil {
+		t.Error("error removing cache dir:", err)
 	}
 	code := ParseAndRun(ioutil.Discard, ioutil.Discard, &bytes.Buffer{}, []string{"-clean"})
 	if code != 0 {
