@@ -648,6 +648,14 @@ func TestInvalidAlias(t *testing.T) {
 }
 
 func TestClean(t *testing.T) {
+	if err := os.RemoveAll(mg.CacheDir()); err != nil {
+		t.Error("error removing cache dir:", err)
+	}
+	code := ParseAndRun(ioutil.Discard, ioutil.Discard, &bytes.Buffer{}, []string{"-clean"})
+	if code != 0 {
+		t.Errorf("expected 0, but got %v", code)
+	}
+
 	TestAlias(t) // make sure we've got something in the CACHE_DIR
 	files, err := ioutil.ReadDir(mg.CacheDir())
 	if err != nil {
@@ -665,7 +673,7 @@ func TestClean(t *testing.T) {
 	if cmd != Clean {
 		t.Errorf("Expected 'clean' command but got %v", cmd)
 	}
-	code := ParseAndRun(ioutil.Discard, ioutil.Discard, &bytes.Buffer{}, []string{"-clean"})
+	code = ParseAndRun(ioutil.Discard, ioutil.Discard, &bytes.Buffer{}, []string{"-clean"})
 	if code != 0 {
 		t.Errorf("expected 0, but got %v", code)
 	}
