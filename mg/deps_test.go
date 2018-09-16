@@ -1,8 +1,10 @@
 package mg
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"log"
 	"testing"
 	"time"
 )
@@ -138,4 +140,33 @@ func TestDepWithUnhandledFunc(t *testing.T) {
 		return a
 	}
 	Deps(NotValid)
+}
+
+func TestDepsErrors(t *testing.T) {
+	buf := &bytes.Buffer{}
+	log := log.New(buf, "", 0)
+
+	h := func() error {
+		log.Println("running h")
+		return errors.New("oops")
+	}
+	g := func() {
+		Deps(h)
+		log.Println("running g")
+	}
+	f := func() {
+		Deps(g, h)
+		log.Println("running f")
+	}
+
+	defer func() {
+		err := recover()
+		if err == nil {
+			t.Fatal("expected f to panic")
+		}
+		if buf.String() != "running h\n" {
+			t.Fatalf("expected just h to run, but got\n%s", buf.String())
+		}
+	}()
+	f()
 }

@@ -199,19 +199,19 @@ type onceFun struct {
 	once sync.Once
 	fn   func(context.Context) error
 	ctx  context.Context
+	err  error
 
 	displayName string
 }
 
 func (o *onceFun) run() error {
-	var err error
 	o.once.Do(func() {
 		if Verbose() {
 			logger.Println("Running dependency:", o.displayName)
 		}
-		err = o.fn(o.ctx)
+		o.err = o.fn(o.ctx)
 	})
-	return err
+	return o.err
 }
 
 // funcCheck tests if a function is one of funcType
