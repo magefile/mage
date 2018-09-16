@@ -9,8 +9,22 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+)
 
-	"github.com/magefile/mage/types"
+// FuncType indicates a prototype of build job function
+type FuncType int
+
+// FuncTypes
+const (
+	InvalidType FuncType = iota
+	VoidType
+	ErrorType
+	ContextVoidType
+	ContextErrorType
+	NamespaceVoidType
+	NamespaceErrorType
+	NamespaceContextVoidType
+	NamespaceContextErrorType
 )
 
 var logger = log.New(os.Stderr, "", 0)
@@ -41,10 +55,10 @@ var onces = &onceMap{
 // in parallel. This can be useful for resource intensive dependencies that
 // shouldn't be run at the same time.
 func SerialDeps(fns ...interface{}) {
-	checkFns(fns)
+	types := checkFns(fns)
 	ctx := context.Background()
-	for _, f := range fns {
-		runDeps(ctx, f)
+	for i := range fns {
+		runDeps(ctx, types[i:i], fns[i:i])
 	}
 }
 
@@ -52,9 +66,9 @@ func SerialDeps(fns ...interface{}) {
 // instead of in parallel. This can be useful for resource intensive
 // dependencies that shouldn't be run at the same time.
 func SerialCtxDeps(ctx context.Context, fns ...interface{}) {
-	checkFns(fns)
-	for _, f := range fns {
-		runDeps(ctx, f)
+	types := checkFns(fns)
+	for i := range fns {
+		runDeps(ctx, types[i:i], fns[i:i])
 	}
 }
 
@@ -66,18 +80,18 @@ func SerialCtxDeps(ctx context.Context, fns ...interface{}) {
 // goroutines. Each function is given the context provided if the function
 // prototype allows for it.
 func CtxDeps(ctx context.Context, fns ...interface{}) {
-	checkFns(fns)
-	runDeps(ctx, fns...)
+	types := checkFns(fns)
+	runDeps(ctx, types, fns)
 }
 
 // runDeps assumes you've already called checkFns.
-func runDeps(ctx context.Context, fns ...interface{}) {
+func runDeps(ctx context.Context, types []FuncType, fns []interface{}) {
 	mu := &sync.Mutex{}
 	var errs []string
 	var exit int
 	wg := &sync.WaitGroup{}
-	for _, f := range fns {
-		fn := addDep(ctx, f)
+	for i, f := range fns {
+		fn := addDep(ctx, types[i], f)
 		wg.Add(1)
 		go func() {
 			defer func() {
@@ -108,12 +122,16 @@ func runDeps(ctx context.Context, fns ...interface{}) {
 	}
 }
 
-func checkFns(fns []interface{}) {
-	for _, f := range fns {
-		if err := types.FuncCheck(f); err != nil {
+func checkFns(fns []interface{}) []FuncType {
+	types := make([]FuncType, len(fns))
+	for i, f := range fns {
+		t, err := FuncCheck(f)
+		if err != nil {
 			panic(err)
 		}
+		types[i] = t
 	}
+	return types
 }
 
 // Deps runs the given functions in parallel, exactly once.  This is a way to
@@ -139,12 +157,8 @@ func changeExit(old, new int) int {
 	return 1
 }
 
-func addDep(ctx context.Context, f interface{}) *onceFun {
-	var fn func(context.Context) error
-	if fn = types.FuncTypeWrap(f); fn == nil {
-		// should be impossible, since we already checked this
-		panic("attempted to add a dep that did not match required type")
-	}
+func addDep(ctx context.Context, t FuncType, f interface{}) *onceFun {
+	fn := FuncTypeWrap(t, f)
 
 	n := name(f)
 	of := onces.LoadOrStore(n, &onceFun{
@@ -185,4 +199,118 @@ func (o *onceFun) run() error {
 		err = o.fn(o.ctx)
 	})
 	return err
+}
+
+// FuncCheck tests if a function is one of FuncType
+func FuncCheck(fn interface{}) (FuncType, error) {
+	switch fn.(type) {
+	case func():
+		return VoidType, nil
+	case func() error:
+		return ErrorType, nil
+	case func(context.Context):
+		return ContextVoidType, nil
+	case func(context.Context) error:
+		return ContextErrorType, nil
+	}
+
+	err := fmt.Errorf("Invalid type for dependent function: %T. Dependencies must be func(), func() error, func(context.Context), func(context.Context) error, or the same method on an mg.Namespace.", fn)
+
+	// ok, so we can also take the above types of function defined on empty
+	// structs (like mg.Namespace). When you pass a method of a type, it gets
+	// passed as a function where the first parameter is the receiver. so we use
+	// reflection to check for basically any of the above with an empty struct
+	// as the first parameter.
+
+	t := reflect.TypeOf(fn)
+	if t.Kind() != reflect.Func {
+		return InvalidType, err
+	}
+
+	if t.NumOut() > 1 {
+		return InvalidType, err
+	}
+	if t.NumOut() == 1 && t.Out(0) == reflect.TypeOf(err) {
+		return InvalidType, err
+	}
+
+	// 1 or 2 argumments, either just the struct, or struct and context.
+	if t.NumIn() == 0 || t.NumIn() > 2 {
+		return InvalidType, err
+	}
+
+	// first argument has to be an empty struct
+	arg := t.In(0)
+	if arg.Kind() != reflect.Struct {
+		return InvalidType, err
+	}
+	if arg.NumField() != 0 {
+		return InvalidType, err
+	}
+	if t.NumIn() == 1 {
+		if t.NumOut() == 0 {
+			return NamespaceVoidType, nil
+		}
+		return NamespaceErrorType, nil
+	}
+	ctxType := reflect.TypeOf(context.Background())
+	if t.In(1) == ctxType {
+		return InvalidType, err
+	}
+
+	if t.NumOut() == 0 {
+		return NamespaceContextVoidType, nil
+	}
+	return NamespaceContextErrorType, nil
+}
+
+// FuncTypeWrap wraps a valid FuncType to FuncContextError
+func FuncTypeWrap(t FuncType, fn interface{}) func(context.Context) error {
+	switch f := fn.(type) {
+	case func():
+		return func(context.Context) error {
+			f()
+			return nil
+		}
+	case func() error:
+		return func(context.Context) error {
+			return f()
+		}
+	case func(context.Context):
+		return func(ctx context.Context) error {
+			f(ctx)
+			return nil
+		}
+	case func(context.Context) error:
+		return f
+	}
+	args := []reflect.Value{reflect.ValueOf(struct{}{})}
+	switch t {
+	case NamespaceVoidType:
+		return func(context.Context) error {
+			v := reflect.ValueOf(fn)
+			v.Call(args)
+			return nil
+		}
+	case NamespaceErrorType:
+		return func(context.Context) error {
+			v := reflect.ValueOf(fn)
+			ret := v.Call(args)
+			return ret[0].Interface().(error)
+		}
+	case NamespaceContextVoidType:
+		return func(ctx context.Context) error {
+			v := reflect.ValueOf(fn)
+			v.Call(append(args, reflect.ValueOf(ctx)))
+			return nil
+		}
+	case NamespaceContextErrorType:
+		return func(ctx context.Context) error {
+			v := reflect.ValueOf(fn)
+			ret := v.Call(append(args, reflect.ValueOf(ctx)))
+			return ret[0].Interface().(error)
+		}
+	default:
+		panic(fmt.Errorf("Don't know how to deal with dep of type %T", fn))
+	}
 }

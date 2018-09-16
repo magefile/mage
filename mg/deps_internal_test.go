@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func TestDepsOfDeps(t *testing.T) {
+func TestDepsLogging(t *testing.T) {
 	os.Setenv("MAGEFILE_VERBOSE", "1")
 	defer os.Unsetenv("MAGEFILE_VERBOSE")
 	buf := &bytes.Buffer{}

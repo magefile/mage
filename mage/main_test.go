@@ -778,3 +778,39 @@ func minorVer(t *testing.T, v string) int {
 	}
 	return a
 }
+
+func TestNamespaceDep(t *testing.T) {
+	stdout := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:    "./testdata/namespaces",
+		Stderr: ioutil.Discard,
+		Stdout: stdout,
+		Args:   []string{"TestNamespaceDep"},
+	}
+	code := Invoke(inv)
+	if code != 0 {
+		t.Fatalf("expected 0, but got %v", code)
+	}
+	expected := "hi!\n"
+	if stdout.String() != expected {
+		t.Fatalf("expected %q, but got %q", expected, stdout.String())
+	}
+}
+
+func TestNamespace(t *testing.T) {
+	stdout := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:    "./testdata/namespaces",
+		Stderr: ioutil.Discard,
+		Stdout: stdout,
+		Args:   []string{"namespace:SayHi"},
+	}
+	code := Invoke(inv)
+	if code != 0 {
+		t.Fatalf("expected 0, but got %v", code)
+	}
+	expected := "hi!\n"
+	if stdout.String() != expected {
+		t.Fatalf("expected %q, but got %q", expected, stdout.String())
+	}
+}
