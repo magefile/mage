@@ -1,0 +1,28 @@
+_mage() {
+	# Get the partial word typed by the user.
+	local PARTIAL_WORD
+	PARTIAL_WORD="$2"
+
+	# Narrow in on a category of completions to offer.
+	local CATEGORY
+	case "$PARTIAL_WORD" in
+		-*)
+			# Flags
+			CATEGORY="$(mage -h | grep '^  -' | cut -d' ' -f3)"
+			;;
+		*)
+			# Targets
+			CATEGORY="$(mage -l | grep '^  ' | cut -d' ' -f3)"
+			;;
+	esac
+
+	# Discard the completions not matching the typed prefix.
+	local FILTERED_COMPLETIONS
+	FILTERED_COMPLETIONS="$(compgen -W "$CATEGORY" -- "$PARTIAL_WORD")"
+
+	# Communicate the result to Bash using an array.
+	COMPREPLY=($FILTERED_COMPLETIONS)
+}
+
+# Hook up our completion function.
+complete -F _mage mage

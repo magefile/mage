@@ -77,6 +77,17 @@ func Clean() error {
 	return sh.Rm("dist")
 }
 
+func InstallCompletion() error {
+	completionDir := "/etc/bash_completion.d"
+	if runtime.GOOS == "darwin" {
+		completionDir = "/usr/local/etc/bash_completion.d"
+	}
+	if _, err := os.Stat(completionDir); err != nil {
+		return err
+	}
+	return sh.Copy(filepath.Join(completionDir, "mage"), "bash_completion")
+}
+
 func flags() string {
 	timestamp := time.Now().Format(time.RFC3339)
 	hash := hash()
