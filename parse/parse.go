@@ -11,8 +11,6 @@ import (
 	"log"
 	"os"
 	"strings"
-
-	mgTypes "github.com/magefile/mage/types"
 )
 
 var debug = log.New(ioutil.Discard, "DEBUG: ", 0)
@@ -126,14 +124,14 @@ typeloop:
 			if !ast.IsExported(f.Name) {
 				continue
 			}
-			if typ := voidOrError(f.Decl.Type); typ != mgTypes.InvalidType {
+			if typ := funcType(f.Decl.Type); typ != invalidType {
 				pi.Funcs = append(pi.Funcs, Function{
 					Name:      f.Name,
 					Receiver:  f.Recv,
 					Comment:   toOneLine(f.Doc),
 					Synopsis:  sanitizeSynopsis(f),
-					IsError:   typ == mgTypes.ErrorType || typ == mgTypes.ContextErrorType,
-					IsContext: typ == mgTypes.ContextVoidType || typ == mgTypes.ContextErrorType,
+					IsError:   typ == errorType || typ == contextErrorType,
+					IsContext: typ == contextVoidType || typ == contextErrorType,
 				})
 			}
 		}
@@ -149,14 +147,14 @@ typeloop:
 			// skip non-exported functions
 			continue
 		}
-		if typ := voidOrError(f.Decl.Type); typ != mgTypes.InvalidType {
+		if typ := funcType(f.Decl.Type); typ != invalidType {
 			debug.Printf("found target %v", f.Name)
 			pi.Funcs = append(pi.Funcs, Function{
 				Name:      f.Name,
 				Comment:   toOneLine(f.Doc),
 				Synopsis:  sanitizeSynopsis(f),
-				IsError:   typ == mgTypes.ErrorType || typ == mgTypes.ContextErrorType,
-				IsContext: typ == mgTypes.ContextVoidType || typ == mgTypes.ContextErrorType,
+				IsError:   typ == errorType || typ == contextErrorType,
+				IsContext: typ == contextVoidType || typ == contextErrorType,
 			})
 		} else {
 			debug.Printf("skipping function with invalid signature func %s(%v)(%v)", f.Name, fieldNames(f.Decl.Type.Params), fieldNames(f.Decl.Type.Results))
@@ -379,24 +377,34 @@ func hasErrorReturn(ft *ast.FuncType) bool {
 	return fmt.Sprint(ret.Type) == "error"
 }
 
-func voidOrError(ft *ast.FuncType) mgTypes.FuncType {
+type functype int
+
+const (
+	invalidType functype = iota
+	voidType
+	errorType
+	contextVoidType
+	contextErrorType
+)
+
+func funcType(ft *ast.FuncType) functype {
 	if hasContextParam(ft) {
 		if hasVoidReturn(ft) {
-			return mgTypes.ContextVoidType
+			return contextVoidType
 		}
 		if hasErrorReturn(ft) {
-			return mgTypes.ContextErrorType
+			return contextErrorType
 		}
 	}
 	if ft.Params.NumFields() == 0 {
 		if hasVoidReturn(ft) {
-			return mgTypes.VoidType
+			return voidType
 		}
 		if hasErrorReturn(ft) {
-			return mgTypes.ErrorType
+			return errorType
 		}
 	}
-	return mgTypes.InvalidType
+	return invalidType
 }
 
 func toOneLine(s string) string {
