@@ -8,6 +8,7 @@ branches:
 # In theory, older versions would probably work fine, but since this isn't a 
 # library, I'm not going to worry about older versions for now.
 go:
+  - tip
   - 1.11.x
   - 1.10.x
   - 1.9.x

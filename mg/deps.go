@@ -309,7 +309,11 @@ func funcTypeWrap(t funcType, fn interface{}) func(context.Context) error {
 		return func(context.Context) error {
 			v := reflect.ValueOf(fn)
 			ret := v.Call(args)
-			return ret[0].Interface().(error)
+			val := ret[0].Interface()
+			if val == nil {
+				return nil
+			}
+			return val.(error)
 		}
 	case namespaceContextVoidType:
 		return func(ctx context.Context) error {
@@ -321,7 +325,11 @@ func funcTypeWrap(t funcType, fn interface{}) func(context.Context) error {
 		return func(ctx context.Context) error {
 			v := reflect.ValueOf(fn)
 			ret := v.Call(append(args, reflect.ValueOf(ctx)))
-			return ret[0].Interface().(error)
+			val := ret[0].Interface()
+			if val == nil {
+				return nil
+			}
+			return val.(error)
 		}
 	default:
 		panic(fmt.Errorf("Don't know how to deal with dep of type %T", fn))
