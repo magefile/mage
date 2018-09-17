@@ -781,15 +781,16 @@ func minorVer(t *testing.T, v string) int {
 
 func TestNamespaceDep(t *testing.T) {
 	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
 	inv := Invocation{
 		Dir:    "./testdata/namespaces",
-		Stderr: ioutil.Discard,
+		Stderr: stderr,
 		Stdout: stdout,
 		Args:   []string{"TestNamespaceDep"},
 	}
 	code := Invoke(inv)
 	if code != 0 {
-		t.Fatalf("expected 0, but got %v", code)
+		t.Fatalf("expected 0, but got %v, stderr:\n%s", code, stderr)
 	}
 	expected := "hi!\n"
 	if stdout.String() != expected {
@@ -803,7 +804,7 @@ func TestNamespace(t *testing.T) {
 		Dir:    "./testdata/namespaces",
 		Stderr: ioutil.Discard,
 		Stdout: stdout,
-		Args:   []string{"namespace:SayHi"},
+		Args:   []string{"ns:error"},
 	}
 	code := Invoke(inv)
 	if code != 0 {
