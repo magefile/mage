@@ -11,6 +11,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"strconv"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -165,6 +166,14 @@ func main() {
 
 	if len(os.Args) < 2 {
 	{{- if .Default}}
+		ignore, _ := strconv.ParseBool(os.Getenv("MAGEFILE_IGNOREDEFAULT"))
+		if ignore {
+			if err := list(); err != nil {
+				logger.Println("Error:", err)
+				os.Exit(1)
+			}
+			return	
+		}
 		{{.DefaultFunc.TemplateString}}
 		handleError(logger, err)
 		return
