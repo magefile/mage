@@ -713,13 +713,20 @@ func TestClean(t *testing.T) {
 		t.Errorf("expected 0, but got %v", code)
 	}
 
-	files, err = ioutil.ReadDir(mg.CacheDir())
+	infos, err := ioutil.ReadDir(mg.CacheDir())
 	if err != nil {
 		t.Error("issue reading file:", err)
 	}
 
-	if len(files) != 0 {
-		t.Errorf("expected '-clean' to remove files from CACHE_DIR, but still have %v", files)
+	var names []string
+	for _, i := range infos {
+		if !i.IsDir() {
+			names = append(names, i.Name())
+		}
+	}
+
+	if len(names) != 0 {
+		t.Errorf("expected '-clean' to remove files from CACHE_DIR, but still have %v", names)
 	}
 }
 
