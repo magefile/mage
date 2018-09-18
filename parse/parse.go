@@ -11,9 +11,10 @@ import (
 	"log"
 	"os"
 	"strings"
+	"time"
 )
 
-var debug = log.New(ioutil.Discard, "DEBUG: ", 0)
+var debug = log.New(ioutil.Discard, "DEBUG: ", log.Ltime|log.Lmicroseconds)
 
 // EnableDebug turns on debug logging.
 func EnableDebug() {
@@ -95,6 +96,10 @@ func (f Function) TemplateString() string {
 
 // Package parses a package
 func Package(path string, files []string) (*PkgInfo, error) {
+	start := time.Now()
+	defer func() {
+		debug.Println("time parse Magefiles:", time.Since(start))
+	}()
 	fset := token.NewFileSet()
 	pkg, err := getPackage(path, files, fset)
 	if err != nil {

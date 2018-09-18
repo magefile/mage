@@ -46,7 +46,7 @@ var initOutput = template.Must(template.New("").Parse(mageTpl))
 const mainfile = "mage_output_file.go"
 const initFile = "magefile.go"
 
-var debug = log.New(ioutil.Discard, "DEBUG: ", 0)
+var debug = log.New(ioutil.Discard, "DEBUG: ", log.Ltime|log.Lmicroseconds)
 
 // set by ldflags when you "mage build"
 var (
@@ -286,20 +286,32 @@ func Invoke(inv Invocation) int {
 	}
 	debug.Println("output exe is ", exePath)
 
-	_, err = os.Stat(exePath)
-	switch {
-	case err == nil:
-		if inv.Force {
-			debug.Println("ignoring existing executable")
-		} else {
-			debug.Println("Running existing exe")
-			return RunCompiled(inv, exePath)
+	useCache := false
+	if s, err := outputDebug(inv.GoCmd, "env", "GOCACHE"); err == nil {
+		// if GOCACHE exists, always rebuild, so we catch transitive
+		// dependencies that have changed.
+		if s != "" {
+			debug.Println("build cache exists, will ignore any compiled binary")
+			useCache = true
 		}
-	case os.IsNotExist(err):
-		debug.Println("no existing exe, creating new")
-	default:
-		debug.Printf("error reading existing exe at %v: %v", exePath, err)
-		debug.Println("creating new exe")
+	}
+
+	if !useCache {
+		_, err = os.Stat(exePath)
+		switch {
+		case err == nil:
+			if inv.Force {
+				debug.Println("ignoring existing executable")
+			} else {
+				debug.Println("Running existing exe")
+				return RunCompiled(inv, exePath)
+			}
+		case os.IsNotExist(err):
+			debug.Println("no existing exe, creating new")
+		default:
+			debug.Printf("error reading existing exe at %v: %v", exePath, err)
+			debug.Println("creating new exe")
+		}
 	}
 
 	// parse wants dir + filenames... arg
@@ -318,15 +330,16 @@ func Invoke(inv Invocation) int {
 	}
 
 	main := filepath.Join(inv.Dir, mainfile)
-	if err := GenerateMainfile(main, info); err != nil {
+	mainhash, err := GenerateMainfile(main, inv.CacheDir, info)
+	if err != nil {
 		log.Println("Error:", err)
 		return 1
 	}
 	if !inv.Keep {
 		defer func() {
-			debug.Println("removing main file")
-			if err := os.Remove(main); err != nil && !os.IsNotExist(err) {
-				debug.Println("error removing main file: ", err)
+			debug.Println("moving main file to cache:", filepath.Join(inv.CacheDir, "mains", mainhash))
+			if err := os.Rename(main, filepath.Join(inv.CacheDir, "mains", mainhash)); err != nil && !os.IsNotExist(err) {
+				debug.Println("error moving main file: ", err)
 			}
 		}()
 	}
@@ -339,8 +352,9 @@ func Invoke(inv Invocation) int {
 		// remove this file before we run the compiled version, in case the
 		// compiled file screws things up.  Yes this doubles up with the above
 		// defer, that's ok.
-		if err := os.Remove(main); err != nil && !os.IsNotExist(err) {
-			debug.Println("error removing main file: ", err)
+		debug.Println("moving main file to cache:", filepath.Join(inv.CacheDir, "mains", mainhash))
+		if err := os.Rename(main, filepath.Join(inv.CacheDir, "mains", mainhash)); err != nil && !os.IsNotExist(err) {
+			debug.Println("error moving main file: ", err)
 		}
 	} else {
 		debug.Print("keeping mainfile")
@@ -378,6 +392,10 @@ func goVersion(gocmd string) (string, error) {
 
 // Magefiles returns the list of magefiles in dir.
 func Magefiles(magePath, goCmd string, stderr io.Writer, isDebug bool) ([]string, error) {
+	start := time.Now()
+	defer func() {
+		debug.Println("time to scan for Magefiles:", time.Since(start))
+	}()
 	fail := func(err error) ([]string, error) {
 		return nil, err
 	}
@@ -441,23 +459,22 @@ func Compile(magePath, goCmd, compileTo string, gofiles []string, isDebug bool, 
 	for i := range gofiles {
 		gofiles[i] = filepath.Base(gofiles[i])
 	}
-	debug.Printf("running %s build -o %s %s", goCmd, compileTo, strings.Join(gofiles, ", "))
+	debug.Printf("running %s build -o %s %s", goCmd, compileTo, strings.Join(gofiles, " "))
 	c := exec.Command(goCmd, append([]string{"build", "-o", compileTo}, gofiles...)...)
 	c.Env = os.Environ()
 	c.Stderr = stderr
 	c.Stdout = stdout
 	c.Dir = magePath
+	start := time.Now()
 	err := c.Run()
+	debug.Println("time to compile Magefile:", time.Since(start))
 	if err != nil {
 		return errors.New("error compiling magefiles")
-	}
-	if _, err := os.Stat(compileTo); err != nil {
-		return errors.New("failed to find compiled magefile")
 	}
 	return nil
 }
 
-func runDebug(cmd string, args ...string) {
+func runDebug(cmd string, args ...string) error {
 	buf := &bytes.Buffer{}
 	errbuf := &bytes.Buffer{}
 	debug.Println("running", cmd, strings.Join(args, " "))
@@ -467,18 +484,34 @@ func runDebug(cmd string, args ...string) {
 	c.Stdout = buf
 	if err := c.Run(); err != nil {
 		debug.Print("error running '", cmd, strings.Join(args, " "), "': ", err, ": ", errbuf)
+		return err
 	}
 	debug.Println(buf)
+	return nil
+}
+
+func outputDebug(cmd string, args ...string) (string, error) {
+	buf := &bytes.Buffer{}
+	errbuf := &bytes.Buffer{}
+	debug.Println("running", cmd, strings.Join(args, " "))
+	c := exec.Command(cmd, args...)
+	c.Env = os.Environ()
+	c.Stderr = errbuf
+	c.Stdout = buf
+	if err := c.Run(); err != nil {
+		debug.Print("error running '", cmd, strings.Join(args, " "), "': ", err, ": ", errbuf)
+		return "", err
+	}
+	return strings.TrimSpace(buf.String()), nil
 }
 
 // GenerateMainfile creates the mainfile at path with the info from
-func GenerateMainfile(path string, info *parse.PkgInfo) error {
+func GenerateMainfile(path, cachedir string, info *parse.PkgInfo) (hash string, _ error) {
 	debug.Println("Creating mainfile at", path)
-	f, err := os.Create(path)
-	if err != nil {
-		return fmt.Errorf("can't create mainfile: %v", err)
-	}
-	defer f.Close()
+	os.MkdirAll(filepath.Join(cachedir, "mains"), 0700)
+	buf := &bytes.Buffer{}
+	hasher := sha1.New()
+	w := io.MultiWriter(buf, hasher)
 
 	data := data{
 		Description: info.Description,
@@ -490,10 +523,46 @@ func GenerateMainfile(path string, info *parse.PkgInfo) error {
 
 	data.DefaultError = info.DefaultIsError
 
-	if err := output.Execute(f, data); err != nil {
-		return fmt.Errorf("can't execute mainfile template: %v", err)
+	if err := output.Execute(w, data); err != nil {
+		return "", fmt.Errorf("can't execute mainfile template: %v", err)
 	}
-	return nil
+
+	hash = fmt.Sprintf("%x", hasher.Sum(nil))
+	err := os.Rename(filepath.Join(cachedir, "mains", hash), path)
+	if os.IsNotExist(err) {
+		debug.Println("file does not exist at", filepath.Join(cachedir, "mains", hash))
+		f, err := os.Open(path)
+		if err == nil {
+			debug.Println("mainfile already exists at", path)
+			existing := sha1.New()
+			_, err := io.Copy(existing, f)
+			if err == nil {
+				if hash == fmt.Sprintf("%x", existing.Sum(nil)) {
+					debug.Println("mainfile is the same as generated, using existing file")
+					if info, err := f.Stat(); err == nil {
+						debug.Println("mainfile modtime:", info.ModTime())
+					}
+					f.Close()
+					// same contents on disk, use those
+					return hash, nil
+				}
+			}
+			f.Close()
+		}
+		if err := ioutil.WriteFile(path, buf.Bytes(), 0600); err != nil {
+			return "", fmt.Errorf("can't write mainfile: %v", err)
+		}
+		info, err := os.Stat(path)
+		if err != nil {
+			debug.Println("mainfile modtime:", info.ModTime())
+		}
+		return hash, nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("can't copy mainfile: %v", err)
+	}
+	debug.Println("reusing mainfile")
+	return hash, nil
 }
 
 // ExeName reports the executable filename that this version of Mage would
@@ -571,6 +640,9 @@ func RunCompiled(inv Invocation, exePath string) int {
 	}
 	if inv.Help {
 		c.Env = append(c.Env, "MAGEFILE_HELP=1")
+	}
+	if inv.Debug {
+		c.Env = append(c.Env, "MAGEFILE_DEBUG=1")
 	}
 	if inv.Timeout > 0 {
 		c.Env = append(c.Env, fmt.Sprintf("MAGEFILE_TIMEOUT=%s", inv.Timeout.String()))

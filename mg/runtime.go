@@ -35,7 +35,7 @@ func Verbose() bool {
 
 // Debug reports whether a magefile was run with the verbose flag.
 func Debug() bool {
-	b, _ := strconv.ParseBool(os.Getenv(VerboseEnv))
+	b, _ := strconv.ParseBool(os.Getenv(DebugEnv))
 	return b
 }
 
