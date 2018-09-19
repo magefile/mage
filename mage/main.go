@@ -187,7 +187,7 @@ Commands:
   -version  show version info for the mage binary
 
 Options:
-  -d <string> 
+  -d <string>
           run magefiles in the given directory (default ".")
   -debug  turn on debug messages
   -h      show description of a target
@@ -291,7 +291,8 @@ func Invoke(inv Invocation) int {
 	debug.Println("output exe is ", exePath)
 
 	useCache := false
-	if s, err := outputDebug(inv.GoCmd, "env", "GOCACHE"); err == nil {
+	var s string
+	if s, err = outputDebug(inv.GoCmd, "env", "GOCACHE"); err == nil {
 		// if GOCACHE exists, always rebuild, so we catch transitive
 		// dependencies that have changed.
 		if s != "" {
@@ -365,8 +366,15 @@ func Invoke(inv Invocation) int {
 
 func moveMainToCache(cachedir, main, hash string) {
 	debug.Println("moving main file to cache:", cachedMainfile(cachedir, hash))
-	if err := os.Rename(main, cachedMainfile(cachedir, hash)); err != nil && !os.IsNotExist(err) {
+
+	// Copy the main file to the cache.
+	if err := copy(main, cachedMainfile(cachedir, hash)); err != nil && !os.IsNotExist(err) {
 		debug.Println("error caching main file: ", err)
+	}
+
+	// Remove the main file.
+	if err := os.Remove(main); err != nil {
+		debug.Println("error removing main file: ", err)
 	}
 }
 
@@ -527,7 +535,7 @@ func GenerateMainfile(path, cachedir string, info *parse.PkgInfo) (hash string, 
 	hasher := sha1.New()
 	w := io.MultiWriter(buf, hasher)
 
-	data := data{
+	d := data{
 		Description: info.Description,
 		Funcs:       info.Funcs,
 		Default:     info.DefaultName,
@@ -535,9 +543,9 @@ func GenerateMainfile(path, cachedir string, info *parse.PkgInfo) (hash string, 
 		Aliases:     info.Aliases,
 	}
 
-	data.DefaultError = info.DefaultIsError
+	d.DefaultError = info.DefaultIsError
 
-	if err := output.Execute(w, data); err != nil {
+	if err := output.Execute(w, d); err != nil {
 		return "", fmt.Errorf("can't execute mainfile template: %v", err)
 	}
 
@@ -558,7 +566,8 @@ func GenerateMainfile(path, cachedir string, info *parse.PkgInfo) (hash string, 
 }
 
 func useExistingMain(cachedMain, path, hash string) bool {
-	err := os.Rename(cachedMain, path)
+	// Copy the file.
+	err := copy(cachedMain, path)
 	if err == nil {
 		debug.Println("using cached mainfile from cachedir")
 		return true
@@ -567,6 +576,11 @@ func useExistingMain(cachedMain, path, hash string) bool {
 		debug.Println("file does not exist at", cachedMain)
 	} else {
 		debug.Printf("error copying cached mainfile from %s to %s: %v", cachedMain, path, err)
+	}
+	// Remove the file.
+	if err = os.Remove(cachedMain); err == nil {
+		debug.Println("error removing cached mainfile from cachedir")
+		return true
 	}
 	// ok, no cached file, try to open the file at the target (happens if
 	// the user ran with -keep)
@@ -710,5 +724,26 @@ func removeContents(dir string) error {
 			return err
 		}
 	}
+	return nil
+}
+
+func copy(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	_, err = io.Copy(out, in)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
