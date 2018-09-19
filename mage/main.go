@@ -544,45 +544,6 @@ func GenerateMainfile(path, cachedir string, info *parse.PkgInfo) error {
 	return os.Chtimes(path, longAgo, longAgo)
 }
 
-func useExistingMain(cachedMain, path, hash string) bool {
-	err := os.Rename(cachedMain, path)
-	if err == nil {
-		debug.Println("using cached mainfile from cachedir")
-		return true
-	}
-	if os.IsNotExist(err) {
-		debug.Println("file does not exist at", cachedMain)
-	} else {
-		debug.Printf("error copying cached mainfile from %s to %s: %v", cachedMain, path, err)
-	}
-	// ok, no cached file, try to open the file at the target (happens if
-	// the user ran with -keep)
-	f, err := os.Open(path)
-	if os.IsNotExist(err) {
-		return false
-	}
-	if err != nil {
-		debug.Printf("error opening existing mainfile at %s: %v", path, err)
-		return false
-	}
-	defer f.Close()
-	debug.Println("mainfile already exists at", path)
-	existing := sha1.New()
-	_, err = io.Copy(existing, f)
-	if err != nil {
-		debug.Println("error hashing existing file:", err)
-		return false
-	}
-
-	if hash == fmt.Sprintf("%x", existing.Sum(nil)) {
-		// same contents on disk, use those
-		debug.Println("mainfile is the same as generated, using existing file")
-		return true
-	}
-	debug.Println("existing file has different contents")
-	return false
-}
-
 // ExeName reports the executable filename that this version of Mage would
 // create for the given magefiles.
 func ExeName(goCmd, cacheDir string, files []string) (string, error) {
