@@ -580,7 +580,7 @@ func useExistingMain(cachedMain, path, hash string) bool {
 	// Remove the file.
 	if err = os.Remove(cachedMain); err != nil {
 		debug.Println("error removing cached mainfile from cachedir: ", err)
-		return true
+		return false
 	}
 	// ok, no cached file, try to open the file at the target (happens if
 	// the user ran with -keep)
