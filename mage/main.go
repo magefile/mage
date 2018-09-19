@@ -539,9 +539,16 @@ func GenerateMainfile(path, cachedir string, info *parse.PkgInfo) error {
 	if err := output.Execute(f, data); err != nil {
 		return fmt.Errorf("can't execute mainfile template: %v", err)
 	}
-	f.Close()
+	if err := f.Close(); err != nil {
+		return fmt.Errorf("error closing generated mainfile: %v", err)
+	}
+	// we set an old modtime on the generated mainfile so that the go tool
+	// won't think it has changed more recently than the compiled binary.
 	longAgo := time.Now().Add(-time.Hour * 24 * 365 * 10)
-	return os.Chtimes(path, longAgo, longAgo)
+	if err := os.Chtimes(path, longAgo, longAgo); err != nil {
+		return fmt.Errorf("error setting old modtime on generated mainfile: %v", err)
+	}
+	return nil
 }
 
 // ExeName reports the executable filename that this version of Mage would
