@@ -67,7 +67,7 @@ Commands:
 Options:
   -d <string> 
           run magefiles in the given directory (default ".")
-  -debug  turn on debug messages (implies -keep)
+  -debug  turn on debug messages
   -h      show description of a target
   -f      force recreation of compiled magefile
   -keep   keep intermediate mage files around after running

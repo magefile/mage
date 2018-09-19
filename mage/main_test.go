@@ -44,7 +44,15 @@ func testmain(m *testing.M) int {
 	if err := os.Setenv(mg.CacheEnv, dir); err != nil {
 		log.Fatal(err)
 	}
-	defer os.Unsetenv(mg.CacheEnv)
+	if err := os.Unsetenv(mg.VerboseEnv); err != nil {
+		log.Fatal(err)
+	}
+	if err := os.Unsetenv(mg.DebugEnv); err != nil {
+		log.Fatal(err)
+	}
+	if err := os.Unsetenv(mg.IgnoreDefaultEnv); err != nil {
+		log.Fatal(err)
+	}
 	return m.Run()
 }
 
