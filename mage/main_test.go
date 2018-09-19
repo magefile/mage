@@ -798,13 +798,6 @@ func TestClean(t *testing.T) {
 	if len(names) != 0 {
 		t.Errorf("expected '-clean' to remove files from CACHE_DIR, but still have %v", names)
 	}
-	infos, err = ioutil.ReadDir(filepath.Join(mg.CacheDir(), mainfileSubdir))
-	if err != nil {
-		t.Error("issue reading directory:", err)
-	}
-	if len(infos) > 0 {
-		t.Fatalf("%d files left in mainfile subdir", len(infos))
-	}
 }
 
 func TestGoCmd(t *testing.T) {
