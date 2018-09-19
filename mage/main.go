@@ -578,7 +578,7 @@ func useExistingMain(cachedMain, path, hash string) bool {
 		debug.Printf("error copying cached mainfile from %s to %s: %v", cachedMain, path, err)
 	}
 	// Remove the file.
-	if err = os.Remove(cachedMain); err == nil {
+	if err = os.Remove(cachedMain); err != nil {
 		debug.Println("error removing cached mainfile from cachedir: ", err)
 		return true
 	}
