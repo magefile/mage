@@ -130,6 +130,11 @@ func ParseAndRun(stdout, stderr io.Writer, stdin io.Reader, args []string) int {
 			log.Println("Error:", err)
 			return 1
 		}
+		if err := removeContents(filepath.Join(inv.CacheDir, mainfileSubdir)); err != nil {
+			log.Println("Error:", err)
+			return 1
+		}
+
 		log.Println(inv.CacheDir, "cleaned")
 		return 0
 	case CompileStatic:

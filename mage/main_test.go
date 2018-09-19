@@ -764,14 +764,15 @@ func TestClean(t *testing.T) {
 	if cmd != Clean {
 		t.Errorf("Expected 'clean' command but got %v", cmd)
 	}
-	code = ParseAndRun(ioutil.Discard, ioutil.Discard, &bytes.Buffer{}, []string{"-clean"})
+	buf := &bytes.Buffer{}
+	code = ParseAndRun(ioutil.Discard, buf, &bytes.Buffer{}, []string{"-clean"})
 	if code != 0 {
-		t.Errorf("expected 0, but got %v", code)
+		t.Fatalf("expected 0, but got %v: %s", code, buf)
 	}
 
 	infos, err := ioutil.ReadDir(mg.CacheDir())
 	if err != nil {
-		t.Error("issue reading file:", err)
+		t.Fatal(err)
 	}
 
 	var names []string
@@ -783,6 +784,13 @@ func TestClean(t *testing.T) {
 
 	if len(names) != 0 {
 		t.Errorf("expected '-clean' to remove files from CACHE_DIR, but still have %v", names)
+	}
+	infos, err = ioutil.ReadDir(filepath.Join(mg.CacheDir(), mainfileSubdir))
+	if err != nil {
+		t.Error("issue reading directory:", err)
+	}
+	if len(infos) > 0 {
+		t.Fatalf("%d files left in mainfile subdir", len(infos))
 	}
 }
 
