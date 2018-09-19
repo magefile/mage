@@ -569,7 +569,7 @@ func useExistingMain(cachedMain, path, hash string) bool {
 	// Copy the file.
 	err := copy(cachedMain, path)
 	if err == nil {
-		debug.Println("error copying cached mainfile from cachedir: ", err)
+		debug.Println("using cached mainfile from cachedir")
 		return true
 	}
 	if os.IsNotExist(err) {
