@@ -309,7 +309,7 @@ func Invoke(inv Invocation) int {
 				debug.Println("ignoring existing executable")
 			} else {
 				debug.Println("Running existing exe")
-				return RunCompiled(inv, exePath)
+				return RunCompiled(inv, exePath, errlog)
 			}
 		case os.IsNotExist(err):
 			debug.Println("no existing exe, creating new")
@@ -361,11 +361,7 @@ func Invoke(inv Invocation) int {
 		return 0
 	}
 
-	err = RunCompiled(inv, exePath)
-	if err != nil {
-		errlog.Printf("error running compiled magefile: %v", err)
-	}
-	return sh.ExitStatus(err)
+	return RunCompiled(inv, exePath, errlog)
 }
 
 func moveMainToCache(cachedir, main, hash string) {
@@ -660,7 +656,7 @@ func generateInit(dir string) error {
 }
 
 // RunCompiled runs an already-compiled mage command with the given args,
-func RunCompiled(inv Invocation, exePath string) error {
+func RunCompiled(inv Invocation, exePath string, errlog *log.Logger) int {
 	debug.Println("running binary", exePath)
 	c := exec.Command(exePath, inv.Args...)
 	c.Stderr = inv.Stderr
@@ -684,7 +680,11 @@ func RunCompiled(inv Invocation, exePath string) error {
 		c.Env = append(c.Env, fmt.Sprintf("MAGEFILE_TIMEOUT=%s", inv.Timeout.String()))
 	}
 	debug.Print("running magefile with mage vars:\n", strings.Join(filter(c.Env, "MAGEFILE"), "\n"))
-	return c.Run()
+	err := c.Run()
+	if !sh.CmdRan(err) {
+		errlog.Printf("failed to run compiled magefile: %v", err)
+	}
+	return sh.ExitStatus(err)
 }
 
 func filter(list []string, prefix string) []string {
