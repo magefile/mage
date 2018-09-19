@@ -540,7 +540,7 @@ func GenerateMainfile(path, cachedir string, info *parse.PkgInfo) error {
 		return fmt.Errorf("can't execute mainfile template: %v", err)
 	}
 	f.Close()
-	longAgo := time.Now().Add(-time.Hour * 24 * 365 * 100)
+	longAgo := time.Now().Add(-time.Hour * 24 * 365 * 10)
 	return os.Chtimes(path, longAgo, longAgo)
 }
 
