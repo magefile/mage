@@ -679,7 +679,11 @@ func RunCompiled(inv Invocation, exePath string) int {
 		c.Env = append(c.Env, fmt.Sprintf("MAGEFILE_TIMEOUT=%s", inv.Timeout.String()))
 	}
 	debug.Print("running magefile with mage vars:\n", strings.Join(filter(c.Env, "MAGEFILE"), "\n"))
-	return sh.ExitStatus(c.Run())
+	err := c.Run()
+	if err != nil {
+		log.Printf("error running compiled magefile: %v", err)
+	}
+	return sh.ExitStatus(err)
 }
 
 func filter(list []string, prefix string) []string {
