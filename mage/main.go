@@ -334,13 +334,13 @@ func Invoke(inv Invocation) int {
 	}
 
 	main := filepath.Join(inv.Dir, mainfile)
-	mainhash, err := GenerateMainfile(main, inv.CacheDir, info)
+	err = GenerateMainfile(main, inv.CacheDir, info)
 	if err != nil {
 		log.Println("Error:", err)
 		return 1
 	}
 	if !inv.Keep {
-		defer moveMainToCache(inv.CacheDir, main, mainhash)
+		defer os.RemoveAll(main)
 	}
 	files = append(files, main)
 	if err := Compile(inv.Dir, inv.GoCmd, exePath, files, inv.Debug, inv.Stderr, inv.Stdout); err != nil {
@@ -351,7 +351,7 @@ func Invoke(inv Invocation) int {
 		// move aside this file before we run the compiled version, in case the
 		// compiled file screws things up.  Yes this doubles up with the above
 		// defer, that's ok.
-		moveMainToCache(inv.CacheDir, main, mainhash)
+		os.RemoveAll(main)
 	} else {
 		debug.Print("keeping mainfile")
 	}
@@ -517,16 +517,14 @@ func cachedMainfile(cachedir, hash string) string {
 // GenerateMainfile generates the mage mainfile at path.  Because go build's
 // cache cares about modtimes, we squirrel away our mainfiles in the cachedir
 // and move them back as needed.
-func GenerateMainfile(path, cachedir string, info *parse.PkgInfo) (hash string, _ error) {
+func GenerateMainfile(path, cachedir string, info *parse.PkgInfo) error {
 	debug.Println("Creating mainfile at", path)
-	mainfiles := filepath.Join(cachedir, mainfileSubdir)
-	if err := os.MkdirAll(mainfiles, 0700); err != nil {
-		return "", fmt.Errorf("failed to create path for mainfiles at %s: %v", mainfiles, err)
-	}
-	buf := &bytes.Buffer{}
-	hasher := sha1.New()
-	w := io.MultiWriter(buf, hasher)
 
+	f, err := os.Create(path)
+	if err != nil {
+		return fmt.Errorf("error creating generated mainfile: %v", err)
+	}
+	defer f.Close()
 	data := data{
 		Description: info.Description,
 		Funcs:       info.Funcs,
@@ -537,24 +535,13 @@ func GenerateMainfile(path, cachedir string, info *parse.PkgInfo) (hash string, 
 
 	data.DefaultError = info.DefaultIsError
 
-	if err := output.Execute(w, data); err != nil {
-		return "", fmt.Errorf("can't execute mainfile template: %v", err)
-	}
-
-	hash = fmt.Sprintf("%x", hasher.Sum(nil))
-	cachedMain := filepath.Join(mainfiles, hash)
-	if useExistingMain(cachedMain, path, hash) {
-		info, err := os.Stat(path)
-		if err != nil {
-			debug.Println("mainfile modtime:", info.ModTime())
-		}
-		return hash, nil
-	}
 	debug.Println("writing new file at", path)
-	if err := ioutil.WriteFile(path, buf.Bytes(), 0600); err != nil {
-		return "", fmt.Errorf("can't write mainfile: %v", err)
+	if err := output.Execute(f, data); err != nil {
+		return fmt.Errorf("can't execute mainfile template: %v", err)
 	}
-	return hash, nil
+	f.Close()
+	longAgo := time.Now().Add(-time.Hour * 24 * 365 * 100)
+	return os.Chtimes(path, longAgo, longAgo)
 }
 
 func useExistingMain(cachedMain, path, hash string) bool {
