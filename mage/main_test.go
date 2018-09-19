@@ -44,8 +44,64 @@ func testmain(m *testing.M) int {
 	if err := os.Setenv(mg.CacheEnv, dir); err != nil {
 		log.Fatal(err)
 	}
-	defer os.Unsetenv(mg.CacheEnv)
+	if err := os.Unsetenv(mg.VerboseEnv); err != nil {
+		log.Fatal(err)
+	}
+	if err := os.Unsetenv(mg.DebugEnv); err != nil {
+		log.Fatal(err)
+	}
+	if err := os.Unsetenv(mg.IgnoreDefaultEnv); err != nil {
+		log.Fatal(err)
+	}
 	return m.Run()
+}
+
+func TestTransitiveDepCache(t *testing.T) {
+	cache, err := outputDebug("go", "env", "gocache")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cache == "" {
+		t.Skip("skipping gocache tests on go version without cache")
+	}
+	// Test that if we change a transitive dep, that we recompile
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	inv := Invocation{
+		Stderr: stderr,
+		Stdout: stdout,
+		Dir:    "testdata/transitiveDeps",
+		Args:   []string{"Run"},
+	}
+	code := Invoke(inv)
+	if code != 0 {
+		t.Fatalf("got code %v, err: %s", code, stderr)
+	}
+	expected := "woof\n"
+	if actual := stdout.String(); actual != expected {
+		t.Fatalf("expected %q but got %q", expected, actual)
+	}
+	// ok, so baseline, the generated and cached binary should do "woof"
+	// now change out the transitive dependency that does the output
+	// so that it produces different output.
+	if err := os.Rename("testdata/transitiveDeps/dep/dog.go", "testdata/transitiveDeps/dep/dog.notgo"); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Rename("testdata/transitiveDeps/dep/dog.notgo", "testdata/transitiveDeps/dep/dog.go")
+	if err := os.Rename("testdata/transitiveDeps/dep/cat.notgo", "testdata/transitiveDeps/dep/cat.go"); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Rename("testdata/transitiveDeps/dep/cat.go", "testdata/transitiveDeps/dep/cat.notgo")
+	stderr.Reset()
+	stdout.Reset()
+	code = Invoke(inv)
+	if code != 0 {
+		t.Fatalf("got code %v, err: %s", code, stderr)
+	}
+	expected = "meow\n"
+	if actual := stdout.String(); actual != expected {
+		t.Fatalf("expected %q but got %q", expected, actual)
+	}
 }
 
 func TestListMagefilesMain(t *testing.T) {
@@ -708,18 +764,33 @@ func TestClean(t *testing.T) {
 	if cmd != Clean {
 		t.Errorf("Expected 'clean' command but got %v", cmd)
 	}
-	code = ParseAndRun(ioutil.Discard, ioutil.Discard, &bytes.Buffer{}, []string{"-clean"})
+	buf := &bytes.Buffer{}
+	code = ParseAndRun(ioutil.Discard, buf, &bytes.Buffer{}, []string{"-clean"})
 	if code != 0 {
-		t.Errorf("expected 0, but got %v", code)
+		t.Fatalf("expected 0, but got %v: %s", code, buf)
 	}
 
-	files, err = ioutil.ReadDir(mg.CacheDir())
+	infos, err := ioutil.ReadDir(mg.CacheDir())
 	if err != nil {
-		t.Error("issue reading file:", err)
+		t.Fatal(err)
 	}
 
-	if len(files) != 0 {
-		t.Errorf("expected '-clean' to remove files from CACHE_DIR, but still have %v", files)
+	var names []string
+	for _, i := range infos {
+		if !i.IsDir() {
+			names = append(names, i.Name())
+		}
+	}
+
+	if len(names) != 0 {
+		t.Errorf("expected '-clean' to remove files from CACHE_DIR, but still have %v", names)
+	}
+	infos, err = ioutil.ReadDir(filepath.Join(mg.CacheDir(), mainfileSubdir))
+	if err != nil {
+		t.Error("issue reading directory:", err)
+	}
+	if len(infos) > 0 {
+		t.Fatalf("%d files left in mainfile subdir", len(infos))
 	}
 }
 

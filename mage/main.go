@@ -46,7 +46,7 @@ var initOutput = template.Must(template.New("").Parse(mageTpl))
 const mainfile = "mage_output_file.go"
 const initFile = "magefile.go"
 
-var debug = log.New(ioutil.Discard, "DEBUG: ", 0)
+var debug = log.New(ioutil.Discard, "DEBUG: ", log.Ltime|log.Lmicroseconds)
 
 // set by ldflags when you "mage build"
 var (
@@ -130,6 +130,11 @@ func ParseAndRun(stdout, stderr io.Writer, stdin io.Reader, args []string) int {
 			log.Println("Error:", err)
 			return 1
 		}
+		if err := removeContents(filepath.Join(inv.CacheDir, mainfileSubdir)); err != nil {
+			log.Println("Error:", err)
+			return 1
+		}
+
 		log.Println(inv.CacheDir, "cleaned")
 		return 0
 	case CompileStatic:
@@ -148,7 +153,7 @@ func Parse(stderr, stdout io.Writer, args []string) (inv Invocation, cmd Command
 	fs := flag.FlagSet{}
 	fs.SetOutput(stdout)
 	fs.BoolVar(&inv.Force, "f", false, "force recreation of compiled magefile")
-	fs.BoolVar(&inv.Debug, "debug", mg.Debug(), "turn on debug messages (implies -keep)")
+	fs.BoolVar(&inv.Debug, "debug", mg.Debug(), "turn on debug messages")
 	fs.BoolVar(&inv.Verbose, "v", mg.Verbose(), "show verbose output when running mage targets")
 	fs.BoolVar(&inv.List, "l", false, "list mage targets in this directory")
 	fs.BoolVar(&inv.Help, "h", false, "show this help")
@@ -184,7 +189,7 @@ Commands:
 Options:
   -d <string> 
           run magefiles in the given directory (default ".")
-  -debug  turn on debug messages (implies -keep)
+  -debug  turn on debug messages
   -h      show description of a target
   -f      force recreation of compiled magefile
   -keep   keep intermediate mage files around after running
@@ -234,7 +239,6 @@ Options:
 
 	if inv.Debug {
 		debug.SetOutput(stderr)
-		inv.Keep = true
 	}
 
 	inv.CacheDir = mg.CacheDir()
@@ -286,20 +290,32 @@ func Invoke(inv Invocation) int {
 	}
 	debug.Println("output exe is ", exePath)
 
-	_, err = os.Stat(exePath)
-	switch {
-	case err == nil:
-		if inv.Force {
-			debug.Println("ignoring existing executable")
-		} else {
-			debug.Println("Running existing exe")
-			return RunCompiled(inv, exePath)
+	useCache := false
+	if s, err := outputDebug(inv.GoCmd, "env", "GOCACHE"); err == nil {
+		// if GOCACHE exists, always rebuild, so we catch transitive
+		// dependencies that have changed.
+		if s != "" {
+			debug.Println("build cache exists, will ignore any compiled binary")
+			useCache = true
 		}
-	case os.IsNotExist(err):
-		debug.Println("no existing exe, creating new")
-	default:
-		debug.Printf("error reading existing exe at %v: %v", exePath, err)
-		debug.Println("creating new exe")
+	}
+
+	if !useCache {
+		_, err = os.Stat(exePath)
+		switch {
+		case err == nil:
+			if inv.Force {
+				debug.Println("ignoring existing executable")
+			} else {
+				debug.Println("Running existing exe")
+				return RunCompiled(inv, exePath)
+			}
+		case os.IsNotExist(err):
+			debug.Println("no existing exe, creating new")
+		default:
+			debug.Printf("error reading existing exe at %v: %v", exePath, err)
+			debug.Println("creating new exe")
+		}
 	}
 
 	// parse wants dir + filenames... arg
@@ -318,17 +334,13 @@ func Invoke(inv Invocation) int {
 	}
 
 	main := filepath.Join(inv.Dir, mainfile)
-	if err := GenerateMainfile(main, info); err != nil {
+	mainhash, err := GenerateMainfile(main, inv.CacheDir, info)
+	if err != nil {
 		log.Println("Error:", err)
 		return 1
 	}
 	if !inv.Keep {
-		defer func() {
-			debug.Println("removing main file")
-			if err := os.Remove(main); err != nil && !os.IsNotExist(err) {
-				debug.Println("error removing main file: ", err)
-			}
-		}()
+		defer moveMainToCache(inv.CacheDir, main, mainhash)
 	}
 	files = append(files, main)
 	if err := Compile(inv.Dir, inv.GoCmd, exePath, files, inv.Debug, inv.Stderr, inv.Stdout); err != nil {
@@ -336,12 +348,10 @@ func Invoke(inv Invocation) int {
 		return 1
 	}
 	if !inv.Keep {
-		// remove this file before we run the compiled version, in case the
+		// move aside this file before we run the compiled version, in case the
 		// compiled file screws things up.  Yes this doubles up with the above
 		// defer, that's ok.
-		if err := os.Remove(main); err != nil && !os.IsNotExist(err) {
-			debug.Println("error removing main file: ", err)
-		}
+		moveMainToCache(inv.CacheDir, main, mainhash)
 	} else {
 		debug.Print("keeping mainfile")
 	}
@@ -351,6 +361,13 @@ func Invoke(inv Invocation) int {
 	}
 
 	return RunCompiled(inv, exePath)
+}
+
+func moveMainToCache(cachedir, main, hash string) {
+	debug.Println("moving main file to cache:", cachedMainfile(cachedir, hash))
+	if err := os.Rename(main, cachedMainfile(cachedir, hash)); err != nil && !os.IsNotExist(err) {
+		debug.Println("error caching main file: ", err)
+	}
 }
 
 type data struct {
@@ -378,6 +395,10 @@ func goVersion(gocmd string) (string, error) {
 
 // Magefiles returns the list of magefiles in dir.
 func Magefiles(magePath, goCmd string, stderr io.Writer, isDebug bool) ([]string, error) {
+	start := time.Now()
+	defer func() {
+		debug.Println("time to scan for Magefiles:", time.Since(start))
+	}()
 	fail := func(err error) ([]string, error) {
 		return nil, err
 	}
@@ -441,23 +462,22 @@ func Compile(magePath, goCmd, compileTo string, gofiles []string, isDebug bool, 
 	for i := range gofiles {
 		gofiles[i] = filepath.Base(gofiles[i])
 	}
-	debug.Printf("running %s build -o %s %s", goCmd, compileTo, strings.Join(gofiles, ", "))
+	debug.Printf("running %s build -o %s %s", goCmd, compileTo, strings.Join(gofiles, " "))
 	c := exec.Command(goCmd, append([]string{"build", "-o", compileTo}, gofiles...)...)
 	c.Env = os.Environ()
 	c.Stderr = stderr
 	c.Stdout = stdout
 	c.Dir = magePath
+	start := time.Now()
 	err := c.Run()
+	debug.Println("time to compile Magefile:", time.Since(start))
 	if err != nil {
 		return errors.New("error compiling magefiles")
-	}
-	if _, err := os.Stat(compileTo); err != nil {
-		return errors.New("failed to find compiled magefile")
 	}
 	return nil
 }
 
-func runDebug(cmd string, args ...string) {
+func runDebug(cmd string, args ...string) error {
 	buf := &bytes.Buffer{}
 	errbuf := &bytes.Buffer{}
 	debug.Println("running", cmd, strings.Join(args, " "))
@@ -467,18 +487,45 @@ func runDebug(cmd string, args ...string) {
 	c.Stdout = buf
 	if err := c.Run(); err != nil {
 		debug.Print("error running '", cmd, strings.Join(args, " "), "': ", err, ": ", errbuf)
+		return err
 	}
 	debug.Println(buf)
+	return nil
 }
 
-// GenerateMainfile creates the mainfile at path with the info from
-func GenerateMainfile(path string, info *parse.PkgInfo) error {
-	debug.Println("Creating mainfile at", path)
-	f, err := os.Create(path)
-	if err != nil {
-		return fmt.Errorf("can't create mainfile: %v", err)
+func outputDebug(cmd string, args ...string) (string, error) {
+	buf := &bytes.Buffer{}
+	errbuf := &bytes.Buffer{}
+	debug.Println("running", cmd, strings.Join(args, " "))
+	c := exec.Command(cmd, args...)
+	c.Env = os.Environ()
+	c.Stderr = errbuf
+	c.Stdout = buf
+	if err := c.Run(); err != nil {
+		debug.Print("error running '", cmd, strings.Join(args, " "), "': ", err, ": ", errbuf)
+		return "", err
 	}
-	defer f.Close()
+	return strings.TrimSpace(buf.String()), nil
+}
+
+const mainfileSubdir = "mainfiles"
+
+func cachedMainfile(cachedir, hash string) string {
+	return filepath.Join(cachedir, mainfileSubdir, hash)
+}
+
+// GenerateMainfile generates the mage mainfile at path.  Because go build's
+// cache cares about modtimes, we squirrel away our mainfiles in the cachedir
+// and move them back as needed.
+func GenerateMainfile(path, cachedir string, info *parse.PkgInfo) (hash string, _ error) {
+	debug.Println("Creating mainfile at", path)
+	mainfiles := filepath.Join(cachedir, mainfileSubdir)
+	if err := os.MkdirAll(mainfiles, 0700); err != nil {
+		return "", fmt.Errorf("failed to create path for mainfiles at %s: %v", mainfiles, err)
+	}
+	buf := &bytes.Buffer{}
+	hasher := sha1.New()
+	w := io.MultiWriter(buf, hasher)
 
 	data := data{
 		Description: info.Description,
@@ -490,10 +537,63 @@ func GenerateMainfile(path string, info *parse.PkgInfo) error {
 
 	data.DefaultError = info.DefaultIsError
 
-	if err := output.Execute(f, data); err != nil {
-		return fmt.Errorf("can't execute mainfile template: %v", err)
+	if err := output.Execute(w, data); err != nil {
+		return "", fmt.Errorf("can't execute mainfile template: %v", err)
 	}
-	return nil
+
+	hash = fmt.Sprintf("%x", hasher.Sum(nil))
+	cachedMain := filepath.Join(mainfiles, hash)
+	if useExistingMain(cachedMain, path, hash) {
+		info, err := os.Stat(path)
+		if err != nil {
+			debug.Println("mainfile modtime:", info.ModTime())
+		}
+		return hash, nil
+	}
+	debug.Println("writing new file at", path)
+	if err := ioutil.WriteFile(path, buf.Bytes(), 0600); err != nil {
+		return "", fmt.Errorf("can't write mainfile: %v", err)
+	}
+	return hash, nil
+}
+
+func useExistingMain(cachedMain, path, hash string) bool {
+	err := os.Rename(cachedMain, path)
+	if err == nil {
+		debug.Println("using cached mainfile from cachedir")
+		return true
+	}
+	if os.IsNotExist(err) {
+		debug.Println("file does not exist at", cachedMain)
+	} else {
+		debug.Printf("error copying cached mainfile from %s to %s: %v", cachedMain, path, err)
+	}
+	// ok, no cached file, try to open the file at the target (happens if
+	// the user ran with -keep)
+	f, err := os.Open(path)
+	if os.IsNotExist(err) {
+		return false
+	}
+	if err != nil {
+		debug.Printf("error opening existing mainfile at %s: %v", path, err)
+		return false
+	}
+	defer f.Close()
+	debug.Println("mainfile already exists at", path)
+	existing := sha1.New()
+	_, err = io.Copy(existing, f)
+	if err != nil {
+		debug.Println("error hashing existing file:", err)
+		return false
+	}
+
+	if hash == fmt.Sprintf("%x", existing.Sum(nil)) {
+		// same contents on disk, use those
+		debug.Println("mainfile is the same as generated, using existing file")
+		return true
+	}
+	debug.Println("existing file has different contents")
+	return false
 }
 
 // ExeName reports the executable filename that this version of Mage would
@@ -571,6 +671,9 @@ func RunCompiled(inv Invocation, exePath string) int {
 	}
 	if inv.Help {
 		c.Env = append(c.Env, "MAGEFILE_HELP=1")
+	}
+	if inv.Debug {
+		c.Env = append(c.Env, "MAGEFILE_DEBUG=1")
 	}
 	if inv.Timeout > 0 {
 		c.Env = append(c.Env, fmt.Sprintf("MAGEFILE_TIMEOUT=%s", inv.Timeout.String()))
