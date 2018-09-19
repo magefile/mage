@@ -15,7 +15,7 @@ and above (possibly even lower versions, but they're not regularly tested).
 
 Install mage by running 
 
-```
+```plain
 go get -u -d github.com/magefile/mage
 cd $GOPATH/src/github.com/magefile/mage
 go run bootstrap.go
@@ -50,7 +50,7 @@ import whatever libraries you want.  Every library in the go ecosystem is a mage
 plugin.  Every tool you use with Go can be used with Magefiles.
 
 ## Usage
-```
+```plain
 mage [options] [target]
 
 Mage is a make-like command runner.  See https://magefile.org for full docs.
@@ -98,7 +98,7 @@ the mage execution runtime and the tasks compiled in such that it can be run on 
 without requiring installation of dependencies. To do so, pass the output path to the compile flag.
 like this:
 
-```
+```plain
 $ mage -compile ./static-output
 ```
 

@@ -7,7 +7,7 @@ Mage supports a makefile-style tree of dependencies using the helper library
 [github.com/magefile/mage/mg](https://godoc.org/github.com/magefile/mage/mg). To
 declare dependencies, pass any number of dependent functions of the following
 types:
-```
+```go
 func()
 func() error
 func(ctx context.Context)
@@ -62,7 +62,7 @@ func h() {
 
 Running `mage build` will produce the following output:
 
-```
+```plain
 h running
 g running
 f running

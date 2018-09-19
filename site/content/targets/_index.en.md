@@ -3,7 +3,7 @@ title = "Targets"
 weight = 10
 +++
 A target is any exported function that is one of the following types:
-```
+```go
 func()
 func() error 
 func(context.Context)
@@ -53,7 +53,7 @@ it to.
 
 Target aliases can be specified using the following notation:
 
-```
+```go
 var Aliases = map[string]interface{} {
   "i":     Install,
   "build": Install,
@@ -71,7 +71,7 @@ normal application.   To define a namespace in your magefile, simply define an
 exported named type of type `mg.Namespace`.  Then, every method on that type which
 matches the normal target signature becomes a target under that namespace.
 
-```
+```go
 import "github.com/magefile/mage/mg"
 
 type Build mg.Namespace
@@ -88,13 +88,13 @@ func (Build) Docs() {}
 To call a namespaced target, type it as `namespace:target`. For example, the
 above would be called by typing
 
-```
+```plain
 $ mage build:site
 ```
 
 Similarly, the help for the target will show how it may be called:
 
-```
+```plain
 $ mage -l
 
 build:docs    Builds the pdf docs.

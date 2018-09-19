@@ -57,6 +57,6 @@ the mage execution runtime and the tasks compiled in such that it can be run on 
 without requiring installation of dependencies. To do so, pass the output path to the compile flag.
 like this:
 
-```
+```plain
 $ mage -compile ./static-output
 ```

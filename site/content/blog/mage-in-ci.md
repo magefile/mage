@@ -20,16 +20,17 @@ mage targets in the current directory.
 
 This will download the mage source and install it (if you're using a gopath):
 
-```
+```plain
 go get -d github.com/magefile/mage
 go run $GOPATH/src/github.com/magefile/mage/bootstrap.go install
 ```
 
 If you're using go modules, you can do it with good old git clone:
 
-```
+```plain
 git clone git@github.com:magefile/mage
-go run ./mage/bootstrap.go install
+cd mage
+go run bootstrap.go install
 ```
 
 Note that in the second case, the binary will be copied to where go env GOPATH

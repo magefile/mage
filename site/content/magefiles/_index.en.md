@@ -70,7 +70,7 @@ func Build(ctx context.Context) {
 
 ```
 
-```
+```plain
 $ mage -l
 A comment on the package will be output when you list the targets of a
 magefile.
@@ -82,7 +82,7 @@ Targets:
 * default target
 ```
 
-```
+```plain
 $ mage -h target
 mage target:
 
