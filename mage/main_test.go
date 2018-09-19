@@ -56,6 +56,54 @@ func testmain(m *testing.M) int {
 	return m.Run()
 }
 
+func TestTransitiveDepCache(t *testing.T) {
+	cache, err := outputDebug("go", "env", "gocache")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cache == "" {
+		t.Skip("skipping gocache tests on go version without cache")
+	}
+	// Test that if we change a transitive dep, that we recompile
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	inv := Invocation{
+		Stderr: stderr,
+		Stdout: stdout,
+		Dir:    "testdata/transitiveDeps",
+		Args:   []string{"Run"},
+	}
+	code := Invoke(inv)
+	if code != 0 {
+		t.Fatalf("got code %v, err: %s", code, stderr)
+	}
+	expected := "woof\n"
+	if actual := stdout.String(); actual != expected {
+		t.Fatalf("expected %q but got %q", expected, actual)
+	}
+	// ok, so baseline, the generated and cached binary should do "woof"
+	// now change out the transitive dependency that does the output
+	// so that it produces different output.
+	if err := os.Rename("testdata/transitiveDeps/dep/dog.go", "testdata/transitiveDeps/dep/dog.notgo"); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Rename("testdata/transitiveDeps/dep/dog.notgo", "testdata/transitiveDeps/dep/dog.go")
+	if err := os.Rename("testdata/transitiveDeps/dep/cat.notgo", "testdata/transitiveDeps/dep/cat.go"); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Rename("testdata/transitiveDeps/dep/cat.go", "testdata/transitiveDeps/dep/cat.notgo")
+	stderr.Reset()
+	stdout.Reset()
+	code = Invoke(inv)
+	if code != 0 {
+		t.Fatalf("got code %v, err: %s", code, stderr)
+	}
+	expected = "meow\n"
+	if actual := stdout.String(); actual != expected {
+		t.Fatalf("expected %q but got %q", expected, actual)
+	}
+}
+
 func TestListMagefilesMain(t *testing.T) {
 	buf := &bytes.Buffer{}
 	files, err := Magefiles("testdata/mixed_main_files", "go", buf, false)
