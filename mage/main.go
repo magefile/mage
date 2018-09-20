@@ -414,7 +414,7 @@ func Magefiles(magePath, goCmd string, stderr io.Writer, isDebug bool) ([]string
 	cmd.Dir = magePath
 	b, err := cmd.Output()
 	if err != nil {
-		fail(fmt.Errorf("failed to list non-mage gofiles: %v", err))
+		return fail(fmt.Errorf("failed to list non-mage gofiles: %v", err))
 	}
 	list := strings.TrimSpace(string(b))
 	debug.Println("found non-mage files", list)
@@ -435,7 +435,7 @@ func Magefiles(magePath, goCmd string, stderr io.Writer, isDebug bool) ([]string
 	list = strings.TrimSpace(string(b))
 
 	if err != nil {
-		fail(fmt.Errorf("failed to list mage gofiles: %v", err))
+		return fail(fmt.Errorf("failed to list mage gofiles: %v", err))
 	}
 	files := []string{}
 	for _, f := range strings.Split(list, "||") {
