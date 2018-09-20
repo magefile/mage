@@ -102,7 +102,7 @@ func main() {
 	_ = handleError
 
 	log.SetFlags(0)
-	if os.Getenv("MAGEFILE_VERBOSE") == "" {
+	if verbose, _ := strconv.ParseBool(os.Getenv("MAGEFILE_VERBOSE")); !verbose {
 		log.SetOutput(ioutil.Discard)
 	}
 	logger := log.New(os.Stderr, "", 0)
@@ -163,8 +163,6 @@ func main() {
 				os.Exit(1)
 		}	
 	}
-	// to avoid unused import
-	_ = strconv.ParseBool
 	if len(os.Args) < 2 {
 	{{- if .Default}}
 		ignore, _ := strconv.ParseBool(os.Getenv("MAGEFILE_IGNOREDEFAULT"))

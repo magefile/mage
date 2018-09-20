@@ -432,11 +432,11 @@ func Magefiles(magePath, goCmd string, stderr io.Writer, isDebug bool) ([]string
 	}
 	cmd.Dir = magePath
 	b, err = cmd.Output()
-	list = strings.TrimSpace(string(b))
-
 	if err != nil {
 		return fail(fmt.Errorf("failed to list mage gofiles: %v", err))
 	}
+
+	list = strings.TrimSpace(string(b))
 	files := []string{}
 	for _, f := range strings.Split(list, "||") {
 		if f != "" && !exclude[f] {
