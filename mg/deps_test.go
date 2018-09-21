@@ -52,6 +52,28 @@ func TestDepsOfDeps(t *testing.T) {
 	}
 }
 
+func TestSerialDeps(t *testing.T) {
+	ch := make(chan string, 3)
+	// this->f->g->h
+	h := func() {
+		ch <- "h"
+	}
+	g := func() {
+		ch <- "g"
+	}
+	f := func() {
+		SerialDeps(g, h)
+		ch <- "f"
+	}
+	Deps(f)
+
+	res := <-ch + <-ch + <-ch
+
+	if res != "ghf" {
+		t.Fatal("expected g then h then f to run, but got " + res)
+	}
+}
+
 func TestDepError(t *testing.T) {
 	// TODO: this test is ugly and relies on implementation details. It should
 	// be recreated as a full-stack test.
