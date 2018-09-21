@@ -58,7 +58,7 @@ func SerialDeps(fns ...interface{}) {
 	types := checkFns(fns)
 	ctx := context.Background()
 	for i := range fns {
-		runDeps(ctx, types[i:i], fns[i:i])
+		runDeps(ctx, types[i:i+1], fns[i:i+1])
 	}
 }
 
@@ -68,7 +68,7 @@ func SerialDeps(fns ...interface{}) {
 func SerialCtxDeps(ctx context.Context, fns ...interface{}) {
 	types := checkFns(fns)
 	for i := range fns {
-		runDeps(ctx, types[i:i], fns[i:i])
+		runDeps(ctx, types[i:i+1], fns[i:i+1])
 	}
 }
 
