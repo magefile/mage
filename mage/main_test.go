@@ -750,6 +750,19 @@ func TestInvalidAlias(t *testing.T) {
 	}
 }
 
+func TestRunCompiledPrintsError(t *testing.T) {
+	stderr := &bytes.Buffer{}
+	logger := log.New(stderr, "", 0)
+	code := RunCompiled(Invocation{}, "thiswon'texist", logger)
+	if code != 1 {
+		t.Errorf("expected code 1 but got %v", code)
+	}
+
+	if strings.TrimSpace(stderr.String()) == "" {
+		t.Fatal("expected to get output to stderr when a run fails, but got nothing.")
+	}
+}
+
 func TestClean(t *testing.T) {
 	if err := os.RemoveAll(mg.CacheDir()); err != nil {
 		t.Error("error removing cache dir:", err)
