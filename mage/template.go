@@ -102,7 +102,8 @@ func main() {
 	_ = handleError
 
 	log.SetFlags(0)
-	if verbose, _ := strconv.ParseBool(os.Getenv("MAGEFILE_VERBOSE")); !verbose {
+	verbose, _ := strconv.ParseBool(os.Getenv("MAGEFILE_VERBOSE"))
+	if !verbose {
 		log.SetOutput(ioutil.Discard)
 	}
 	logger := log.New(os.Stderr, "", 0)
@@ -194,7 +195,7 @@ func main() {
 		switch strings.ToLower(target) {
 		{{range .Funcs }}
 		case "{{lower .TemplateName}}":
-			if os.Getenv("MAGEFILE_VERBOSE") != "" {
+			if verbose {
 				logger.Println("Running target:", "{{.TemplateName}}")
 			}
 			{{.TemplateString}}

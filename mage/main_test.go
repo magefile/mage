@@ -191,7 +191,19 @@ func TestVerboseEnv(t *testing.T) {
 	if inv.Verbose != true {
 		t.Fatalf("expected %t, but got %t ", expected, inv.Verbose)
 	}
+}
+func TestVerboseFalseEnv(t *testing.T) {
+	os.Setenv("MAGEFILE_VERBOSE", "0")
+	defer os.Unsetenv("MAGEFILE_VERBOSE")
+	stdout := &bytes.Buffer{}
+	code := ParseAndRun(ioutil.Discard, stdout, nil, []string{"-d", "testdata", "testverbose"})
+	if code != 0 {
+		t.Fatal("unexpected code", code)
+	}
 
+	if stdout.String() != "" {
+		t.Fatalf("expected no output, but got %s", stdout.String())
+	}
 }
 
 func TestList(t *testing.T) {
