@@ -22,14 +22,14 @@ func main() {
 	// magefiles.
 	list := func() error {
 		{{with .Description}}fmt.Println(` + "`{{.}}\n`" + `){{end}}
-		{{- $default := .Default}}
+		{{- $default := .DefaultFunc}}
 		w := tabwriter.NewWriter(os.Stdout, 0, 4, 4, ' ', 0)
 		fmt.Println("Targets:")
 		{{- range .Funcs}}
-		fmt.Fprintln(w, "  {{lowerfirst .TemplateName}}{{if eq .Name $default}}*{{end}}\t" + {{printf "%q" .Synopsis}})
+		fmt.Fprintln(w, "  {{lowerfirst .TemplateName}}{{if and (eq .Name $default.Name) (eq .Receiver $default.Receiver)}}*{{end}}\t" + {{printf "%q" .Synopsis}})
 		{{- end}}
 		err := w.Flush()
-		{{- if .Default}}
+		{{- if .DefaultFunc.Name}}
 		if err == nil {
 			fmt.Println("\n* default target")
 		}
@@ -107,7 +107,7 @@ func main() {
 		log.SetOutput(ioutil.Discard)
 	}
 	logger := log.New(os.Stderr, "", 0)
-	if os.Getenv("MAGEFILE_LIST") != "" {
+	if ok, _ := strconv.ParseBool(os.Getenv("MAGEFILE_LIST")); ok {
 		if err := list(); err != nil {
 			log.Println(err)
 			os.Exit(1)
@@ -137,7 +137,7 @@ func main() {
 		os.Exit(2)
 	}
 
-	if os.Getenv("MAGEFILE_HELP") != "" {
+	if help, _ := strconv.ParseBool(os.Getenv("MAGEFILE_HELP")); help {
 		if len(os.Args) < 2 {
 			logger.Println("no target specified")
 			os.Exit(1)
@@ -151,8 +151,9 @@ func main() {
 				{{end}}
 				var aliases []string
 				{{- $name := .Name -}}
+				{{- $recv := .Receiver -}}
 				{{range $alias, $func := $.Aliases}}
-				{{if eq $name $func}}aliases = append(aliases, "{{$alias}}"){{end -}}
+				{{if and (eq $name $func.Name) (eq $recv $func.Receiver)}}aliases = append(aliases, "{{$alias}}"){{end -}}
 				{{- end}}
 				if len(aliases) > 0 {
 					fmt.Printf("Aliases: %s\n\n", strings.Join(aliases, ", "))
@@ -165,7 +166,7 @@ func main() {
 		}	
 	}
 	if len(os.Args) < 2 {
-	{{- if .Default}}
+	{{- if .DefaultFunc.Name}}
 		ignore, _ := strconv.ParseBool(os.Getenv("MAGEFILE_IGNOREDEFAULT"))
 		if ignore {
 			if err := list(); err != nil {
@@ -189,7 +190,7 @@ func main() {
 		switch strings.ToLower(target) {
 		{{range $alias, $func := .Aliases}}
 		case "{{lower $alias}}":
-			target = "{{$func}}"
+			target = "{{with $func.Receiver}}{{.}}:{{end}}{{$func.Name}}"
 		{{- end}}
 		}
 		switch strings.ToLower(target) {

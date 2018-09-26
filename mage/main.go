@@ -377,7 +377,7 @@ type data struct {
 	DefaultError bool
 	Default      string
 	DefaultFunc  parse.Function
-	Aliases      map[string]string
+	Aliases      map[string]parse.Function
 }
 
 func goVersion(gocmd string) (string, error) {
@@ -529,12 +529,9 @@ func GenerateMainfile(path, cachedir string, info *parse.PkgInfo) error {
 	data := data{
 		Description: info.Description,
 		Funcs:       info.Funcs,
-		Default:     info.DefaultName,
 		DefaultFunc: info.DefaultFunc,
 		Aliases:     info.Aliases,
 	}
-
-	data.DefaultError = info.DefaultIsError
 
 	debug.Println("writing new file at", path)
 	if err := output.Execute(f, data); err != nil {

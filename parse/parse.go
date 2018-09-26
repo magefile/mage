@@ -24,13 +24,10 @@ func EnableDebug() {
 // PkgInfo contains inforamtion about a package of files according to mage's
 // parsing rules.
 type PkgInfo struct {
-	Description      string
-	Funcs            []Function
-	DefaultIsError   bool
-	DefaultIsContext bool
-	DefaultName      string
-	DefaultFunc      Function
-	Aliases          map[string]string
+	Description string
+	Funcs       []Function
+	DefaultFunc Function
+	Aliases     map[string]Function
 }
 
 // Function represented a job function from a mage file
@@ -253,15 +250,20 @@ func setDefault(p *doc.Package, pi *PkgInfo) {
 			if len(spec.Values) != 1 {
 				log.Println("warning: default declaration has multiple values")
 			}
-			id, ok := spec.Values[0].(*ast.Ident)
-			if !ok {
-				log.Println("warning: default declaration is not a function name")
+
+			var name string
+			var receiver string
+			switch v := spec.Values[0].(type) {
+			case *ast.Ident:
+				name = v.Name
+			case *ast.SelectorExpr:
+				name = v.Sel.Name
+				receiver = fmt.Sprintf("%s", v.X)
+			default:
+				log.Printf("warning: target for Default %s is not a function", spec.Values[0])
 			}
 			for _, f := range pi.Funcs {
-				if f.Name == id.Name {
-					pi.DefaultName = f.Name
-					pi.DefaultIsError = f.IsError
-					pi.DefaultIsContext = f.IsContext
+				if f.Name == name && f.Receiver == receiver {
 					pi.DefaultFunc = f
 					return
 				}
@@ -290,7 +292,7 @@ func setAliases(p *doc.Package, pi *PkgInfo) {
 				log.Println("warning: aliases declaration is not a map")
 				return
 			}
-			pi.Aliases = make(map[string]string)
+			pi.Aliases = map[string]Function{}
 			for _, elem := range comp.Elts {
 				kv, ok := elem.(*ast.KeyValueExpr)
 				if !ok {
@@ -302,20 +304,30 @@ func setAliases(p *doc.Package, pi *PkgInfo) {
 					log.Println("warning: alias is not a string")
 					return
 				}
-				v, ok := kv.Value.(*ast.Ident)
-				if !ok {
-					log.Println("warning: alias target is not a function")
-					return
+
+				var name string
+				var receiver string
+				switch v := kv.Value.(type) {
+				case *ast.Ident:
+					name = v.Name
+				case *ast.SelectorExpr:
+					name = v.Sel.Name
+					receiver = fmt.Sprintf("%s", v.X)
+				default:
+					log.Printf("warning: target for alias %s is not a function", k.Value)
 				}
 				alias := strings.Trim(k.Value, "\"")
 				valid := false
 				for _, f := range pi.Funcs {
-					valid = valid || f.Name == v.Name
+					if f.Name == name && f.Receiver == receiver {
+						pi.Aliases[alias] = f
+						valid = true
+						break
+					}
 				}
 				if !valid {
 					log.Printf("warning: alias declaration (%s) does not reference a mage target", alias)
 				}
-				pi.Aliases[alias] = v.Name
 			}
 			return
 		}

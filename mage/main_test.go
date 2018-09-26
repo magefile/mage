@@ -740,11 +740,11 @@ func TestInvalidAlias(t *testing.T) {
 		Args:   []string{"co"},
 	}
 	code := Invoke(inv)
-	if code != 1 {
+	if code != 2 {
 		t.Errorf("expected to exit with code 1, but got %v", code)
 	}
 	actual := stderr.String()
-	expected := "Unknown target: \"co\"\n"
+	expected := "Unknown target specified: co\n"
 	if actual != expected {
 		t.Fatalf("expected %q, but got %q", expected, actual)
 	}
@@ -929,6 +929,23 @@ func TestNamespace(t *testing.T) {
 		Stderr: ioutil.Discard,
 		Stdout: stdout,
 		Args:   []string{"ns:error"},
+	}
+	code := Invoke(inv)
+	if code != 0 {
+		t.Fatalf("expected 0, but got %v", code)
+	}
+	expected := "hi!\n"
+	if stdout.String() != expected {
+		t.Fatalf("expected %q, but got %q", expected, stdout.String())
+	}
+}
+
+func TestNamespaceDefault(t *testing.T) {
+	stdout := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:    "./testdata/namespaces",
+		Stderr: ioutil.Discard,
+		Stdout: stdout,
 	}
 	code := Invoke(inv)
 	if code != 0 {
