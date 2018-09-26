@@ -137,7 +137,7 @@ func main() {
 		os.Exit(2)
 	}
 
-	if os.Getenv("MAGEFILE_HELP") != "" {
+	if help, _ := strconv.ParseBool(os.Getenv("MAGEFILE_HELP")); help {
 		if len(os.Args) < 2 {
 			logger.Println("no target specified")
 			os.Exit(1)
@@ -151,8 +151,9 @@ func main() {
 				{{end}}
 				var aliases []string
 				{{- $name := .Name -}}
+				{{- $recv := .Receiver -}}
 				{{range $alias, $func := $.Aliases}}
-				{{if eq $name $func}}aliases = append(aliases, "{{$alias}}"){{end -}}
+				{{if and (eq $name $func.Name) (eq $recv $func.Receiver)}}aliases = append(aliases, "{{$alias}}"){{end -}}
 				{{- end}}
 				if len(aliases) > 0 {
 					fmt.Printf("Aliases: %s\n\n", strings.Join(aliases, ", "))
@@ -189,7 +190,7 @@ func main() {
 		switch strings.ToLower(target) {
 		{{range $alias, $func := .Aliases}}
 		case "{{lower $alias}}":
-			target = "{{$func}}"
+			target = "{{with $func.Receiver}}{{.}}:{{end}}{{$func.Name}}"
 		{{- end}}
 		}
 		switch strings.ToLower(target) {

@@ -9,6 +9,8 @@ import (
 	"github.com/magefile/mage/mg"
 )
 
+var Default = NS.Bare
+
 func TestNamespaceDep() {
 	mg.Deps(NS.Error, NS.Bare, NS.BareCtx, NS.CtxErr)
 }

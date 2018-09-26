@@ -740,11 +740,11 @@ func TestInvalidAlias(t *testing.T) {
 		Args:   []string{"co"},
 	}
 	code := Invoke(inv)
-	if code != 1 {
+	if code != 2 {
 		t.Errorf("expected to exit with code 1, but got %v", code)
 	}
 	actual := stderr.String()
-	expected := "Unknown target: \"co\"\n"
+	expected := "Unknown target specified: co\n"
 	if actual != expected {
 		t.Fatalf("expected %q, but got %q", expected, actual)
 	}

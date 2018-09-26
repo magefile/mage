@@ -377,7 +377,7 @@ type data struct {
 	DefaultError bool
 	Default      string
 	DefaultFunc  parse.Function
-	Aliases      map[string]string
+	Aliases      map[string]parse.Function
 }
 
 func goVersion(gocmd string) (string, error) {
