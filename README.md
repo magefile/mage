@@ -1,3 +1,4 @@
+[![Built with Mage](https://magefile.org/badge.svg)](https://magefile.org)
 [![Build Status](https://travis-ci.org/magefile/mage.svg?branch=master)](https://travis-ci.org/magefile/mage) [![Build status](https://ci.appveyor.com/api/projects/status/n6h146y79xgxkidl/branch/master?svg=true)](https://ci.appveyor.com/project/natefinch/mage/branch/master)
 
 <p align="center"><img src="https://user-images.githubusercontent.com/3185864/32058716-5ee9b512-ba38-11e7-978a-287eb2a62743.png"/></p>
