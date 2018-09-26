@@ -22,14 +22,14 @@ func main() {
 	// magefiles.
 	list := func() error {
 		{{with .Description}}fmt.Println(` + "`{{.}}\n`" + `){{end}}
-		{{- $default := .Default}}
+		{{- $default := .DefaultFunc}}
 		w := tabwriter.NewWriter(os.Stdout, 0, 4, 4, ' ', 0)
 		fmt.Println("Targets:")
 		{{- range .Funcs}}
-		fmt.Fprintln(w, "  {{lowerfirst .TemplateName}}{{if eq .Name $default}}*{{end}}\t" + {{printf "%q" .Synopsis}})
+		fmt.Fprintln(w, "  {{lowerfirst .TemplateName}}{{if and (eq .Name $default.Name) (eq .Receiver $default.Receiver)}}*{{end}}\t" + {{printf "%q" .Synopsis}})
 		{{- end}}
 		err := w.Flush()
-		{{- if .Default}}
+		{{- if .DefaultFunc.Name}}
 		if err == nil {
 			fmt.Println("\n* default target")
 		}
@@ -107,7 +107,7 @@ func main() {
 		log.SetOutput(ioutil.Discard)
 	}
 	logger := log.New(os.Stderr, "", 0)
-	if os.Getenv("MAGEFILE_LIST") != "" {
+	if ok, _ := strconv.ParseBool(os.Getenv("MAGEFILE_LIST")); ok {
 		if err := list(); err != nil {
 			log.Println(err)
 			os.Exit(1)
@@ -166,7 +166,7 @@ func main() {
 		}	
 	}
 	if len(os.Args) < 2 {
-	{{- if .Default}}
+	{{- if .DefaultFunc.Name}}
 		ignore, _ := strconv.ParseBool(os.Getenv("MAGEFILE_IGNOREDEFAULT"))
 		if ignore {
 			if err := list(); err != nil {

@@ -939,3 +939,20 @@ func TestNamespace(t *testing.T) {
 		t.Fatalf("expected %q, but got %q", expected, stdout.String())
 	}
 }
+
+func TestNamespaceDefault(t *testing.T) {
+	stdout := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:    "./testdata/namespaces",
+		Stderr: ioutil.Discard,
+		Stdout: stdout,
+	}
+	code := Invoke(inv)
+	if code != 0 {
+		t.Fatalf("expected 0, but got %v", code)
+	}
+	expected := "hi!\n"
+	if stdout.String() != expected {
+		t.Fatalf("expected %q, but got %q", expected, stdout.String())
+	}
+}

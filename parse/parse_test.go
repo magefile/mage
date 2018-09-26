@@ -50,12 +50,12 @@ func TestParse(t *testing.T) {
 	}
 
 	// DefaultIsError
-	if info.DefaultIsError != true {
+	if info.DefaultFunc.IsError != true {
 		t.Fatalf("expected DefaultIsError to be true")
 	}
 
 	// DefaultName
-	if info.DefaultName != "ReturnsNilError" {
+	if info.DefaultFunc.Name != "ReturnsNilError" {
 		t.Fatalf("expected DefaultName to be ReturnsNilError")
 	}
 

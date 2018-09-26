@@ -24,13 +24,10 @@ func EnableDebug() {
 // PkgInfo contains inforamtion about a package of files according to mage's
 // parsing rules.
 type PkgInfo struct {
-	Description      string
-	Funcs            []Function
-	DefaultIsError   bool
-	DefaultIsContext bool
-	DefaultName      string
-	DefaultFunc      Function
-	Aliases          map[string]Function
+	Description string
+	Funcs       []Function
+	DefaultFunc Function
+	Aliases     map[string]Function
 }
 
 // Function represented a job function from a mage file
@@ -253,15 +250,20 @@ func setDefault(p *doc.Package, pi *PkgInfo) {
 			if len(spec.Values) != 1 {
 				log.Println("warning: default declaration has multiple values")
 			}
-			id, ok := spec.Values[0].(*ast.Ident)
-			if !ok {
-				log.Println("warning: default declaration is not a function name")
+
+			var name string
+			var receiver string
+			switch v := spec.Values[0].(type) {
+			case *ast.Ident:
+				name = v.Name
+			case *ast.SelectorExpr:
+				name = v.Sel.Name
+				receiver = fmt.Sprintf("%s", v.X)
+			default:
+				log.Printf("warning: target for Default %s is not a function", spec.Values[0])
 			}
 			for _, f := range pi.Funcs {
-				if f.Name == id.Name {
-					pi.DefaultName = f.Name
-					pi.DefaultIsError = f.IsError
-					pi.DefaultIsContext = f.IsContext
+				if f.Name == name && f.Receiver == receiver {
 					pi.DefaultFunc = f
 					return
 				}
