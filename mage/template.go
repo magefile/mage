@@ -15,24 +15,32 @@ import (
 	"strings"
 	"text/tabwriter"
 	"time"
+	{{range .Imports}}"{{.Path}}"
+	{{end}}
 )
 
 func main() {
 	// These functions are local variables to avoid name conflicts with 
 	// magefiles.
 	list := func() error {
-		{{with .Description}}fmt.Println(` + "`{{.}}\n`" + `){{end}}
+		{{with .Description}}fmt.Println(` + "`{{.}}\n`" + `)
+		{{- end}}
 		{{- $default := .DefaultFunc}}
 		w := tabwriter.NewWriter(os.Stdout, 0, 4, 4, ' ', 0)
 		fmt.Println("Targets:")
 		{{- range .Funcs}}
-		fmt.Fprintln(w, "  {{lowerfirst .TemplateName}}{{if and (eq .Name $default.Name) (eq .Receiver $default.Receiver)}}*{{end}}\t" + {{printf "%q" .Synopsis}})
+			fmt.Fprintln(w, "  {{.TargetName}}{{if and (eq .Name $default.Name) (eq .Receiver $default.Receiver)}}*{{end}}\t" + {{printf "%q" .Synopsis}})
+		{{- end}}
+		{{- range .Imports}}{{$imp := .}}
+			{{- range .Info.Funcs}}
+			fmt.Fprintln(w, "  {{.TargetName}}{{if and (eq .Name $default.Name) (eq .Receiver $default.Receiver)}}*{{end}}\t" + {{printf "%q" .Synopsis}})
+			{{end}}
 		{{- end}}
 		err := w.Flush()
 		{{- if .DefaultFunc.Name}}
-		if err == nil {
-			fmt.Println("\n* default target")
-		}
+			if err == nil {
+				fmt.Println("\n* default target")
+			}
 		{{- end}}
 		return err
 	}
@@ -118,7 +126,14 @@ func main() {
 	targets := map[string]bool {
 		{{range $alias, $funci := .Aliases}}"{{lower $alias}}": true,
 		{{end}}
-		{{range .Funcs}}"{{lower .TemplateName}}": true,
+		{{range .Funcs}}"{{.TargetName}}": true,
+		{{end}}
+		{{range .Imports}}
+			{{$imp := .}}
+			{{range $alias, $funci := .Info.Aliases}}"{{if ne $imp.Alias "."}}{{lower $imp.Alias}}:{{end}}{{lower $alias}}": true,
+			{{end}}
+			{{range .Info.Funcs}}"{{.TargetName}}": true,
+			{{end}}
 		{{end}}
 	}
 
@@ -143,8 +158,8 @@ func main() {
 			os.Exit(1)
 		}
 		switch strings.ToLower(os.Args[1]) {
-			{{range .Funcs}}case "{{lower .TemplateName}}":
-				fmt.Print("mage {{lower .TemplateName}}:\n\n")
+			{{range .Funcs}}case "{{lower .TargetName}}":
+				fmt.Print("mage {{lower .TargetName}}:\n\n")
 				{{if ne .Comment "" -}}
 				fmt.Println({{printf "%q" .Comment}})
 				fmt.Println()
@@ -175,7 +190,7 @@ func main() {
 			}
 			return	
 		}
-		{{.DefaultFunc.TemplateString}}
+		{{.DefaultFunc.ExecCode}}
 		handleError(logger, err)
 		return
 	{{- else}}
@@ -189,18 +204,29 @@ func main() {
 	for _, target := range os.Args[1:] {
 		switch strings.ToLower(target) {
 		{{range $alias, $func := .Aliases}}
-		case "{{lower $alias}}":
-			target = "{{with $func.Receiver}}{{.}}:{{end}}{{$func.Name}}"
+			case "{{lower $alias}}":
+				target = "{{$func.TargetName}}"
 		{{- end}}
 		}
 		switch strings.ToLower(target) {
 		{{range .Funcs }}
-		case "{{lower .TemplateName}}":
-			if verbose {
-				logger.Println("Running target:", "{{.TemplateName}}")
-			}
-			{{.TemplateString}}
-			handleError(logger, err)
+			case "{{.TargetName}}":
+				if verbose {
+					logger.Println("Running target:", "{{.TargetName}}")
+				}
+				{{.ExecCode}}
+				handleError(logger, err)
+		{{- end}}
+		{{range .Imports}}
+		{{$imp := .}}
+			{{range .Info.Funcs }}
+				case "{{.TargetName}}":
+					if verbose {
+						logger.Println("Running target:", "{{.TargetName}}")
+					}
+					{{.ExecCode}}
+					handleError(logger, err)
+			{{- end}}
 		{{- end}}
 		default:
 			// should be impossible since we check this above.

@@ -19,10 +19,6 @@ import (
 	"github.com/magefile/mage/sh"
 )
 
-var Aliases = map[string]interface{}{
-	"foo": Foo.Build,
-}
-
 // Runs "go install" for mage.  This generates the version info the binary.
 func Install() error {
 	name := "mage"
@@ -101,10 +97,4 @@ func tag() string {
 func hash() string {
 	hash, _ := sh.Output("git", "rev-parse", "--short", "HEAD")
 	return hash
-}
-
-type Foo mg.Namespace
-
-func (Foo) Build() {
-
 }

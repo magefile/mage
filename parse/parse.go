@@ -1,6 +1,7 @@
 package parse
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"go/ast"
@@ -10,6 +11,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"os/exec"
 	"strings"
 	"time"
 )
@@ -28,10 +30,13 @@ type PkgInfo struct {
 	Funcs       []Function
 	DefaultFunc Function
 	Aliases     map[string]Function
+	Imports     map[string]string
 }
 
 // Function represented a job function from a mage file
 type Function struct {
+	PkgAlias  string
+	Package   string
 	Name      string
 	Receiver  string
 	IsError   bool
@@ -40,58 +45,75 @@ type Function struct {
 	Comment   string
 }
 
-// TemplateName returns the invocation name, supporting namespaced functions.
-func (f Function) TemplateName() string {
-	if f.Receiver != "" {
-		return strings.ToLower(fmt.Sprintf("%s:%s", f.Receiver, f.Name))
-	}
+// TargetName returns the name of the target as it should appear when used from
+// the mage cli.  It is always lowercase.
+func (f Function) TargetName() string {
+	var names []string
+	pkg := f.PkgAlias
 
-	return f.Name
+	// package alias of "." means use it like a dot import, i.e. don't namespace
+	// with the package alias name.
+	if pkg == "." {
+		pkg = ""
+	}
+	for _, s := range []string{pkg, f.Receiver, f.Name} {
+		if s != "" {
+			names = append(names, s)
+		}
+	}
+	return strings.ToLower(strings.Join(names, ":"))
 }
 
-// TemplateString returns code for the template switch to run the target.
+// ExecCode returns code for the template switch to run the target.
 // It wraps each target call to match the func(context.Context) error that
 // runTarget requires.
-func (f Function) TemplateString() string {
+func (f Function) ExecCode() (string, error) {
 	name := f.Name
 	if f.Receiver != "" {
-		name = fmt.Sprintf("%s{}.%s", f.Receiver, f.Name)
+		name = f.Receiver + "{}." + name
 	}
+	if f.Package != "" {
+		name = f.Package + "." + name
+	}
+
 	if f.IsContext && f.IsError {
-		out := `wrapFn := func(ctx context.Context) error {
+		out := `
+			wrapFn := func(ctx context.Context) error {
 				return %s(ctx)
 			}
-			err := runTarget(wrapFn)`
-		return fmt.Sprintf(out, name)
+			err := runTarget(wrapFn)`[1:]
+		return fmt.Sprintf(out, name), nil
 	}
 	if f.IsContext && !f.IsError {
-		out := `wrapFn := func(ctx context.Context) error {
+		out := `
+			wrapFn := func(ctx context.Context) error {
 				%s(ctx)
 				return nil
 			}
-			err := runTarget(wrapFn)`
-		return fmt.Sprintf(out, name)
+			err := runTarget(wrapFn)`[1:]
+		return fmt.Sprintf(out, name), nil
 	}
 	if !f.IsContext && f.IsError {
-		out := `wrapFn := func(ctx context.Context) error {
+		out := `
+			wrapFn := func(ctx context.Context) error {
 				return %s()
 			}
-			err := runTarget(wrapFn)`
-		return fmt.Sprintf(out, name)
+			err := runTarget(wrapFn)`[1:]
+		return fmt.Sprintf(out, name), nil
 	}
 	if !f.IsContext && !f.IsError {
-		out := `wrapFn := func(ctx context.Context) error {
+		out := `
+			wrapFn := func(ctx context.Context) error {
 				%s()
 				return nil
 			}
-			err := runTarget(wrapFn)`
-		return fmt.Sprintf(out, name)
+			err := runTarget(wrapFn)`[1:]
+		return fmt.Sprintf(out, name), nil
 	}
-	return `fmt.Printf("Error formatting job code\n")
-	os.Exit(1)`
+	return "", fmt.Errorf("Error formatting ExecCode code for %#v", f)
 }
 
-// Package parses a package
+// Package parses a package.  If files is non-empty, it will only parse the files given.
 func Package(path string, files []string) (*PkgInfo, error) {
 	start := time.Now()
 	defer func() {
@@ -176,6 +198,9 @@ typeloop:
 
 	setDefault(p, pi)
 	setAliases(p, pi)
+	if err := setImports(p, pi); err != nil {
+		return nil, err
+	}
 
 	return pi, nil
 }
@@ -273,6 +298,77 @@ func setDefault(p *doc.Package, pi *PkgInfo) {
 	}
 }
 
+func setImports(p *doc.Package, pi *PkgInfo) error {
+	pi.Imports = map[string]string{}
+	for _, v := range p.Vars {
+		for x, name := range v.Names {
+			if name != "MageImports" {
+				continue
+			}
+			spec := v.Decl.Specs[x].(*ast.ValueSpec)
+			if len(spec.Values) != 1 {
+				return errors.New("MageImports declaration has multiple values")
+			}
+			v, ok := spec.Values[0].(*ast.CompositeLit)
+			if !ok {
+				return errors.New("MageImports must be a composite literal map")
+			}
+			t, ok := v.Type.(*ast.MapType)
+			if !ok {
+				return errors.New("MageImports is not a map")
+			}
+			k, ok := t.Key.(*ast.Ident)
+			if !ok || k.Name != "string" {
+				return errors.New("MageImports must be a map[string]string")
+			}
+			val, ok := t.Value.(*ast.Ident)
+			if !ok || val.Name != "string" {
+				return errors.New("MageImports must be a map[string]string")
+			}
+
+			for _, e := range v.Elts {
+				kv, ok := e.(*ast.KeyValueExpr)
+				if !ok {
+					return errors.New(`elements of MageImports must be "name" : "importpath"`)
+				}
+				k, ok := kv.Key.(*ast.BasicLit)
+				if !ok {
+					return errors.New(`elements of MageImports must be "name" : "importpath"`)
+				}
+				v, ok := kv.Value.(*ast.BasicLit)
+				if !ok {
+					return errors.New(`elements of MageImports must be "name" : "importpath"`)
+				}
+				if !strings.HasPrefix(k.Value, `"`) || !strings.HasSuffix(k.Value, `"`) {
+					return errors.New(`elements of MageImports must be "name" : "importpath"`)
+				}
+				if !strings.HasPrefix(v.Value, `"`) || !strings.HasSuffix(v.Value, `"`) {
+					return errors.New(`elements of MageImports must be "name" : "importpath"`)
+				}
+				alias := strings.Trim(k.Value, `"`)
+				path := strings.Trim(v.Value, `"`)
+				pi.Imports[alias] = path
+			}
+		}
+	}
+	return nil
+}
+
+func outputDebug(cmd string, args ...string) (string, error) {
+	buf := &bytes.Buffer{}
+	errbuf := &bytes.Buffer{}
+	debug.Println("running", cmd, strings.Join(args, " "))
+	c := exec.Command(cmd, args...)
+	c.Env = os.Environ()
+	c.Stderr = errbuf
+	c.Stdout = buf
+	if err := c.Run(); err != nil {
+		debug.Print("error running '", cmd, strings.Join(args, " "), "': ", err, ": ", errbuf)
+		return "", err
+	}
+	return strings.TrimSpace(buf.String()), nil
+}
+
 func setAliases(p *doc.Package, pi *PkgInfo) {
 	for _, v := range p.Vars {
 		for x, name := range v.Names {
@@ -336,13 +432,16 @@ func setAliases(p *doc.Package, pi *PkgInfo) {
 
 // getPackage returns the non-test package at the given path.
 func getPackage(path string, files []string, fset *token.FileSet) (*ast.Package, error) {
-	fm := make(map[string]bool, len(files))
-	for _, f := range files {
-		fm[f] = true
-	}
+	var filter func(f os.FileInfo) bool
+	if len(files) > 0 {
+		fm := make(map[string]bool, len(files))
+		for _, f := range files {
+			fm[f] = true
+		}
 
-	filter := func(f os.FileInfo) bool {
-		return fm[f.Name()]
+		filter = func(f os.FileInfo) bool {
+			return fm[f.Name()]
+		}
 	}
 
 	pkgs, err := parser.ParseDir(fset, path, filter, parser.ParseComments)
