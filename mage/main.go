@@ -334,10 +334,18 @@ func Invoke(inv Invocation) int {
 		return 1
 	}
 
-	imports, err := getImports(inv.GoCmd, info.Imports)
+	imports, err := getNamedImports(inv.GoCmd, info.Imports)
 	if err != nil {
 		errlog.Println(err)
 		return 1
+	}
+	for _, s := range info.RootImports {
+		imp, err := getImport(inv.GoCmd, s, "")
+		if err != nil {
+			errlog.Println(err)
+			return 1
+		}
+		imports = append(imports, imp)
 	}
 
 	main := filepath.Join(inv.Dir, mainfile)
@@ -370,32 +378,40 @@ func Invoke(inv Invocation) int {
 	return RunCompiled(inv, exePath, errlog)
 }
 
-func getImports(gocmd string, pkgs map[string]string) ([]Import, error) {
+func getNamedImports(gocmd string, pkgs map[string]string) ([]Import, error) {
 	var imports []Import
 	for alias, pkg := range pkgs {
 		debug.Printf("getting import package %q, alias %q", pkg, alias)
-		out, err := outputDebug(gocmd, "list", "-tags=mage", "-f", "{{.Dir}}||{{.Name}}", pkg)
+		imp, err := getImport(gocmd, pkg, alias)
 		if err != nil {
 			return nil, err
 		}
-		parts := strings.Split(out, "||")
-		if len(parts) != 2 {
-			return nil, fmt.Errorf("incorrect data from go list: %s", out)
-		}
-		dir, name := parts[0], parts[1]
-		debug.Printf("parsing imported package %q from dir %q", pkg, dir)
-		info, err := parse.Package(dir, nil)
-		if err != nil {
-			return nil, err
-		}
-		for i := range info.Funcs {
-			debug.Printf("setting alias %q and package %q on func %v", alias, name, info.Funcs[i].Name)
-			info.Funcs[i].PkgAlias = alias
-			info.Funcs[i].Package = name
-		}
-		imports = append(imports, Import{Alias: alias, Name: name, Path: pkg, Info: *info})
+		imports = append(imports, imp)
 	}
 	return imports, nil
+}
+
+func getImport(gocmd, importpath, alias string) (Import, error) {
+	out, err := outputDebug(gocmd, "list", "-tags=mage", "-f", "{{.Dir}}||{{.Name}}", importpath)
+	if err != nil {
+		return Import{}, err
+	}
+	parts := strings.Split(out, "||")
+	if len(parts) != 2 {
+		return Import{}, fmt.Errorf("incorrect data from go list: %s", out)
+	}
+	dir, name := parts[0], parts[1]
+	debug.Printf("parsing imported package %q from dir %q", importpath, dir)
+	info, err := parse.Package(dir, nil)
+	if err != nil {
+		return Import{}, err
+	}
+	for i := range info.Funcs {
+		debug.Printf("setting alias %q and package %q on func %v", alias, name, info.Funcs[i].Name)
+		info.Funcs[i].PkgAlias = alias
+		info.Funcs[i].Package = name
+	}
+	return Import{Alias: alias, Name: name, Path: importpath, Info: *info}, nil
 }
 
 type Import struct {

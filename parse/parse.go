@@ -31,6 +31,7 @@ type PkgInfo struct {
 	DefaultFunc Function
 	Aliases     map[string]Function
 	Imports     map[string]string
+	RootImports []string
 }
 
 // Function represented a job function from a mage file
@@ -49,14 +50,8 @@ type Function struct {
 // the mage cli.  It is always lowercase.
 func (f Function) TargetName() string {
 	var names []string
-	pkg := f.PkgAlias
 
-	// package alias of "." means use it like a dot import, i.e. don't namespace
-	// with the package alias name.
-	if pkg == "." {
-		pkg = ""
-	}
-	for _, s := range []string{pkg, f.Receiver, f.Name} {
+	for _, s := range []string{f.PkgAlias, f.Receiver, f.Name} {
 		if s != "" {
 			names = append(names, s)
 		}
@@ -130,34 +125,26 @@ func Package(path string, files []string) (*PkgInfo, error) {
 		Description: toOneLine(p.Doc),
 	}
 
-typeloop:
 	for _, t := range p.Types {
-		for _, s := range t.Decl.Specs {
-			if id, ok := s.(*ast.TypeSpec); ok {
-				if sel, ok := id.Type.(*ast.SelectorExpr); ok {
-					if ident, ok := sel.X.(*ast.Ident); ok {
-						if ident.Name != "mg" || sel.Sel.Name != "Namespace" {
-							continue typeloop
-						}
-					}
-				}
-				break
-			}
+		if !isNamespace(t) {
+			continue
 		}
 		for _, f := range t.Methods {
 			if !ast.IsExported(f.Name) {
 				continue
 			}
-			if typ := funcType(f.Decl.Type); typ != invalidType {
-				pi.Funcs = append(pi.Funcs, Function{
-					Name:      f.Name,
-					Receiver:  f.Recv,
-					Comment:   toOneLine(f.Doc),
-					Synopsis:  sanitizeSynopsis(f),
-					IsError:   typ == errorType || typ == contextErrorType,
-					IsContext: typ == contextVoidType || typ == contextErrorType,
-				})
+			typ := funcType(f.Decl.Type)
+			if typ == invalidType {
+				continue
 			}
+			pi.Funcs = append(pi.Funcs, Function{
+				Name:      f.Name,
+				Receiver:  f.Recv,
+				Comment:   toOneLine(f.Doc),
+				Synopsis:  sanitizeSynopsis(f),
+				IsError:   typ == errorType || typ == contextErrorType,
+				IsContext: typ == contextVoidType || typ == contextErrorType,
+			})
 		}
 	}
 	for _, f := range p.Funcs {
@@ -198,11 +185,33 @@ typeloop:
 
 	setDefault(p, pi)
 	setAliases(p, pi)
-	if err := setImports(p, pi); err != nil {
+	if err := setNamedImports(p, pi); err != nil {
+		return nil, err
+	}
+	if err := setRootImports(p, pi); err != nil {
 		return nil, err
 	}
 
 	return pi, nil
+}
+
+func isNamespace(t *doc.Type) bool {
+	if len(t.Decl.Specs) != 1 {
+		return false
+	}
+	id, ok := t.Decl.Specs[0].(*ast.TypeSpec)
+	if !ok {
+		return false
+	}
+	sel, ok := id.Type.(*ast.SelectorExpr)
+	if !ok {
+		return false
+	}
+	ident, ok := sel.X.(*ast.Ident)
+	if !ok {
+		return false
+	}
+	return ident.Name == "mg" && sel.Sel.Name == "Namespace"
 }
 
 func fieldNames(flist *ast.FieldList) string {
@@ -298,8 +307,64 @@ func setDefault(p *doc.Package, pi *PkgInfo) {
 	}
 }
 
-func setImports(p *doc.Package, pi *PkgInfo) error {
+func setNamedImports(p *doc.Package, pi *PkgInfo) error {
 	pi.Imports = map[string]string{}
+	for _, v := range p.Vars {
+		for x, name := range v.Names {
+			if name != "MageImportMap" {
+				continue
+			}
+			spec := v.Decl.Specs[x].(*ast.ValueSpec)
+			if len(spec.Values) != 1 {
+				return errors.New("ImportMap declaration has multiple values")
+			}
+			v, ok := spec.Values[0].(*ast.CompositeLit)
+			if !ok {
+				return errors.New("ImportMap must be a composite literal map")
+			}
+			t, ok := v.Type.(*ast.MapType)
+			if !ok {
+				return errors.New("ImportMap is not a map")
+			}
+			k, ok := t.Key.(*ast.Ident)
+			if !ok || k.Name != "string" {
+				return errors.New("ImportMap must be a map[string]string")
+			}
+			val, ok := t.Value.(*ast.Ident)
+			if !ok || val.Name != "string" {
+				return errors.New("ImportMap must be a map[string]string")
+			}
+
+			for _, e := range v.Elts {
+				kv, ok := e.(*ast.KeyValueExpr)
+				if !ok {
+					return errors.New(`elements of ImportMap must be "name" : "importpath"`)
+				}
+				k, ok := kv.Key.(*ast.BasicLit)
+				if !ok {
+					return errors.New(`elements of ImportMap must be "name" : "importpath"`)
+				}
+				v, ok := kv.Value.(*ast.BasicLit)
+				if !ok {
+					return errors.New(`elements of ImportMap must be "name" : "importpath"`)
+				}
+				if !strings.HasPrefix(k.Value, `"`) || !strings.HasSuffix(k.Value, `"`) {
+					return errors.New(`elements of ImportMap must be "name" : "importpath"`)
+				}
+				if !strings.HasPrefix(v.Value, `"`) || !strings.HasSuffix(v.Value, `"`) {
+					return errors.New(`elements of ImportMap must be "name" : "importpath"`)
+				}
+				alias := strings.Trim(k.Value, `"`)
+				path := strings.Trim(v.Value, `"`)
+				debug.Printf("found named import %q : %q", alias, path)
+				pi.Imports[alias] = path
+			}
+		}
+	}
+	return nil
+}
+
+func setRootImports(p *doc.Package, pi *PkgInfo) error {
 	for _, v := range p.Vars {
 		for x, name := range v.Names {
 			if name != "MageImports" {
@@ -307,50 +372,39 @@ func setImports(p *doc.Package, pi *PkgInfo) error {
 			}
 			spec := v.Decl.Specs[x].(*ast.ValueSpec)
 			if len(spec.Values) != 1 {
-				return errors.New("MageImports declaration has multiple values")
+				return errors.New("Import declaration has multiple values")
 			}
 			v, ok := spec.Values[0].(*ast.CompositeLit)
 			if !ok {
-				return errors.New("MageImports must be a composite literal map")
+				return errors.New("Import must be a composite literal")
 			}
-			t, ok := v.Type.(*ast.MapType)
+			t, ok := v.Type.(*ast.ArrayType)
 			if !ok {
-				return errors.New("MageImports is not a map")
+				return errors.New("Import is not a slice")
 			}
-			k, ok := t.Key.(*ast.Ident)
-			if !ok || k.Name != "string" {
-				return errors.New("MageImports must be a map[string]string")
+			elt, ok := t.Elt.(*ast.Ident)
+			if !ok {
+				return errors.New("Import is not a slice of strings")
 			}
-			val, ok := t.Value.(*ast.Ident)
-			if !ok || val.Name != "string" {
-				return errors.New("MageImports must be a map[string]string")
+			if elt.Name != "string" {
+				return errors.New("Import must be a []string")
 			}
 
 			for _, e := range v.Elts {
-				kv, ok := e.(*ast.KeyValueExpr)
+				l, ok := e.(*ast.BasicLit)
 				if !ok {
-					return errors.New(`elements of MageImports must be "name" : "importpath"`)
+					return errors.New(`elements of Import must be a literal string of the import path`)
 				}
-				k, ok := kv.Key.(*ast.BasicLit)
-				if !ok {
-					return errors.New(`elements of MageImports must be "name" : "importpath"`)
+				if !strings.HasPrefix(l.Value, `"`) || !strings.HasSuffix(l.Value, `"`) {
+					return errors.New(`elements of Import must be a literal string of the import path`)
 				}
-				v, ok := kv.Value.(*ast.BasicLit)
-				if !ok {
-					return errors.New(`elements of MageImports must be "name" : "importpath"`)
-				}
-				if !strings.HasPrefix(k.Value, `"`) || !strings.HasSuffix(k.Value, `"`) {
-					return errors.New(`elements of MageImports must be "name" : "importpath"`)
-				}
-				if !strings.HasPrefix(v.Value, `"`) || !strings.HasSuffix(v.Value, `"`) {
-					return errors.New(`elements of MageImports must be "name" : "importpath"`)
-				}
-				alias := strings.Trim(k.Value, `"`)
-				path := strings.Trim(v.Value, `"`)
-				pi.Imports[alias] = path
+				path := strings.Trim(l.Value, `"`)
+				debug.Printf("found root import %q", path)
+				pi.RootImports = append(pi.RootImports, path)
 			}
 		}
 	}
+
 	return nil
 }
 
