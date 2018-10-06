@@ -16,6 +16,8 @@ import (
 	"time"
 )
 
+const importTag = "mage:import"
+
 var debug = log.New(ioutil.Discard, "DEBUG: ", log.Ltime|log.Lmicroseconds)
 
 // EnableDebug turns on debug logging.
@@ -56,7 +58,7 @@ func (f Function) TargetName() string {
 			names = append(names, s)
 		}
 	}
-	return strings.ToLower(strings.Join(names, ":"))
+	return strings.Join(names, ":")
 }
 
 // ExecCode returns code for the template switch to run the target.
@@ -119,34 +121,35 @@ func Package(path string, files []string) (*PkgInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	p := doc.New(pkg, "./", 0)
 	pi := &PkgInfo{
 		Description: toOneLine(p.Doc),
 	}
 
-	for _, t := range p.Types {
-		if !isNamespace(t) {
-			continue
-		}
-		for _, f := range t.Methods {
-			if !ast.IsExported(f.Name) {
-				continue
-			}
-			typ := funcType(f.Decl.Type)
-			if typ == invalidType {
-				continue
-			}
-			pi.Funcs = append(pi.Funcs, Function{
-				Name:      f.Name,
-				Receiver:  f.Recv,
-				Comment:   toOneLine(f.Doc),
-				Synopsis:  sanitizeSynopsis(f),
-				IsError:   typ == errorType || typ == contextErrorType,
-				IsContext: typ == contextVoidType || typ == contextErrorType,
-			})
-		}
+	if err := setImports(pkg, pi); err != nil {
+		return nil, err
 	}
+	setNamespaces(p, pi)
+	setFuncs(p, pi)
+
+	hasDupes, names := checkDupes(pi)
+	if hasDupes {
+		msg := "Build targets must be case insensitive, thus the following targets conflict:\n"
+		for _, v := range names {
+			if len(v) > 1 {
+				msg += "  " + strings.Join(v, ", ") + "\n"
+			}
+		}
+		return nil, errors.New(msg)
+	}
+
+	setDefault(p, pi)
+	setAliases(p, pi)
+
+	return pi, nil
+}
+
+func setFuncs(p *doc.Package, pi *PkgInfo) {
 	for _, f := range p.Funcs {
 		if f.Recv != "" {
 			debug.Printf("skipping method %s.%s", f.Recv, f.Name)
@@ -171,28 +174,90 @@ func Package(path string, files []string) (*PkgInfo, error) {
 			debug.Printf("skipping function with invalid signature func %s(%v)(%v)", f.Name, fieldNames(f.Decl.Type.Params), fieldNames(f.Decl.Type.Results))
 		}
 	}
+}
 
-	hasDupes, names := checkDupes(pi)
-	if hasDupes {
-		msg := "Build targets must be case insensitive, thus the following targets conflict:\n"
-		for _, v := range names {
-			if len(v) > 1 {
-				msg += "  " + strings.Join(v, ", ") + "\n"
+func setNamespaces(p *doc.Package, pi *PkgInfo) {
+	for _, t := range p.Types {
+		if !isNamespace(t) {
+			continue
+		}
+		debug.Printf("found namespace %s %s", p.ImportPath, t.Name)
+		for _, f := range t.Methods {
+			if !ast.IsExported(f.Name) {
+				continue
+			}
+			typ := funcType(f.Decl.Type)
+			if typ == invalidType {
+				continue
+			}
+			debug.Printf("found namespace method %s %s.%s", p.ImportPath, t.Name, f.Name)
+			pi.Funcs = append(pi.Funcs, Function{
+				Name:      f.Name,
+				Receiver:  t.Name,
+				Comment:   toOneLine(f.Doc),
+				Synopsis:  sanitizeSynopsis(f),
+				IsError:   typ == errorType || typ == contextErrorType,
+				IsContext: typ == contextVoidType || typ == contextErrorType,
+			})
+		}
+	}
+}
+
+func setImports(pkg *ast.Package, pi *PkgInfo) error {
+	pi.Imports = map[string]string{}
+	for _, f := range pkg.Files {
+		for _, imp := range f.Imports {
+			name, alias, ok := getImport(imp)
+			if !ok {
+				continue
+			}
+			if alias != "" {
+				debug.Printf("found %s: %s (%s)", importTag, name, alias)
+				if pi.Imports[alias] != "" {
+					return fmt.Errorf("duplicate import alias: %q", alias)
+				}
+				pi.Imports[alias] = name
+			} else {
+				debug.Printf("found %s: %s", importTag, name)
+				pi.RootImports = append(pi.RootImports, name)
 			}
 		}
-		return nil, errors.New(msg)
+	}
+	return nil
+}
+
+func getImport(imp *ast.ImportSpec) (path, alias string, ok bool) {
+	if imp.Doc == nil || len(imp.Doc.List) == 9 {
+		return "", "", false
+	}
+	// import is always the last comment
+	s := imp.Doc.List[len(imp.Doc.List)-1].Text
+
+	// trim comment start and normalize for anyone who has spaces or not between
+	// "//"" and the text
+	vals := strings.Fields(strings.ToLower(s[2:]))
+	if len(vals) == 0 {
+		return "", "", false
+	}
+	if vals[0] != importTag {
+		return "", "", false
+	}
+	path, ok = lit2string(imp.Path)
+	if !ok {
+		return "", "", false
 	}
 
-	setDefault(p, pi)
-	setAliases(p, pi)
-	if err := setNamedImports(p, pi); err != nil {
-		return nil, err
+	switch len(vals) {
+	case 1:
+		// just the import tag, this is a root import
+		return path, "", true
+	case 2:
+		// also has an alias
+		return path, vals[1], true
+	default:
+		log.Println("warning: ignoring malformed", importTag, "for import", path)
+		return "", "", false
 	}
-	if err := setRootImports(p, pi); err != nil {
-		return nil, err
-	}
-
-	return pi, nil
 }
 
 func isNamespace(t *doc.Type) bool {
@@ -307,105 +372,11 @@ func setDefault(p *doc.Package, pi *PkgInfo) {
 	}
 }
 
-func setNamedImports(p *doc.Package, pi *PkgInfo) error {
-	pi.Imports = map[string]string{}
-	for _, v := range p.Vars {
-		for x, name := range v.Names {
-			if name != "MageImportMap" {
-				continue
-			}
-			spec := v.Decl.Specs[x].(*ast.ValueSpec)
-			if len(spec.Values) != 1 {
-				return errors.New("ImportMap declaration has multiple values")
-			}
-			v, ok := spec.Values[0].(*ast.CompositeLit)
-			if !ok {
-				return errors.New("ImportMap must be a composite literal map")
-			}
-			t, ok := v.Type.(*ast.MapType)
-			if !ok {
-				return errors.New("ImportMap is not a map")
-			}
-			k, ok := t.Key.(*ast.Ident)
-			if !ok || k.Name != "string" {
-				return errors.New("ImportMap must be a map[string]string")
-			}
-			val, ok := t.Value.(*ast.Ident)
-			if !ok || val.Name != "string" {
-				return errors.New("ImportMap must be a map[string]string")
-			}
-
-			for _, e := range v.Elts {
-				kv, ok := e.(*ast.KeyValueExpr)
-				if !ok {
-					return errors.New(`elements of ImportMap must be "name" : "importpath"`)
-				}
-				k, ok := kv.Key.(*ast.BasicLit)
-				if !ok {
-					return errors.New(`elements of ImportMap must be "name" : "importpath"`)
-				}
-				v, ok := kv.Value.(*ast.BasicLit)
-				if !ok {
-					return errors.New(`elements of ImportMap must be "name" : "importpath"`)
-				}
-				if !strings.HasPrefix(k.Value, `"`) || !strings.HasSuffix(k.Value, `"`) {
-					return errors.New(`elements of ImportMap must be "name" : "importpath"`)
-				}
-				if !strings.HasPrefix(v.Value, `"`) || !strings.HasSuffix(v.Value, `"`) {
-					return errors.New(`elements of ImportMap must be "name" : "importpath"`)
-				}
-				alias := strings.Trim(k.Value, `"`)
-				path := strings.Trim(v.Value, `"`)
-				debug.Printf("found named import %q : %q", alias, path)
-				pi.Imports[alias] = path
-			}
-		}
+func lit2string(l *ast.BasicLit) (string, bool) {
+	if !strings.HasPrefix(l.Value, `"`) || !strings.HasSuffix(l.Value, `"`) {
+		return "", false
 	}
-	return nil
-}
-
-func setRootImports(p *doc.Package, pi *PkgInfo) error {
-	for _, v := range p.Vars {
-		for x, name := range v.Names {
-			if name != "MageImports" {
-				continue
-			}
-			spec := v.Decl.Specs[x].(*ast.ValueSpec)
-			if len(spec.Values) != 1 {
-				return errors.New("Import declaration has multiple values")
-			}
-			v, ok := spec.Values[0].(*ast.CompositeLit)
-			if !ok {
-				return errors.New("Import must be a composite literal")
-			}
-			t, ok := v.Type.(*ast.ArrayType)
-			if !ok {
-				return errors.New("Import is not a slice")
-			}
-			elt, ok := t.Elt.(*ast.Ident)
-			if !ok {
-				return errors.New("Import is not a slice of strings")
-			}
-			if elt.Name != "string" {
-				return errors.New("Import must be a []string")
-			}
-
-			for _, e := range v.Elts {
-				l, ok := e.(*ast.BasicLit)
-				if !ok {
-					return errors.New(`elements of Import must be a literal string of the import path`)
-				}
-				if !strings.HasPrefix(l.Value, `"`) || !strings.HasSuffix(l.Value, `"`) {
-					return errors.New(`elements of Import must be a literal string of the import path`)
-				}
-				path := strings.Trim(l.Value, `"`)
-				debug.Printf("found root import %q", path)
-				pi.RootImports = append(pi.RootImports, path)
-			}
-		}
-	}
-
-	return nil
+	return strings.Trim(l.Value, `"`), true
 }
 
 func outputDebug(cmd string, args ...string) (string, error) {
@@ -465,8 +436,13 @@ func setAliases(p *doc.Package, pi *PkgInfo) {
 					receiver = fmt.Sprintf("%s", v.X)
 				default:
 					log.Printf("warning: target for alias %s is not a function", k.Value)
+					continue
 				}
-				alias := strings.Trim(k.Value, "\"")
+				alias, ok := lit2string(k)
+				if !ok {
+					log.Println("warning: malformed alias declaration for alias", k.Value)
+					continue
+				}
 				valid := false
 				for _, f := range pi.Funcs {
 					if f.Name == name && f.Receiver == receiver {

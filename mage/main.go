@@ -32,7 +32,7 @@ const magicRebuildKey = "v0.3"
 
 var output = template.Must(template.New("").Funcs(map[string]interface{}{
 	"lower": strings.ToLower,
-	"lowerfirst": func(s string) string {
+	"lowerFirst": func(s string) string {
 		parts := strings.Split(s, ":")
 		for i, t := range parts {
 			r := []rune(t)

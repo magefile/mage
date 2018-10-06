@@ -17,17 +17,7 @@ import (
 
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
-
-	// Mage:Import
-	_ "github.com/magefile/mage/zztest"
 )
-
-var MageImports = []string{
-	"github.com/magefile/mage/zztest",
-}
-var MageImportMap = map[string]string{
-	"zz": "github.com/magefile/mage/zztest2",
-}
 
 // Runs "go install" for mage.  This generates the version info the binary.
 func Install() error {

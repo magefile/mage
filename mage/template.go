@@ -29,11 +29,11 @@ func main() {
 		w := tabwriter.NewWriter(os.Stdout, 0, 4, 4, ' ', 0)
 		fmt.Println("Targets:")
 		{{- range .Funcs}}
-			fmt.Fprintln(w, "  {{.TargetName}}{{if and (eq .Name $default.Name) (eq .Receiver $default.Receiver)}}*{{end}}\t" + {{printf "%q" .Synopsis}})
+			fmt.Fprintln(w, "  {{lowerFirst .TargetName}}{{if and (eq .Name $default.Name) (eq .Receiver $default.Receiver)}}*{{end}}\t" + {{printf "%q" .Synopsis}})
 		{{- end}}
 		{{- range .Imports}}{{$imp := .}}
 			{{- range .Info.Funcs}}
-			fmt.Fprintln(w, "  {{.TargetName}}{{if and (eq .Name $default.Name) (eq .Receiver $default.Receiver)}}*{{end}}\t" + {{printf "%q" .Synopsis}})
+			fmt.Fprintln(w, "  {{lowerFirst .TargetName}}{{if and (eq .Name $default.Name) (eq .Receiver $default.Receiver)}}*{{end}}\t" + {{printf "%q" .Synopsis}})
 			{{end}}
 		{{- end}}
 		err := w.Flush()
@@ -126,13 +126,13 @@ func main() {
 	targets := map[string]bool {
 		{{range $alias, $funci := .Aliases}}"{{lower $alias}}": true,
 		{{end}}
-		{{range .Funcs}}"{{.TargetName}}": true,
+		{{range .Funcs}}"{{lower .TargetName}}": true,
 		{{end}}
 		{{range .Imports}}
 			{{$imp := .}}
 			{{range $alias, $funci := .Info.Aliases}}"{{if ne $imp.Alias "."}}{{lower $imp.Alias}}:{{end}}{{lower $alias}}": true,
 			{{end}}
-			{{range .Info.Funcs}}"{{.TargetName}}": true,
+			{{range .Info.Funcs}}"{{lower .TargetName}}": true,
 			{{end}}
 		{{end}}
 	}
@@ -210,7 +210,7 @@ func main() {
 		}
 		switch strings.ToLower(target) {
 		{{range .Funcs }}
-			case "{{.TargetName}}":
+			case "{{lower .TargetName}}":
 				if verbose {
 					logger.Println("Running target:", "{{.TargetName}}")
 				}
@@ -220,7 +220,7 @@ func main() {
 		{{range .Imports}}
 		{{$imp := .}}
 			{{range .Info.Funcs }}
-				case "{{.TargetName}}":
+				case "{{lower .TargetName}}":
 					if verbose {
 						logger.Println("Running target:", "{{.TargetName}}")
 					}
