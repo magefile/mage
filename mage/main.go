@@ -131,11 +131,6 @@ func ParseAndRun(stdout, stderr io.Writer, stdin io.Reader, args []string) int {
 			out.Println("Error:", err)
 			return 1
 		}
-		if err := removeContents(filepath.Join(inv.CacheDir, mainfileSubdir)); err != nil {
-			out.Println("Error:", err)
-			return 1
-		}
-
 		out.Println(inv.CacheDir, "cleaned")
 		return 0
 	case CompileStatic:
@@ -348,6 +343,10 @@ func Invoke(inv Invocation) int {
 		imports = append(imports, imp)
 	}
 
+	if !checkDupes(info, imports) {
+		return 1
+	}
+
 	main := filepath.Join(inv.Dir, mainfile)
 	err = GenerateMainfile(main, inv.CacheDir, info, imports)
 	if err != nil {
@@ -376,6 +375,46 @@ func Invoke(inv Invocation) int {
 	}
 
 	return RunCompiled(inv, exePath, errlog)
+}
+
+func checkDupes(info *parse.PkgInfo, imports []Import) (ok bool) {
+	funcs := map[string][]parse.Function{}
+	for _, f := range info.Funcs {
+		funcs[strings.ToLower(f.TargetName())] = append(funcs[strings.ToLower(f.TargetName())], f)
+	}
+	for _, imp := range imports {
+		for _, f := range imp.Info.Funcs {
+			target := strings.ToLower(f.TargetName())
+			funcs[target] = append(funcs[target], f)
+		}
+	}
+	for alias, f := range info.Aliases {
+		if len(funcs[alias]) != 0 {
+			var ids []string
+			for _, f := range funcs[alias] {
+				ids = append(ids, f.ID())
+			}
+			fmt.Printf("ERROR: alias %q duplicates existing target(s): %s\n", alias, strings.Join(ids, ", "))
+		}
+		funcs[alias] = append(funcs[alias], f)
+	}
+	var dupes []string
+	for target, list := range funcs {
+		if len(list) > 1 {
+			dupes = append(dupes, target)
+		}
+	}
+	if len(dupes) == 0 {
+		return true
+	}
+	for _, d := range dupes {
+		var ids []string
+		for _, f := range funcs[d] {
+			ids = append(ids, f.ID())
+		}
+		fmt.Printf("ERROR: %q target has multiple definitions: %s\n", d, strings.Join(ids, ", "))
+	}
+	return false
 }
 
 func getNamedImports(gocmd string, pkgs map[string]string) ([]Import, error) {
@@ -410,6 +449,7 @@ func getImport(gocmd, importpath, alias string) (Import, error) {
 		debug.Printf("setting alias %q and package %q on func %v", alias, name, info.Funcs[i].Name)
 		info.Funcs[i].PkgAlias = alias
 		info.Funcs[i].Package = name
+		info.Funcs[i].ImportPath = importpath
 	}
 	return Import{Alias: alias, Name: name, Path: importpath, Info: *info}, nil
 }
@@ -419,45 +459,6 @@ type Import struct {
 	Name  string
 	Path  string
 	Info  parse.PkgInfo
-}
-
-// merge inserts the targets from imp into main using name as the namespace.
-// func merge(main, imp *parse.PkgInfo, name string) error {
-// 	if len(imp.Imports) > 0 {
-// 		return fmt.Errorf("imported magefiles can't import other magefiles")
-// 	}
-// 	if main.DefaultFunc.Name != "" && imp.DefaultFunc.Name != "" {
-// 		return fmt.Errorf("conflicting default targets cannot be ")
-// 	}
-// 	if main.DefaultFunc.Name == "" {
-// 		main.DefaultFunc = imp.DefaultFunc
-// 	}
-
-// 	type fn struct {
-// 		Pkg      string
-// 		Name     string
-// 		Receiver string
-// 	}
-// 	fun := func(f parse.Function) fn {
-// 		return fn{Pkg: name, Name: f.Name, Receiver: f.Receiver}
-// 	}
-// 	functions := make(map[fn]bool, len(main.Funcs))
-// 	for _, f := range main.Funcs {
-// 		functions[fn{Pkg: ".", Name: f.Name, Receiver: f.Receiver}] = true
-// 	}
-
-// 	for _, f := range imp.Funcs {
-// 		fn := fun(f)
-// 		if
-// 	}
-// 	return nil
-// }
-
-func moveMainToCache(cachedir, main, hash string) {
-	debug.Println("moving main file to cache:", cachedMainfile(cachedir, hash))
-	if err := os.Rename(main, cachedMainfile(cachedir, hash)); err != nil && !os.IsNotExist(err) {
-		debug.Println("error caching main file: ", err)
-	}
 }
 
 type data struct {
@@ -595,12 +596,6 @@ func outputDebug(cmd string, args ...string) (string, error) {
 		return "", err
 	}
 	return strings.TrimSpace(buf.String()), nil
-}
-
-const mainfileSubdir = "mainfiles"
-
-func cachedMainfile(cachedir, hash string) string {
-	return filepath.Join(cachedir, mainfileSubdir, hash)
 }
 
 // GenerateMainfile generates the mage mainfile at path.  Because go build's

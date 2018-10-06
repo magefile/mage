@@ -38,14 +38,28 @@ type PkgInfo struct {
 
 // Function represented a job function from a mage file
 type Function struct {
-	PkgAlias  string
-	Package   string
-	Name      string
-	Receiver  string
-	IsError   bool
-	IsContext bool
-	Synopsis  string
-	Comment   string
+	PkgAlias   string
+	Package    string
+	ImportPath string
+	Name       string
+	Receiver   string
+	IsError    bool
+	IsContext  bool
+	Synopsis   string
+	Comment    string
+}
+
+// ID returns user-readable information about where this function is defined.
+func (f Function) ID() string {
+	path := "<current>"
+	if f.ImportPath != "" {
+		path = f.ImportPath
+	}
+	receiver := ""
+	if f.Receiver != "" {
+		receiver = f.Receiver + "."
+	}
+	return fmt.Sprintf("%s.%s%s", path, receiver, f.Name)
 }
 
 // TargetName returns the name of the target as it should appear when used from
