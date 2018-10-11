@@ -347,6 +347,22 @@ func Invoke(inv Invocation) int {
 		return 1
 	}
 
+	// have to set unique package names on imports
+	used := map[string]bool{}
+	for _, imp := range imports {
+		unique := imp.Name + "_mageimport"
+		x := 1
+		for used[unique] {
+			unique = fmt.Sprintf("%s_mageimport%d", imp.Name, x)
+			x++
+		}
+		used[unique] = true
+		imp.UniqueName = unique
+		for _, f := range imp.Info.Funcs {
+			f.Package = unique
+		}
+	}
+
 	main := filepath.Join(inv.Dir, mainfile)
 	err = GenerateMainfile(main, inv.CacheDir, info, imports)
 	if err != nil {
@@ -377,8 +393,8 @@ func Invoke(inv Invocation) int {
 	return RunCompiled(inv, exePath, errlog)
 }
 
-func checkDupes(info *parse.PkgInfo, imports []Import) (ok bool) {
-	funcs := map[string][]parse.Function{}
+func checkDupes(info *parse.PkgInfo, imports []*Import) (ok bool) {
+	funcs := map[string][]*parse.Function{}
 	for _, f := range info.Funcs {
 		funcs[strings.ToLower(f.TargetName())] = append(funcs[strings.ToLower(f.TargetName())], f)
 	}
@@ -417,8 +433,8 @@ func checkDupes(info *parse.PkgInfo, imports []Import) (ok bool) {
 	return false
 }
 
-func getNamedImports(gocmd string, pkgs map[string]string) ([]Import, error) {
-	var imports []Import
+func getNamedImports(gocmd string, pkgs map[string]string) ([]*Import, error) {
+	var imports []*Import
 	for alias, pkg := range pkgs {
 		debug.Printf("getting import package %q, alias %q", pkg, alias)
 		imp, err := getImport(gocmd, pkg, alias)
@@ -430,43 +446,43 @@ func getNamedImports(gocmd string, pkgs map[string]string) ([]Import, error) {
 	return imports, nil
 }
 
-func getImport(gocmd, importpath, alias string) (Import, error) {
+func getImport(gocmd, importpath, alias string) (*Import, error) {
 	out, err := outputDebug(gocmd, "list", "-tags=mage", "-f", "{{.Dir}}||{{.Name}}", importpath)
 	if err != nil {
-		return Import{}, err
+		return nil, err
 	}
 	parts := strings.Split(out, "||")
 	if len(parts) != 2 {
-		return Import{}, fmt.Errorf("incorrect data from go list: %s", out)
+		return nil, fmt.Errorf("incorrect data from go list: %s", out)
 	}
 	dir, name := parts[0], parts[1]
 	debug.Printf("parsing imported package %q from dir %q", importpath, dir)
 	info, err := parse.Package(dir, nil)
 	if err != nil {
-		return Import{}, err
+		return nil, err
 	}
 	for i := range info.Funcs {
 		debug.Printf("setting alias %q and package %q on func %v", alias, name, info.Funcs[i].Name)
 		info.Funcs[i].PkgAlias = alias
-		info.Funcs[i].Package = name
 		info.Funcs[i].ImportPath = importpath
 	}
-	return Import{Alias: alias, Name: name, Path: importpath, Info: *info}, nil
+	return &Import{Alias: alias, Name: name, Path: importpath, Info: *info}, nil
 }
 
 type Import struct {
-	Alias string
-	Name  string
-	Path  string
-	Info  parse.PkgInfo
+	Alias      string
+	Name       string
+	UniqueName string // a name unique across all imports
+	Path       string
+	Info       parse.PkgInfo
 }
 
 type data struct {
 	Description string
-	Funcs       []parse.Function
+	Funcs       []*parse.Function
 	DefaultFunc parse.Function
-	Aliases     map[string]parse.Function
-	Imports     []Import
+	Aliases     map[string]*parse.Function
+	Imports     []*Import
 }
 
 func goVersion(gocmd string) (string, error) {
@@ -601,7 +617,7 @@ func outputDebug(cmd string, args ...string) (string, error) {
 // GenerateMainfile generates the mage mainfile at path.  Because go build's
 // cache cares about modtimes, we squirrel away our mainfiles in the cachedir
 // and move them back as needed.
-func GenerateMainfile(path, cachedir string, info *parse.PkgInfo, imports []Import) error {
+func GenerateMainfile(path, cachedir string, info *parse.PkgInfo, imports []*Import) error {
 	debug.Println("Creating mainfile at", path)
 
 	f, err := os.Create(path)
@@ -612,9 +628,12 @@ func GenerateMainfile(path, cachedir string, info *parse.PkgInfo, imports []Impo
 	data := data{
 		Description: info.Description,
 		Funcs:       info.Funcs,
-		DefaultFunc: info.DefaultFunc,
 		Aliases:     info.Aliases,
 		Imports:     imports,
+	}
+
+	if info.DefaultFunc != nil {
+		data.DefaultFunc = *info.DefaultFunc
 	}
 
 	debug.Println("writing new file at", path)

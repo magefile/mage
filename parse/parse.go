@@ -29,9 +29,9 @@ func EnableDebug() {
 // parsing rules.
 type PkgInfo struct {
 	Description string
-	Funcs       []Function
-	DefaultFunc Function
-	Aliases     map[string]Function
+	Funcs       []*Function
+	DefaultFunc *Function
+	Aliases     map[string]*Function
 	Imports     map[string]string
 	RootImports []string
 }
@@ -177,7 +177,7 @@ func setFuncs(p *doc.Package, pi *PkgInfo) {
 		}
 		if typ := funcType(f.Decl.Type); typ != invalidType {
 			debug.Printf("found target %v", f.Name)
-			pi.Funcs = append(pi.Funcs, Function{
+			pi.Funcs = append(pi.Funcs, &Function{
 				Name:      f.Name,
 				Comment:   toOneLine(f.Doc),
 				Synopsis:  sanitizeSynopsis(f),
@@ -205,7 +205,7 @@ func setNamespaces(p *doc.Package, pi *PkgInfo) {
 				continue
 			}
 			debug.Printf("found namespace method %s %s.%s", p.ImportPath, t.Name, f.Name)
-			pi.Funcs = append(pi.Funcs, Function{
+			pi.Funcs = append(pi.Funcs, &Function{
 				Name:      f.Name,
 				Receiver:  t.Name,
 				Comment:   toOneLine(f.Doc),
@@ -427,7 +427,7 @@ func setAliases(p *doc.Package, pi *PkgInfo) {
 				log.Println("warning: aliases declaration is not a map")
 				return
 			}
-			pi.Aliases = map[string]Function{}
+			pi.Aliases = map[string]*Function{}
 			for _, elem := range comp.Elts {
 				kv, ok := elem.(*ast.KeyValueExpr)
 				if !ok {

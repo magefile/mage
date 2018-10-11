@@ -1,12 +1,20 @@
 package mage
 
-import "github.com/magefile/mage/mg"
+import (
+	"fmt"
+
+	"github.com/magefile/mage/mg"
+)
 
 // BuildSubdir Builds stuff.
-func BuildSubdir() {}
+func BuildSubdir() {
+	fmt.Println("buildsubdir")
+}
 
 // NS is a namespace.
 type NS mg.Namespace
 
 // Deploy deploys stuff.
-func (NS) Deploy() {}
+func (NS) Deploy() {
+	fmt.Println("deploy")
+}

@@ -78,9 +78,11 @@ func TestParse(t *testing.T) {
 	for _, fn := range expected {
 		found := false
 		for _, infoFn := range info.Funcs {
-			if reflect.DeepEqual(fn, infoFn) {
+			if reflect.DeepEqual(fn, *infoFn) {
 				found = true
 				break
+			} else {
+				t.Logf("%#v", infoFn)
 			}
 		}
 		if !found {

@@ -15,7 +15,7 @@ import (
 	"strings"
 	"text/tabwriter"
 	"time"
-	{{range .Imports}}"{{.Path}}"
+	{{range .Imports}}{{.UniqueName}} "{{.Path}}"
 	{{end}}
 )
 
