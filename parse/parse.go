@@ -1,6 +1,7 @@
 package parse
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"go/ast"
@@ -10,9 +11,12 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"os/exec"
 	"strings"
 	"time"
 )
+
+const importTag = "mage:import"
 
 var debug = log.New(ioutil.Discard, "DEBUG: ", log.Ltime|log.Lmicroseconds)
 
@@ -25,73 +29,102 @@ func EnableDebug() {
 // parsing rules.
 type PkgInfo struct {
 	Description string
-	Funcs       []Function
-	DefaultFunc Function
-	Aliases     map[string]Function
+	Funcs       []*Function
+	DefaultFunc *Function
+	Aliases     map[string]*Function
+	Imports     map[string]string
+	RootImports []string
 }
 
 // Function represented a job function from a mage file
 type Function struct {
-	Name      string
-	Receiver  string
-	IsError   bool
-	IsContext bool
-	Synopsis  string
-	Comment   string
+	PkgAlias   string
+	Package    string
+	ImportPath string
+	Name       string
+	Receiver   string
+	IsError    bool
+	IsContext  bool
+	Synopsis   string
+	Comment    string
 }
 
-// TemplateName returns the invocation name, supporting namespaced functions.
-func (f Function) TemplateName() string {
-	if f.Receiver != "" {
-		return strings.ToLower(fmt.Sprintf("%s:%s", f.Receiver, f.Name))
+// ID returns user-readable information about where this function is defined.
+func (f Function) ID() string {
+	path := "<current>"
+	if f.ImportPath != "" {
+		path = f.ImportPath
 	}
-
-	return f.Name
+	receiver := ""
+	if f.Receiver != "" {
+		receiver = f.Receiver + "."
+	}
+	return fmt.Sprintf("%s.%s%s", path, receiver, f.Name)
 }
 
-// TemplateString returns code for the template switch to run the target.
+// TargetName returns the name of the target as it should appear when used from
+// the mage cli.  It is always lowercase.
+func (f Function) TargetName() string {
+	var names []string
+
+	for _, s := range []string{f.PkgAlias, f.Receiver, f.Name} {
+		if s != "" {
+			names = append(names, s)
+		}
+	}
+	return strings.Join(names, ":")
+}
+
+// ExecCode returns code for the template switch to run the target.
 // It wraps each target call to match the func(context.Context) error that
 // runTarget requires.
-func (f Function) TemplateString() string {
+func (f Function) ExecCode() (string, error) {
 	name := f.Name
 	if f.Receiver != "" {
-		name = fmt.Sprintf("%s{}.%s", f.Receiver, f.Name)
+		name = f.Receiver + "{}." + name
 	}
+	if f.Package != "" {
+		name = f.Package + "." + name
+	}
+
 	if f.IsContext && f.IsError {
-		out := `wrapFn := func(ctx context.Context) error {
+		out := `
+			wrapFn := func(ctx context.Context) error {
 				return %s(ctx)
 			}
-			err := runTarget(wrapFn)`
-		return fmt.Sprintf(out, name)
+			err := runTarget(wrapFn)`[1:]
+		return fmt.Sprintf(out, name), nil
 	}
 	if f.IsContext && !f.IsError {
-		out := `wrapFn := func(ctx context.Context) error {
+		out := `
+			wrapFn := func(ctx context.Context) error {
 				%s(ctx)
 				return nil
 			}
-			err := runTarget(wrapFn)`
-		return fmt.Sprintf(out, name)
+			err := runTarget(wrapFn)`[1:]
+		return fmt.Sprintf(out, name), nil
 	}
 	if !f.IsContext && f.IsError {
-		out := `wrapFn := func(ctx context.Context) error {
+		out := `
+			wrapFn := func(ctx context.Context) error {
 				return %s()
 			}
-			err := runTarget(wrapFn)`
-		return fmt.Sprintf(out, name)
+			err := runTarget(wrapFn)`[1:]
+		return fmt.Sprintf(out, name), nil
 	}
 	if !f.IsContext && !f.IsError {
-		out := `wrapFn := func(ctx context.Context) error {
+		out := `
+			wrapFn := func(ctx context.Context) error {
 				%s()
 				return nil
 			}
-			err := runTarget(wrapFn)`
-		return fmt.Sprintf(out, name)
+			err := runTarget(wrapFn)`[1:]
+		return fmt.Sprintf(out, name), nil
 	}
-	return `fmt.Printf("Error formatting job code\n")
-	os.Exit(1)`
+	return "", fmt.Errorf("Error formatting ExecCode code for %#v", f)
 }
 
-// Package parses a package
+// Package parses a package.  If files is non-empty, it will only parse the files given.
 func Package(path string, files []string) (*PkgInfo, error) {
 	start := time.Now()
 	defer func() {
@@ -102,66 +135,16 @@ func Package(path string, files []string) (*PkgInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	p := doc.New(pkg, "./", 0)
 	pi := &PkgInfo{
 		Description: toOneLine(p.Doc),
 	}
 
-typeloop:
-	for _, t := range p.Types {
-		for _, s := range t.Decl.Specs {
-			if id, ok := s.(*ast.TypeSpec); ok {
-				if sel, ok := id.Type.(*ast.SelectorExpr); ok {
-					if ident, ok := sel.X.(*ast.Ident); ok {
-						if ident.Name != "mg" || sel.Sel.Name != "Namespace" {
-							continue typeloop
-						}
-					}
-				}
-				break
-			}
-		}
-		for _, f := range t.Methods {
-			if !ast.IsExported(f.Name) {
-				continue
-			}
-			if typ := funcType(f.Decl.Type); typ != invalidType {
-				pi.Funcs = append(pi.Funcs, Function{
-					Name:      f.Name,
-					Receiver:  f.Recv,
-					Comment:   toOneLine(f.Doc),
-					Synopsis:  sanitizeSynopsis(f),
-					IsError:   typ == errorType || typ == contextErrorType,
-					IsContext: typ == contextVoidType || typ == contextErrorType,
-				})
-			}
-		}
+	if err := setImports(pkg, pi); err != nil {
+		return nil, err
 	}
-	for _, f := range p.Funcs {
-		if f.Recv != "" {
-			debug.Printf("skipping method %s.%s", f.Recv, f.Name)
-			// skip methods
-			continue
-		}
-		if !ast.IsExported(f.Name) {
-			debug.Printf("skipping non-exported function %s", f.Name)
-			// skip non-exported functions
-			continue
-		}
-		if typ := funcType(f.Decl.Type); typ != invalidType {
-			debug.Printf("found target %v", f.Name)
-			pi.Funcs = append(pi.Funcs, Function{
-				Name:      f.Name,
-				Comment:   toOneLine(f.Doc),
-				Synopsis:  sanitizeSynopsis(f),
-				IsError:   typ == errorType || typ == contextErrorType,
-				IsContext: typ == contextVoidType || typ == contextErrorType,
-			})
-		} else {
-			debug.Printf("skipping function with invalid signature func %s(%v)(%v)", f.Name, fieldNames(f.Decl.Type.Params), fieldNames(f.Decl.Type.Results))
-		}
-	}
+	setNamespaces(p, pi)
+	setFuncs(p, pi)
 
 	hasDupes, names := checkDupes(pi)
 	if hasDupes {
@@ -178,6 +161,136 @@ typeloop:
 	setAliases(p, pi)
 
 	return pi, nil
+}
+
+func setFuncs(p *doc.Package, pi *PkgInfo) {
+	for _, f := range p.Funcs {
+		if f.Recv != "" {
+			debug.Printf("skipping method %s.%s", f.Recv, f.Name)
+			// skip methods
+			continue
+		}
+		if !ast.IsExported(f.Name) {
+			debug.Printf("skipping non-exported function %s", f.Name)
+			// skip non-exported functions
+			continue
+		}
+		if typ := funcType(f.Decl.Type); typ != invalidType {
+			debug.Printf("found target %v", f.Name)
+			pi.Funcs = append(pi.Funcs, &Function{
+				Name:      f.Name,
+				Comment:   toOneLine(f.Doc),
+				Synopsis:  sanitizeSynopsis(f),
+				IsError:   typ == errorType || typ == contextErrorType,
+				IsContext: typ == contextVoidType || typ == contextErrorType,
+			})
+		} else {
+			debug.Printf("skipping function with invalid signature func %s(%v)(%v)", f.Name, fieldNames(f.Decl.Type.Params), fieldNames(f.Decl.Type.Results))
+		}
+	}
+}
+
+func setNamespaces(p *doc.Package, pi *PkgInfo) {
+	for _, t := range p.Types {
+		if !isNamespace(t) {
+			continue
+		}
+		debug.Printf("found namespace %s %s", p.ImportPath, t.Name)
+		for _, f := range t.Methods {
+			if !ast.IsExported(f.Name) {
+				continue
+			}
+			typ := funcType(f.Decl.Type)
+			if typ == invalidType {
+				continue
+			}
+			debug.Printf("found namespace method %s %s.%s", p.ImportPath, t.Name, f.Name)
+			pi.Funcs = append(pi.Funcs, &Function{
+				Name:      f.Name,
+				Receiver:  t.Name,
+				Comment:   toOneLine(f.Doc),
+				Synopsis:  sanitizeSynopsis(f),
+				IsError:   typ == errorType || typ == contextErrorType,
+				IsContext: typ == contextVoidType || typ == contextErrorType,
+			})
+		}
+	}
+}
+
+func setImports(pkg *ast.Package, pi *PkgInfo) error {
+	pi.Imports = map[string]string{}
+	for _, f := range pkg.Files {
+		for _, imp := range f.Imports {
+			name, alias, ok := getImport(imp)
+			if !ok {
+				continue
+			}
+			if alias != "" {
+				debug.Printf("found %s: %s (%s)", importTag, name, alias)
+				if pi.Imports[alias] != "" {
+					return fmt.Errorf("duplicate import alias: %q", alias)
+				}
+				pi.Imports[alias] = name
+			} else {
+				debug.Printf("found %s: %s", importTag, name)
+				pi.RootImports = append(pi.RootImports, name)
+			}
+		}
+	}
+	return nil
+}
+
+func getImport(imp *ast.ImportSpec) (path, alias string, ok bool) {
+	if imp.Doc == nil || len(imp.Doc.List) == 9 {
+		return "", "", false
+	}
+	// import is always the last comment
+	s := imp.Doc.List[len(imp.Doc.List)-1].Text
+
+	// trim comment start and normalize for anyone who has spaces or not between
+	// "//"" and the text
+	vals := strings.Fields(strings.ToLower(s[2:]))
+	if len(vals) == 0 {
+		return "", "", false
+	}
+	if vals[0] != importTag {
+		return "", "", false
+	}
+	path, ok = lit2string(imp.Path)
+	if !ok {
+		return "", "", false
+	}
+
+	switch len(vals) {
+	case 1:
+		// just the import tag, this is a root import
+		return path, "", true
+	case 2:
+		// also has an alias
+		return path, vals[1], true
+	default:
+		log.Println("warning: ignoring malformed", importTag, "for import", path)
+		return "", "", false
+	}
+}
+
+func isNamespace(t *doc.Type) bool {
+	if len(t.Decl.Specs) != 1 {
+		return false
+	}
+	id, ok := t.Decl.Specs[0].(*ast.TypeSpec)
+	if !ok {
+		return false
+	}
+	sel, ok := id.Type.(*ast.SelectorExpr)
+	if !ok {
+		return false
+	}
+	ident, ok := sel.X.(*ast.Ident)
+	if !ok {
+		return false
+	}
+	return ident.Name == "mg" && sel.Sel.Name == "Namespace"
 }
 
 func fieldNames(flist *ast.FieldList) string {
@@ -273,6 +386,28 @@ func setDefault(p *doc.Package, pi *PkgInfo) {
 	}
 }
 
+func lit2string(l *ast.BasicLit) (string, bool) {
+	if !strings.HasPrefix(l.Value, `"`) || !strings.HasSuffix(l.Value, `"`) {
+		return "", false
+	}
+	return strings.Trim(l.Value, `"`), true
+}
+
+func outputDebug(cmd string, args ...string) (string, error) {
+	buf := &bytes.Buffer{}
+	errbuf := &bytes.Buffer{}
+	debug.Println("running", cmd, strings.Join(args, " "))
+	c := exec.Command(cmd, args...)
+	c.Env = os.Environ()
+	c.Stderr = errbuf
+	c.Stdout = buf
+	if err := c.Run(); err != nil {
+		debug.Print("error running '", cmd, strings.Join(args, " "), "': ", err, ": ", errbuf)
+		return "", err
+	}
+	return strings.TrimSpace(buf.String()), nil
+}
+
 func setAliases(p *doc.Package, pi *PkgInfo) {
 	for _, v := range p.Vars {
 		for x, name := range v.Names {
@@ -292,7 +427,7 @@ func setAliases(p *doc.Package, pi *PkgInfo) {
 				log.Println("warning: aliases declaration is not a map")
 				return
 			}
-			pi.Aliases = map[string]Function{}
+			pi.Aliases = map[string]*Function{}
 			for _, elem := range comp.Elts {
 				kv, ok := elem.(*ast.KeyValueExpr)
 				if !ok {
@@ -315,8 +450,13 @@ func setAliases(p *doc.Package, pi *PkgInfo) {
 					receiver = fmt.Sprintf("%s", v.X)
 				default:
 					log.Printf("warning: target for alias %s is not a function", k.Value)
+					continue
 				}
-				alias := strings.Trim(k.Value, "\"")
+				alias, ok := lit2string(k)
+				if !ok {
+					log.Println("warning: malformed alias declaration for alias", k.Value)
+					continue
+				}
 				valid := false
 				for _, f := range pi.Funcs {
 					if f.Name == name && f.Receiver == receiver {
@@ -336,13 +476,16 @@ func setAliases(p *doc.Package, pi *PkgInfo) {
 
 // getPackage returns the non-test package at the given path.
 func getPackage(path string, files []string, fset *token.FileSet) (*ast.Package, error) {
-	fm := make(map[string]bool, len(files))
-	for _, f := range files {
-		fm[f] = true
-	}
+	var filter func(f os.FileInfo) bool
+	if len(files) > 0 {
+		fm := make(map[string]bool, len(files))
+		for _, f := range files {
+			fm[f] = true
+		}
 
-	filter := func(f os.FileInfo) bool {
-		return fm[f.Name()]
+		filter = func(f os.FileInfo) bool {
+			return fm[f.Name()]
+		}
 	}
 
 	pkgs, err := parser.ParseDir(fset, path, filter, parser.ParseComments)

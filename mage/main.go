@@ -32,7 +32,7 @@ const magicRebuildKey = "v0.3"
 
 var output = template.Must(template.New("").Funcs(map[string]interface{}{
 	"lower": strings.ToLower,
-	"lowerfirst": func(s string) string {
+	"lowerFirst": func(s string) string {
 		parts := strings.Split(s, ":")
 		for i, t := range parts {
 			r := []rune(t)
@@ -131,11 +131,6 @@ func ParseAndRun(stdout, stderr io.Writer, stdin io.Reader, args []string) int {
 			out.Println("Error:", err)
 			return 1
 		}
-		if err := removeContents(filepath.Join(inv.CacheDir, mainfileSubdir)); err != nil {
-			out.Println("Error:", err)
-			return 1
-		}
-
 		out.Println(inv.CacheDir, "cleaned")
 		return 0
 	case CompileStatic:
@@ -334,8 +329,42 @@ func Invoke(inv Invocation) int {
 		return 1
 	}
 
+	imports, err := getNamedImports(inv.GoCmd, info.Imports)
+	if err != nil {
+		errlog.Println(err)
+		return 1
+	}
+	for _, s := range info.RootImports {
+		imp, err := getImport(inv.GoCmd, s, "")
+		if err != nil {
+			errlog.Println(err)
+			return 1
+		}
+		imports = append(imports, imp)
+	}
+
+	if !checkDupes(info, imports) {
+		return 1
+	}
+
+	// have to set unique package names on imports
+	used := map[string]bool{}
+	for _, imp := range imports {
+		unique := imp.Name + "_mageimport"
+		x := 1
+		for used[unique] {
+			unique = fmt.Sprintf("%s_mageimport%d", imp.Name, x)
+			x++
+		}
+		used[unique] = true
+		imp.UniqueName = unique
+		for _, f := range imp.Info.Funcs {
+			f.Package = unique
+		}
+	}
+
 	main := filepath.Join(inv.Dir, mainfile)
-	err = GenerateMainfile(main, inv.CacheDir, info)
+	err = GenerateMainfile(main, inv.CacheDir, info, imports)
 	if err != nil {
 		errlog.Println("Error:", err)
 		return 1
@@ -364,20 +393,96 @@ func Invoke(inv Invocation) int {
 	return RunCompiled(inv, exePath, errlog)
 }
 
-func moveMainToCache(cachedir, main, hash string) {
-	debug.Println("moving main file to cache:", cachedMainfile(cachedir, hash))
-	if err := os.Rename(main, cachedMainfile(cachedir, hash)); err != nil && !os.IsNotExist(err) {
-		debug.Println("error caching main file: ", err)
+func checkDupes(info *parse.PkgInfo, imports []*Import) (ok bool) {
+	funcs := map[string][]*parse.Function{}
+	for _, f := range info.Funcs {
+		funcs[strings.ToLower(f.TargetName())] = append(funcs[strings.ToLower(f.TargetName())], f)
 	}
+	for _, imp := range imports {
+		for _, f := range imp.Info.Funcs {
+			target := strings.ToLower(f.TargetName())
+			funcs[target] = append(funcs[target], f)
+		}
+	}
+	for alias, f := range info.Aliases {
+		if len(funcs[alias]) != 0 {
+			var ids []string
+			for _, f := range funcs[alias] {
+				ids = append(ids, f.ID())
+			}
+			fmt.Printf("ERROR: alias %q duplicates existing target(s): %s\n", alias, strings.Join(ids, ", "))
+		}
+		funcs[alias] = append(funcs[alias], f)
+	}
+	var dupes []string
+	for target, list := range funcs {
+		if len(list) > 1 {
+			dupes = append(dupes, target)
+		}
+	}
+	if len(dupes) == 0 {
+		return true
+	}
+	for _, d := range dupes {
+		var ids []string
+		for _, f := range funcs[d] {
+			ids = append(ids, f.ID())
+		}
+		fmt.Printf("ERROR: %q target has multiple definitions: %s\n", d, strings.Join(ids, ", "))
+	}
+	return false
+}
+
+func getNamedImports(gocmd string, pkgs map[string]string) ([]*Import, error) {
+	var imports []*Import
+	for alias, pkg := range pkgs {
+		debug.Printf("getting import package %q, alias %q", pkg, alias)
+		imp, err := getImport(gocmd, pkg, alias)
+		if err != nil {
+			return nil, err
+		}
+		imports = append(imports, imp)
+	}
+	return imports, nil
+}
+
+func getImport(gocmd, importpath, alias string) (*Import, error) {
+	out, err := outputDebug(gocmd, "list", "-tags=mage", "-f", "{{.Dir}}||{{.Name}}", importpath)
+	if err != nil {
+		return nil, err
+	}
+	parts := strings.Split(out, "||")
+	if len(parts) != 2 {
+		return nil, fmt.Errorf("incorrect data from go list: %s", out)
+	}
+	dir, name := parts[0], parts[1]
+	debug.Printf("parsing imported package %q from dir %q", importpath, dir)
+	info, err := parse.Package(dir, nil)
+	if err != nil {
+		return nil, err
+	}
+	for i := range info.Funcs {
+		debug.Printf("setting alias %q and package %q on func %v", alias, name, info.Funcs[i].Name)
+		info.Funcs[i].PkgAlias = alias
+		info.Funcs[i].ImportPath = importpath
+	}
+	return &Import{Alias: alias, Name: name, Path: importpath, Info: *info}, nil
+}
+
+type Import struct {
+	Alias      string
+	Name       string
+	UniqueName string // a name unique across all imports
+	Path       string
+	Info       parse.PkgInfo
 }
 
 type data struct {
-	Description  string
-	Funcs        []parse.Function
-	DefaultError bool
-	Default      string
-	DefaultFunc  parse.Function
-	Aliases      map[string]parse.Function
+	Description string
+	Funcs       []*parse.Function
+	DefaultFunc parse.Function
+	Aliases     map[string]*parse.Function
+	Imports     []*Import
 }
 
 func goVersion(gocmd string) (string, error) {
@@ -463,8 +568,8 @@ func Compile(magePath, goCmd, compileTo string, gofiles []string, isDebug bool, 
 	for i := range gofiles {
 		gofiles[i] = filepath.Base(gofiles[i])
 	}
-	debug.Printf("running %s build -o %s %s", goCmd, compileTo, strings.Join(gofiles, " "))
-	c := exec.Command(goCmd, append([]string{"build", "-o", compileTo}, gofiles...)...)
+	debug.Printf("running %s -tag=mage build -o %s %s", goCmd, compileTo, strings.Join(gofiles, " "))
+	c := exec.Command(goCmd, append([]string{"build", "-tags=mage", "-o", compileTo}, gofiles...)...)
 	c.Env = os.Environ()
 	c.Stderr = stderr
 	c.Stdout = stdout
@@ -509,16 +614,10 @@ func outputDebug(cmd string, args ...string) (string, error) {
 	return strings.TrimSpace(buf.String()), nil
 }
 
-const mainfileSubdir = "mainfiles"
-
-func cachedMainfile(cachedir, hash string) string {
-	return filepath.Join(cachedir, mainfileSubdir, hash)
-}
-
 // GenerateMainfile generates the mage mainfile at path.  Because go build's
 // cache cares about modtimes, we squirrel away our mainfiles in the cachedir
 // and move them back as needed.
-func GenerateMainfile(path, cachedir string, info *parse.PkgInfo) error {
+func GenerateMainfile(path, cachedir string, info *parse.PkgInfo, imports []*Import) error {
 	debug.Println("Creating mainfile at", path)
 
 	f, err := os.Create(path)
@@ -529,8 +628,12 @@ func GenerateMainfile(path, cachedir string, info *parse.PkgInfo) error {
 	data := data{
 		Description: info.Description,
 		Funcs:       info.Funcs,
-		DefaultFunc: info.DefaultFunc,
 		Aliases:     info.Aliases,
+		Imports:     imports,
+	}
+
+	if info.DefaultFunc != nil {
+		data.DefaultFunc = *info.DefaultFunc
 	}
 
 	debug.Println("writing new file at", path)
