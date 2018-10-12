@@ -1,0 +1,3 @@
+package subdir
+
+func Build() {}
