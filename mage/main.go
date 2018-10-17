@@ -447,7 +447,7 @@ func getNamedImports(gocmd string, pkgs map[string]string) ([]*Import, error) {
 }
 
 func getImport(gocmd, importpath, alias string) (*Import, error) {
-	out, err := outputDebug(gocmd, "list", "-tags=mage", "-f", "{{.Dir}}||{{.Name}}", importpath)
+	out, err := outputDebug(gocmd, "list", "-f", "{{.Dir}}||{{.Name}}", importpath)
 	if err != nil {
 		return nil, err
 	}
@@ -569,7 +569,7 @@ func Compile(magePath, goCmd, compileTo string, gofiles []string, isDebug bool, 
 		gofiles[i] = filepath.Base(gofiles[i])
 	}
 	debug.Printf("running %s -tag=mage build -o %s %s", goCmd, compileTo, strings.Join(gofiles, " "))
-	c := exec.Command(goCmd, append([]string{"build", "-tags=mage", "-o", compileTo}, gofiles...)...)
+	c := exec.Command(goCmd, append([]string{"build", "-o", compileTo}, gofiles...)...)
 	c.Env = os.Environ()
 	c.Stderr = stderr
 	c.Stdout = stdout

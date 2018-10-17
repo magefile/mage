@@ -2,4 +2,8 @@
 
 package main
 
-func Build() {}
+import "./subdir"
+
+func Build() {
+	subdir.Build()
+}
