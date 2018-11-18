@@ -7,6 +7,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -20,8 +21,57 @@ import (
 )
 
 func main() {
-	// These functions are local variables to avoid name conflicts with 
-	// magefiles.
+	// Use local types and functions in order to avoid name conflicts with additional magefiles.
+	type arguments struct {
+		Verbose       bool          // print out log statements
+		List          bool          // print out a list of targets
+		Help          bool          // print out help for a specific target
+		IgnoreDefault bool          // ignore the default build target and print all build targets instead
+		Timeout       time.Duration // set a timeout to running the targets
+		Args          []string      // args contain the non-flag command-line arguments
+	}
+	initArgs := func() arguments {
+		args := arguments{}
+		// default flag set with ExitOnError and auto generated PrintDefaults should be sufficient
+		flag.BoolVar(&args.Verbose, "v", false, "show verbose output when running mage targets")
+		flag.BoolVar(&args.List, "l", false, "list mage targets in this directory")
+		flag.BoolVar(&args.Help, "h", false, "print out help for a specific target")
+		flag.BoolVar(&args.IgnoreDefault, "ignoredefault", false, "ignore the default build target")
+		flag.DurationVar(&args.Timeout, "t", 0, "timeout in duration parsable format (e.g. 5m30s)")
+		flag.Parse()
+		args.Args = flag.Args()
+		// With golangs flag package we can't distinguish, whether a flag's default value has been:
+		//  * provided by the user or
+		//  * never passed by command-line and thus having been set to its default value
+		// This feature would be nice because we could lookup an environment var ONLY if the
+		// flag hasn't been provided by the user.
+		// The answer at https://stackoverflow.com/a/51903637 provides a pretty clever workaround
+		// without breaking flag.PrintDefaults, but is a bit tedious. Let's just allow
+		// the override of any flag with its respective environment variable value.
+		env := os.Getenv("MAGEFILE_VERBOSE")
+		if val, err := strconv.ParseBool(env); err == nil {
+			args.Verbose = val
+		}
+		env = os.Getenv("MAGEFILE_IGNOREDEFAULT")
+		if val, err := strconv.ParseBool(env); err == nil {
+			args.IgnoreDefault = val
+		}
+		env = os.Getenv("MAGEFILE_LIST")
+		if val, err := strconv.ParseBool(env); err == nil {
+			args.List = val
+		}
+		env = os.Getenv("MAGEFILE_HELP")
+		if val, err := strconv.ParseBool(env); err == nil {
+			args.Help = val
+		}
+		env = os.Getenv("MAGEFILE_TIMEOUT")
+		if val, err := time.ParseDuration(env); err == nil {
+			args.Timeout = val
+		}
+		return args
+	}
+	args := initArgs()
+
 	list := func() error {
 		{{with .Description}}fmt.Println(` + "`{{.}}\n`" + `)
 		{{- end}}
@@ -53,14 +103,8 @@ func main() {
 			return ctx, ctxCancel
 		}
 
-		if os.Getenv("MAGEFILE_TIMEOUT") != "" {
-			timeout, err := time.ParseDuration(os.Getenv("MAGEFILE_TIMEOUT"))
-			if err != nil {
-				fmt.Printf("timeout error: %v\n", err)
-				os.Exit(1)
-			}
-
-			ctx, ctxCancel = context.WithTimeout(context.Background(), timeout)
+		if args.Timeout != 0 {
+			ctx, ctxCancel = context.WithTimeout(context.Background(), args.Timeout)
 		} else {
 			ctx = context.Background()
 			ctxCancel = func() {}
@@ -110,12 +154,11 @@ func main() {
 	_ = handleError
 
 	log.SetFlags(0)
-	verbose, _ := strconv.ParseBool(os.Getenv("MAGEFILE_VERBOSE"))
-	if !verbose {
+	if !args.Verbose {
 		log.SetOutput(ioutil.Discard)
 	}
 	logger := log.New(os.Stderr, "", 0)
-	if ok, _ := strconv.ParseBool(os.Getenv("MAGEFILE_LIST")); ok {
+	if args.List {
 		if err := list(); err != nil {
 			log.Println(err)
 			os.Exit(1)
@@ -138,7 +181,7 @@ func main() {
 	}
 
 	var unknown []string
-	for _, arg := range os.Args[1:] {
+	for _, arg := range args.Args {
 		if !targets[strings.ToLower(arg)] {
 			unknown = append(unknown, arg)
 		}
@@ -152,12 +195,12 @@ func main() {
 		os.Exit(2)
 	}
 
-	if help, _ := strconv.ParseBool(os.Getenv("MAGEFILE_HELP")); help {
-		if len(os.Args) < 2 {
+	if args.Help {
+		if len(args.Args) < 1 {
 			logger.Println("no target specified")
 			os.Exit(1)
 		}
-		switch strings.ToLower(os.Args[1]) {
+		switch strings.ToLower(args.Args[0]) {
 			{{range .Funcs}}case "{{lower .TargetName}}":
 				fmt.Print("mage {{lower .TargetName}}:\n\n")
 				{{if ne .Comment "" -}}
@@ -176,19 +219,18 @@ func main() {
 				return
 			{{end}}
 			default:
-				logger.Printf("Unknown target: %q\n", os.Args[1])
+				logger.Printf("Unknown target: %q\n", args.Args[0])
 				os.Exit(1)
-		}	
+		}
 	}
-	if len(os.Args) < 2 {
+	if len(args.Args) < 1 {
 	{{- if .DefaultFunc.Name}}
-		ignore, _ := strconv.ParseBool(os.Getenv("MAGEFILE_IGNOREDEFAULT"))
-		if ignore {
+		if args.IgnoreDefault {
 			if err := list(); err != nil {
 				logger.Println("Error:", err)
 				os.Exit(1)
 			}
-			return	
+			return
 		}
 		{{.DefaultFunc.ExecCode}}
 		handleError(logger, err)
@@ -201,7 +243,7 @@ func main() {
 		return
 	{{- end}}
 	}
-	for _, target := range os.Args[1:] {
+	for _, target := range args.Args {
 		switch strings.ToLower(target) {
 		{{range $alias, $func := .Aliases}}
 			case "{{lower $alias}}":
@@ -211,7 +253,7 @@ func main() {
 		switch strings.ToLower(target) {
 		{{range .Funcs }}
 			case "{{lower .TargetName}}":
-				if verbose {
+				if args.Verbose {
 					logger.Println("Running target:", "{{.TargetName}}")
 				}
 				{{.ExecCode}}
@@ -221,7 +263,7 @@ func main() {
 		{{$imp := .}}
 			{{range .Info.Funcs }}
 				case "{{lower .TargetName}}":
-					if verbose {
+					if args.Verbose {
 						logger.Println("Running target:", "{{.TargetName}}")
 					}
 					{{.ExecCode}}
@@ -230,7 +272,7 @@ func main() {
 		{{- end}}
 		default:
 			// should be impossible since we check this above.
-			logger.Printf("Unknown target: %q\n", os.Args[1])
+			logger.Printf("Unknown target: %q\n", args.Args[0])
 			os.Exit(1)
 		}
 	}
