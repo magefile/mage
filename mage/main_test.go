@@ -783,6 +783,185 @@ func TestRunCompiledPrintsError(t *testing.T) {
 	}
 }
 
+func TestCompiledFlags(t *testing.T) {
+	stderr := &bytes.Buffer{}
+	stdout := &bytes.Buffer{}
+	f, err := ioutil.TempFile("", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	name := f.Name()
+	defer os.Remove(name)
+	f.Close()
+	inv := Invocation{
+		Dir:        "./testdata/compiled",
+		Stdout:     stdout,
+		Stderr:     stderr,
+		CompileOut: name,
+	}
+	code := Invoke(inv)
+	if code != 0 {
+		t.Errorf("expected to exit with code 0, but got %v, stderr: %s", code, stderr)
+	}
+
+	run := func(stdout, stderr *bytes.Buffer, filename string, args ...string) error {
+		stderr.Reset()
+		stdout.Reset()
+		cmd := exec.Command(filename, args...)
+		cmd.Env = os.Environ()
+		cmd.Stderr = stderr
+		cmd.Stdout = stdout
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("running '%s %s' failed with: %v\nstdout: %s\nstderr: %s",
+				filename, strings.Join(args, " "), err, stdout, stderr)
+		}
+		return nil
+	}
+
+	// get help to target with flag -h target
+	if err := run(stdout, stderr, name, "-h", "deploy"); err != nil {
+		t.Fatal(err)
+	}
+	got := strings.TrimSpace(stdout.String())
+	want := "mage deploy:\n\nThis is the synopsis for Deploy. This part shouldn't show up."
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+
+	// run target with verbose flag -v
+	if err := run(stdout, stderr, name, "-v", "testverbose"); err != nil {
+		t.Fatal(err)
+	}
+	got = stderr.String()
+	want = "hi!"
+	if strings.Contains(got, want) == false {
+		t.Errorf("got %q, does not contain %q", got, want)
+	}
+
+	// pass list flag -l
+	if err := run(stdout, stderr, name, "-l"); err != nil {
+		t.Fatal(err)
+	}
+	got = stdout.String()
+	want = "This is the synopsis for Deploy"
+	if strings.Contains(got, want) == false {
+		t.Errorf("got %q, does not contain %q", got, want)
+	}
+	want = "This is very verbose"
+	if strings.Contains(got, want) == false {
+		t.Errorf("got %q, does not contain %q", got, want)
+	}
+
+	// pass flag -ignoredefault --> display list and exit
+	if err := run(stdout, stderr, name, "-ignoredefault"); err != nil {
+		t.Fatal(err)
+	}
+	got = stdout.String()
+	want = "Compiled package description."
+	if strings.Contains(got, want) == false {
+		t.Errorf("got %q, does not contain %q", got, want)
+	}
+
+	// pass flag -t 1ms
+	err = run(stdout, stderr, name, "-t", "1ms", "sleep")
+	if err == nil {
+		t.Fatalf("expected an error because of timeout")
+	}
+	got = stdout.String()
+	want = "context deadline exceeded"
+	if strings.Contains(got, want) == false {
+		t.Errorf("got %q, does not contain %q", got, want)
+	}
+}
+
+func TestCompiledEnvironmentVars(t *testing.T) {
+	stderr := &bytes.Buffer{}
+	stdout := &bytes.Buffer{}
+	f, err := ioutil.TempFile("", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	name := f.Name()
+	defer os.Remove(name)
+	f.Close()
+	inv := Invocation{
+		Dir:        "./testdata/compiled",
+		Stdout:     stdout,
+		Stderr:     stderr,
+		CompileOut: name,
+	}
+	code := Invoke(inv)
+	if code != 0 {
+		t.Errorf("expected to exit with code 0, but got %v, stderr: %s", code, stderr)
+	}
+
+	run := func(stdout, stderr *bytes.Buffer, filename string, envval string, args ...string) error {
+		env := os.Environ()
+		env = append(env, envval)
+		stderr.Reset()
+		stdout.Reset()
+		cmd := exec.Command(filename, args...)
+		cmd.Env = env
+		cmd.Stderr = stderr
+		cmd.Stdout = stdout
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("running '%s %s' failed with: %v\nstdout: %s\nstderr: %s",
+				filename, strings.Join(args, " "), err, stdout, stderr)
+		}
+		return nil
+	}
+
+	if err := run(stdout, stderr, name, "MAGEFILE_HELP=1", "deploy"); err != nil {
+		t.Fatal(err)
+	}
+	got := strings.TrimSpace(stdout.String())
+	want := "mage deploy:\n\nThis is the synopsis for Deploy. This part shouldn't show up."
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+
+	if err := run(stdout, stderr, name, mg.VerboseEnv+"=1", "testverbose"); err != nil {
+		t.Fatal(err)
+	}
+	got = stderr.String()
+	want = "hi!"
+	if strings.Contains(got, want) == false {
+		t.Errorf("got %q, does not contain %q", got, want)
+	}
+
+	if err := run(stdout, stderr, name, "MAGEFILE_LIST=1"); err != nil {
+		t.Fatal(err)
+	}
+	got = stdout.String()
+	want = "This is the synopsis for Deploy"
+	if strings.Contains(got, want) == false {
+		t.Errorf("got %q, does not contain %q", got, want)
+	}
+	want = "This is very verbose"
+	if strings.Contains(got, want) == false {
+		t.Errorf("got %q, does not contain %q", got, want)
+	}
+
+	if err := run(stdout, stderr, name, mg.IgnoreDefaultEnv+"=1"); err != nil {
+		t.Fatal(err)
+	}
+	got = stdout.String()
+	want = "Compiled package description."
+	if strings.Contains(got, want) == false {
+		t.Errorf("got %q, does not contain %q", got, want)
+	}
+
+	err = run(stdout, stderr, name, "MAGEFILE_TIMEOUT=1ms", "sleep")
+	if err == nil {
+		t.Fatalf("expected an error because of timeout")
+	}
+	got = stdout.String()
+	want = "context deadline exceeded"
+	if strings.Contains(got, want) == false {
+		t.Errorf("got %q, does not contain %q", got, want)
+	}
+}
+
 func TestClean(t *testing.T) {
 	if err := os.RemoveAll(mg.CacheDir()); err != nil {
 		t.Error("error removing cache dir:", err)
