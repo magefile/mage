@@ -16,12 +16,12 @@ and above (possibly even lower versions, but they're not regularly tested).
 Install mage by running 
 
 ```plain
-go get -u -d github.com/magefile/mage
-cd $GOPATH/src/github.com/magefile/mage
+git clone https://github.com/magefile/mage
+cd mage
 go run bootstrap.go
 ```
 
-This will download the code into your GOPATH, and then run the bootstrap script
+This will download the code then run the bootstrap script
 to build mage with version infomation embedded in it.  A normal `go get`
 (without -d) will build the binary correctly, but no version info will be
 embedded.  If you've done this, no worries, just go to
