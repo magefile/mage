@@ -291,7 +291,7 @@ func TestIgnoreDefault(t *testing.T) {
 		Stdout: stdout,
 		Stderr: stderr,
 	}
-	defer os.Setenv(mg.IgnoreDefaultEnv, os.Getenv(mg.IgnoreDefaultEnv))
+	defer os.Unsetenv(mg.IgnoreDefaultEnv)
 	if err := os.Setenv(mg.IgnoreDefaultEnv, "1"); err != nil {
 		t.Fatal(err)
 	}
@@ -885,7 +885,6 @@ func TestCompiledEnvironmentVars(t *testing.T) {
 		Stdout:     stdout,
 		Stderr:     stderr,
 		CompileOut: outName,
-		Debug:      true,
 	}
 	code := Invoke(inv)
 	if code != 0 {
@@ -893,12 +892,10 @@ func TestCompiledEnvironmentVars(t *testing.T) {
 	}
 
 	run := func(stdout, stderr *bytes.Buffer, filename string, envval string, args ...string) error {
-		env := os.Environ()
-		env = append(env, envval)
 		stderr.Reset()
 		stdout.Reset()
 		cmd := exec.Command(filename, args...)
-		cmd.Env = env
+		cmd.Env = []string{envval}
 		cmd.Stderr = stderr
 		cmd.Stdout = stdout
 		if err := cmd.Run(); err != nil {
@@ -1010,10 +1007,10 @@ func TestClean(t *testing.T) {
 
 func TestGoCmd(t *testing.T) {
 	textOutput := "TestGoCmd"
+	defer os.Unsetenv(testExeEnv)
 	if err := os.Setenv(testExeEnv, textOutput); err != nil {
 		t.Fatal(err)
 	}
-	defer os.Unsetenv(testExeEnv)
 
 	// fake out the compiled file, since the code checks for it.
 	f, err := ioutil.TempFile("", "")
