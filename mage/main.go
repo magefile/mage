@@ -574,7 +574,7 @@ func Compile(magePath, goCmd, compileTo string, gofiles []string, isDebug bool, 
 	for i := range gofiles {
 		gofiles[i] = filepath.Base(gofiles[i])
 	}
-	debug.Printf("running %s -tag=mage build -o %s %s", goCmd, compileTo, strings.Join(gofiles, " "))
+	debug.Printf("running %s build -o %s %s", goCmd, compileTo, strings.Join(gofiles, " "))
 	c := exec.Command(goCmd, append([]string{"build", "-o", compileTo}, gofiles...)...)
 	c.Env = os.Environ()
 	c.Stderr = stderr

@@ -786,18 +786,21 @@ func TestRunCompiledPrintsError(t *testing.T) {
 func TestCompiledFlags(t *testing.T) {
 	stderr := &bytes.Buffer{}
 	stdout := &bytes.Buffer{}
-	f, err := ioutil.TempFile("", "")
+	dir := "./testdata/compiled"
+	compileDir, err := ioutil.TempDir(dir, "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	name := f.Name()
-	defer os.Remove(name)
-	f.Close()
+	name := filepath.Join(compileDir, "mage_out")
+	// The CompileOut directory is relative to the
+	// invocation directory, so chop off the invocation dir.
+	outName := "./" + name[len(dir)-1:]
+	defer os.RemoveAll(compileDir)
 	inv := Invocation{
-		Dir:        "./testdata/compiled",
+		Dir:        dir,
 		Stdout:     stdout,
 		Stderr:     stderr,
-		CompileOut: name,
+		CompileOut: outName,
 	}
 	code := Invoke(inv)
 	if code != 0 {
@@ -867,18 +870,22 @@ func TestCompiledFlags(t *testing.T) {
 func TestCompiledEnvironmentVars(t *testing.T) {
 	stderr := &bytes.Buffer{}
 	stdout := &bytes.Buffer{}
-	f, err := ioutil.TempFile("", "")
+	dir := "./testdata/compiled"
+	compileDir, err := ioutil.TempDir(dir, "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	name := f.Name()
-	defer os.Remove(name)
-	f.Close()
+	name := filepath.Join(compileDir, "mage_out")
+	// The CompileOut directory is relative to the
+	// invocation directory, so chop off the invocation dir.
+	outName := "./" + name[len(dir)-1:]
+	defer os.RemoveAll(compileDir)
 	inv := Invocation{
-		Dir:        "./testdata/compiled",
+		Dir:        dir,
 		Stdout:     stdout,
 		Stderr:     stderr,
-		CompileOut: name,
+		CompileOut: outName,
+		Debug:      true,
 	}
 	code := Invoke(inv)
 	if code != 0 {
