@@ -30,7 +30,7 @@ import (
 // change the inputs to the compiling process.
 const magicRebuildKey = "v0.3"
 
-var output = template.Must(template.New("").Funcs(map[string]interface{}{
+var mainfileTemplate = template.Must(template.New("").Funcs(map[string]interface{}{
 	"lower": strings.ToLower,
 	"lowerFirst": func(s string) string {
 		parts := strings.Split(s, ":")
@@ -40,7 +40,7 @@ var output = template.Must(template.New("").Funcs(map[string]interface{}{
 		}
 		return strings.Join(parts, ":")
 	},
-}).Parse(tpl))
+}).Parse(mageMainfileTplString))
 var initOutput = template.Must(template.New("").Parse(mageTpl))
 
 const mainfile = "mage_output_file.go"
@@ -364,7 +364,12 @@ func Invoke(inv Invocation) int {
 	}
 
 	main := filepath.Join(inv.Dir, mainfile)
-	err = GenerateMainfile(main, inv.CacheDir, info, imports)
+	binaryName := "mage"
+	if inv.CompileOut != "" {
+		binaryName = filepath.Base(inv.CompileOut)
+	}
+
+	err = GenerateMainfile(binaryName, main, info, imports)
 	if err != nil {
 		errlog.Println("Error:", err)
 		return 1
@@ -477,12 +482,13 @@ type Import struct {
 	Info       parse.PkgInfo
 }
 
-type data struct {
+type mainfileTemplateData struct {
 	Description string
 	Funcs       []*parse.Function
 	DefaultFunc parse.Function
 	Aliases     map[string]*parse.Function
 	Imports     []*Import
+	BinaryName  string
 }
 
 func goVersion(gocmd string) (string, error) {
@@ -614,10 +620,8 @@ func outputDebug(cmd string, args ...string) (string, error) {
 	return strings.TrimSpace(buf.String()), nil
 }
 
-// GenerateMainfile generates the mage mainfile at path.  Because go build's
-// cache cares about modtimes, we squirrel away our mainfiles in the cachedir
-// and move them back as needed.
-func GenerateMainfile(path, cachedir string, info *parse.PkgInfo, imports []*Import) error {
+// GenerateMainfile generates the mage mainfile at path.
+func GenerateMainfile(binaryName, path string, info *parse.PkgInfo, imports []*Import) error {
 	debug.Println("Creating mainfile at", path)
 
 	f, err := os.Create(path)
@@ -625,11 +629,12 @@ func GenerateMainfile(path, cachedir string, info *parse.PkgInfo, imports []*Imp
 		return fmt.Errorf("error creating generated mainfile: %v", err)
 	}
 	defer f.Close()
-	data := data{
+	data := mainfileTemplateData{
 		Description: info.Description,
 		Funcs:       info.Funcs,
 		Aliases:     info.Aliases,
 		Imports:     imports,
+		BinaryName:  binaryName,
 	}
 
 	if info.DefaultFunc != nil {
@@ -637,7 +642,7 @@ func GenerateMainfile(path, cachedir string, info *parse.PkgInfo, imports []*Imp
 	}
 
 	debug.Println("writing new file at", path)
-	if err := output.Execute(f, data); err != nil {
+	if err := mainfileTemplate.Execute(f, data); err != nil {
 		return fmt.Errorf("can't execute mainfile template: %v", err)
 	}
 	if err := f.Close(); err != nil {
@@ -665,7 +670,7 @@ func ExeName(goCmd, cacheDir string, files []string) (string, error) {
 	}
 	// hash the mainfile template to ensure if it gets updated, we make a new
 	// binary.
-	hashes = append(hashes, fmt.Sprintf("%x", sha1.Sum([]byte(tpl))))
+	hashes = append(hashes, fmt.Sprintf("%x", sha1.Sum([]byte(mageMainfileTplString))))
 	sort.Strings(hashes)
 	ver, err := goVersion(goCmd)
 	if err != nil {

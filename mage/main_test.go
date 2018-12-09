@@ -400,13 +400,13 @@ func TestPanicsErr(t *testing.T) {
 // executable name to run, so we automatically create a new exe if the template
 // changes.
 func TestHashTemplate(t *testing.T) {
-	templ := tpl
-	defer func() { tpl = templ }()
+	templ := mageMainfileTplString
+	defer func() { mageMainfileTplString = templ }()
 	name, err := ExeName("go", mg.CacheDir(), []string{"testdata/func.go", "testdata/command.go"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	tpl = "some other template"
+	mageMainfileTplString = "some other template"
 	changed, err := ExeName("go", mg.CacheDir(), []string{"testdata/func.go", "testdata/command.go"})
 	if err != nil {
 		t.Fatal(err)
@@ -823,7 +823,7 @@ func TestCompiledFlags(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := strings.TrimSpace(stdout.String())
-	want := "mage deploy:\n\nThis is the synopsis for Deploy. This part shouldn't show up."
+	want := filepath.Base(name) + " deploy:\n\nThis is the synopsis for Deploy. This part shouldn't show up."
 	if got != want {
 		t.Errorf("got %q, want %q", got, want)
 	}
@@ -848,16 +848,6 @@ func TestCompiledFlags(t *testing.T) {
 		t.Errorf("got %q, does not contain %q", got, want)
 	}
 	want = "This is very verbose"
-	if strings.Contains(got, want) == false {
-		t.Errorf("got %q, does not contain %q", got, want)
-	}
-
-	// pass flag -ignoredefault --> display list and exit
-	if err := run(stdout, stderr, name, "-ignoredefault"); err != nil {
-		t.Fatal(err)
-	}
-	got = stdout.String()
-	want = "Compiled package description."
 	if strings.Contains(got, want) == false {
 		t.Errorf("got %q, does not contain %q", got, want)
 	}
@@ -915,7 +905,7 @@ func TestCompiledEnvironmentVars(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := strings.TrimSpace(stdout.String())
-	want := "mage deploy:\n\nThis is the synopsis for Deploy. This part shouldn't show up."
+	want := filepath.Base(name) + " deploy:\n\nThis is the synopsis for Deploy. This part shouldn't show up."
 	if got != want {
 		t.Errorf("got %q, want %q", got, want)
 	}

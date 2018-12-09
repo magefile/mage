@@ -1,7 +1,9 @@
 package mage
 
+// this template uses the "data"
+
 // var only for tests
-var tpl = `// +build ignore
+var mageMainfileTplString = `// +build ignore
 
 package main
 
@@ -12,6 +14,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"text/tabwriter"
@@ -26,52 +29,69 @@ func main() {
 		Verbose       bool          // print out log statements
 		List          bool          // print out a list of targets
 		Help          bool          // print out help for a specific target
-		IgnoreDefault bool          // ignore the default build target and print all build targets instead
 		Timeout       time.Duration // set a timeout to running the targets
 		Args          []string      // args contain the non-flag command-line arguments
 	}
-	initArgs := func() arguments {
-		args := arguments{}
-		// default flag set with ExitOnError and auto generated PrintDefaults should be sufficient
-		flag.BoolVar(&args.Verbose, "v", false, "show verbose output when running mage targets")
-		flag.BoolVar(&args.List, "l", false, "list mage targets in this directory")
-		flag.BoolVar(&args.Help, "h", false, "print out help for a specific target")
-		flag.BoolVar(&args.IgnoreDefault, "ignoredefault", false, "ignore the default build target")
-		flag.DurationVar(&args.Timeout, "t", 0, "timeout in duration parsable format (e.g. 5m30s)")
-		flag.Parse()
-		args.Args = flag.Args()
-		// With golangs flag package we can't distinguish, whether a flag's default value has been:
-		//  * provided by the user or
-		//  * never passed by command-line and thus having been set to its default value
-		// This feature would be nice because we could lookup an environment var ONLY if the
-		// flag hasn't been provided by the user.
-		// The answer at https://stackoverflow.com/a/51903637 provides a pretty clever workaround
-		// without breaking flag.PrintDefaults, but is a bit tedious. Let's just allow
-		// the override of any flag with its respective environment variable value.
-		env := os.Getenv("MAGEFILE_VERBOSE")
-		if val, err := strconv.ParseBool(env); err == nil {
-			args.Verbose = val
-		}
-		env = os.Getenv("MAGEFILE_IGNOREDEFAULT")
-		if val, err := strconv.ParseBool(env); err == nil {
-			args.IgnoreDefault = val
-		}
-		env = os.Getenv("MAGEFILE_LIST")
-		if val, err := strconv.ParseBool(env); err == nil {
-			args.List = val
-		}
-		env = os.Getenv("MAGEFILE_HELP")
-		if val, err := strconv.ParseBool(env); err == nil {
-			args.Help = val
-		}
-		env = os.Getenv("MAGEFILE_TIMEOUT")
-		if val, err := time.ParseDuration(env); err == nil {
-			args.Timeout = val
-		}
-		return args
-	}
-	args := initArgs()
 
+	parseBool := func(env string) bool {
+		val := os.Getenv(env)
+		if val == "" {
+			return false
+		}		
+		b, err := strconv.ParseBool(val)
+		if err != nil {
+			log.Printf("warning: environment variable %s is not a valid bool value: %v", env, val)
+			return false
+		}
+		return b
+	}
+
+	parseDuration := func(env string) time.Duration {
+		val := os.Getenv(env)
+		if val == "" {
+			return 0
+		}		
+		d, err := time.ParseDuration(val)
+		if err != nil {
+			log.Printf("warning: environment variable %s is not a valid duration value: %v", env, val)
+			return 0
+		}
+		return d
+	}
+	args := arguments{}
+	fs := flag.FlagSet{}
+	fs.SetOutput(os.Stdout)
+
+	// default flag set with ExitOnError and auto generated PrintDefaults should be sufficient
+	fs.BoolVar(&args.Verbose, "v", parseBool("MAGEFILE_VERBOSE"), "show verbose output when running targets")
+	fs.BoolVar(&args.List, "l", parseBool("MAGEFILE_LIST"), "list targets for this binary")
+	fs.BoolVar(&args.Help, "h", parseBool("MAGEFILE_HELP"), "print out help for a specific target")
+	fs.DurationVar(&args.Timeout, "t", parseDuration("MAGEFILE_TIMEOUT"), "timeout in duration parsable format (e.g. 5m30s)")
+	fs.Usage = func() {
+		fmt.Fprintf(os.Stdout, ` + "`" + `
+%s [options] [target]
+
+Commands:
+  -l    list targets in this binary
+  -h    show this help
+
+Options:
+  -h    show description of a target
+  -t <string>
+        timeout in duration parsable format (e.g. 5m30s)
+  -v    show verbose output when running targets
+ ` + "`" + `[1:], filepath.Base(os.Args[0]))
+	}
+	if err := fs.Parse(os.Args[1:]); err != nil {
+		// flag will have printed out an error already.
+		return
+	}
+	args.Args = fs.Args()
+	if args.Help && len(args.Args) == 0 {
+		fs.Usage()
+		return
+	}
+	  
 	list := func() error {
 		{{with .Description}}fmt.Println(` + "`{{.}}\n`" + `)
 		{{- end}}
@@ -202,7 +222,7 @@ func main() {
 		}
 		switch strings.ToLower(args.Args[0]) {
 			{{range .Funcs}}case "{{lower .TargetName}}":
-				fmt.Print("mage {{lower .TargetName}}:\n\n")
+				fmt.Print("{{$.BinaryName}} {{lower .TargetName}}:\n\n")
 				{{if ne .Comment "" -}}
 				fmt.Println({{printf "%q" .Comment}})
 				fmt.Println()
@@ -225,7 +245,8 @@ func main() {
 	}
 	if len(args.Args) < 1 {
 	{{- if .DefaultFunc.Name}}
-		if args.IgnoreDefault {
+		ignoreDefault, _ := strconv.ParseBool(os.Getenv("MAGEFILE_IGNOREDEFAULT"))
+		if ignoreDefault {
 			if err := list(); err != nil {
 				logger.Println("Error:", err)
 				os.Exit(1)
