@@ -66,17 +66,19 @@ Commands:
 
 Options:
   -d <string> 
-          run magefiles in the given directory (default ".")
-  -debug  turn on debug messages
-  -h      show description of a target
-  -f      force recreation of compiled magefile
-  -keep   keep intermediate mage files around after running
+            run magefiles in the given directory (default ".")
+  -debug    turn on debug messages
+  -h        show description of a target
+  -f        force recreation of compiled magefile
+  -keep     keep intermediate mage files around after running
   -gocmd <string>
-          use the given go binary to compile the output (default: "go")
+		    use the given go binary to compile the output (default: "go")
+  -goos     sets the GOOS for the binary created by -compile (default: current OS)
+  -goarch   sets the GOARCH for the binary created by -compile (default: current arch)
   -t <string>
-          timeout in duration parsable format (e.g. 5m30s)
-  -v      show verbose output when running mage targets
-```
+            timeout in duration parsable format (e.g. 5m30s)
+  -v        show verbose output when running mage targets
+  ```
 
 ## Why?
 
@@ -90,17 +92,6 @@ Windows.  Go is superior to bash for any non-trivial task involving branching, l
 that's not just straight line execution of commands.  And if your project is written in Go, why
 introduce another language as idiosyncratic as bash?  Why not use the language your contributors are
 already comfortable with?
-
-## Compiling a static binary
-
-If your tasks are not related to compiling Go code, it can be useful to compile a binary which has
-the mage execution runtime and the tasks compiled in such that it can be run on another machine
-without requiring installation of dependencies. To do so, pass the output path to the compile flag.
-like this:
-
-```plain
-$ mage -compile ./static-output
-```
 
 ## Code
 

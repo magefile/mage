@@ -2,11 +2,14 @@ package mage
 
 import (
 	"bytes"
+	"debug/macho"
+	"debug/pe"
 	"flag"
 	"fmt"
 	"go/build"
 	"go/parser"
 	"go/token"
+	"io"
 	"io/ioutil"
 	"log"
 	"os"
@@ -106,7 +109,7 @@ func TestTransitiveDepCache(t *testing.T) {
 
 func TestListMagefilesMain(t *testing.T) {
 	buf := &bytes.Buffer{}
-	files, err := Magefiles("testdata/mixed_main_files", "go", buf, false)
+	files, err := Magefiles("testdata/mixed_main_files", "", "", "go", buf, false)
 	if err != nil {
 		t.Errorf("error from magefile list: %v: %s", err, buf)
 	}
@@ -116,9 +119,112 @@ func TestListMagefilesMain(t *testing.T) {
 	}
 }
 
+func TestListMagefilesIgnoresGOOS(t *testing.T) {
+	buf := &bytes.Buffer{}
+	if runtime.GOOS == "windows" {
+		os.Setenv("GOOS", "linux")
+	} else {
+		os.Setenv("GOOS", "windows")
+	}
+	defer os.Setenv("GOOS", runtime.GOOS)
+	files, err := Magefiles("testdata/goos_magefiles", "", "", "go", buf, false)
+	if err != nil {
+		t.Errorf("error from magefile list: %v: %s", err, buf)
+	}
+	var expected []string
+	if runtime.GOOS == "windows" {
+		expected = []string{"testdata/goos_magefiles/magefile_windows.go"}
+	} else {
+		expected = []string{"testdata/goos_magefiles/magefile_nonwindows.go"}
+	}
+	if !reflect.DeepEqual(files, expected) {
+		t.Fatalf("expected %q but got %q", expected, files)
+	}
+}
+
+func TestListMagefilesIgnoresRespectsGOOSArg(t *testing.T) {
+	buf := &bytes.Buffer{}
+	var goos string
+	if runtime.GOOS == "windows" {
+		goos = "linux"
+	} else {
+		goos = "windows"
+	}
+	files, err := Magefiles("testdata/goos_magefiles", goos, "", "go", buf, false)
+	if err != nil {
+		t.Errorf("error from magefile list: %v: %s", err, buf)
+	}
+	var expected []string
+	if goos == "windows" {
+		expected = []string{"testdata/goos_magefiles/magefile_windows.go"}
+	} else {
+		expected = []string{"testdata/goos_magefiles/magefile_nonwindows.go"}
+	}
+	if !reflect.DeepEqual(files, expected) {
+		t.Fatalf("expected %q but got %q", expected, files)
+	}
+}
+
+func TestCompileDiffGoosGoarch(t *testing.T) {
+	target, err := ioutil.TempDir("./testdata", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(target)
+
+	// intentionally choose an arch and os to build that are not our current one.
+
+	goos := "windows"
+	if runtime.GOOS == "windows" {
+		goos = "darwin"
+	}
+	goarch := "amd64"
+	if runtime.GOARCH == "amd64" {
+		goarch = "386"
+	}
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	inv := Invocation{
+		Stderr: stderr,
+		Stdout: stdout,
+		Debug:  true,
+		Dir:    "testdata",
+		// this is relative to the Dir above
+		CompileOut: filepath.Join(".", filepath.Base(target), "output"),
+		GOOS:       goos,
+		GOARCH:     goarch,
+	}
+	code := Invoke(inv)
+	if code != 0 {
+		t.Fatalf("got code %v, err: %s", code, stderr)
+	}
+	os, arch, err := fileData(filepath.Join(target, "output"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if goos == "windows" {
+		if os != winExe {
+			t.Error("ran with GOOS=windows but did not produce a windows exe")
+		}
+	} else {
+		if os != macExe {
+			t.Error("ran with GOOS=darwin but did not a mac exe")
+		}
+	}
+	if goarch == "amd64" {
+		if arch != arch64 {
+			t.Error("ran with GOARCH=amd64 but did not produce a 64 bit exe")
+		}
+	} else {
+		if arch != arch32 {
+			t.Error("rand with GOARCH=386 but did not produce a 32 bit exe")
+		}
+	}
+}
+
 func TestListMagefilesLib(t *testing.T) {
 	buf := &bytes.Buffer{}
-	files, err := Magefiles("testdata/mixed_lib_files", "go", buf, false)
+	files, err := Magefiles("testdata/mixed_lib_files", "", "", "go", buf, false)
 	if err != nil {
 		t.Errorf("error from magefile list: %v: %s", err, buf)
 	}
@@ -1024,7 +1130,7 @@ func TestGoCmd(t *testing.T) {
 
 	buf := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
-	if err := Compile(dir, os.Args[0], name, []string{}, false, stderr, buf); err != nil {
+	if err := Compile("", "", dir, os.Args[0], name, []string{}, false, stderr, buf); err != nil {
 		t.Log("stderr: ", stderr.String())
 		t.Fatal(err)
 	}
@@ -1148,4 +1254,55 @@ func TestNamespaceDefault(t *testing.T) {
 	if stdout.String() != expected {
 		t.Fatalf("expected %q, but got %q", expected, stdout.String())
 	}
+}
+
+/// This code liberally borrowed from https://github.com/rsc/goversion/blob/master/version/exe.go
+
+type exeType int
+type archSize int
+
+const (
+	winExe exeType = iota
+	macExe
+
+	arch32 archSize = iota
+	arch64
+)
+
+// fileData tells us if the given file is mac or windows and if they're 32bit or
+// 64 bit.  Other exe versions are not supported.
+func fileData(file string) (exeType, archSize, error) {
+	f, err := os.Open(file)
+	if err != nil {
+		return -1, -1, err
+	}
+	defer f.Close()
+	data := make([]byte, 16)
+	if _, err := io.ReadFull(f, data); err != nil {
+		return -1, -1, err
+	}
+	if bytes.HasPrefix(data, []byte("MZ")) {
+		// hello windows exe!
+		e, err := pe.NewFile(f)
+		if err != nil {
+			return -1, -1, err
+		}
+		if e.Machine == pe.IMAGE_FILE_MACHINE_AMD64 {
+			return winExe, arch64, nil
+		}
+		return winExe, arch32, nil
+	}
+
+	if bytes.HasPrefix(data, []byte("\xFE\xED\xFA")) || bytes.HasPrefix(data[1:], []byte("\xFA\xED\xFE")) {
+		// hello mac exe!
+		fe, err := macho.NewFile(f)
+		if err != nil {
+			return -1, -1, err
+		}
+		if fe.Cpu&0x01000000 != 0 {
+			return macExe, arch64, nil
+		}
+		return macExe, arch32, nil
+	}
+	return -1, -1, fmt.Errorf("unrecognized executable format")
 }
