@@ -9,10 +9,10 @@ When building the binary for your magefile, mage will ignore the GOOS and GOARCH
 
 ## Compiling a static binary
 
-If your tasks are not related to compiling Go code, it can be useful to compile
-a static binary which has the mage execution runtime and the tasks compiled in
-such that it can be run on another machine without requiring installation of
-dependencies. To do so, pass the output path to the compile flag. like this:
+It can be useful to compile a static binary which has the mage execution runtime
+and the tasks compiled in such that it can be run on another machine without
+requiring any dependencies. To do so, pass the output path to the compile flag.
+like this:
 
 ```plain
 $ mage -compile ./static-output
@@ -34,8 +34,8 @@ Options:
   -v    show verbose output when running targets
 ```
 
-## Compiling for a different OS
+## Compiling for a different OS -goos and -goarch
 
-If you intend to run the binary on another machine with a different OS platform, you may use the -goos and -goarch flags to build the compiled binary for the target platform.  Valid values for these flags may be found here: https://golang.org/doc/install/source#environment.  The OS values are obvious, the GOARCH values most commonly needed will be "amd64" or "386" for 64 for 32 bit versions of common desktop OSes.
+If you intend to run the binary on another machine with a different OS platform, you may use the `-goos` and `-goarch` flags to build the compiled binary for the target platform.  Valid values for these flags may be found here: https://golang.org/doc/install/source#environment.  The OS values are obvious (except darwin=MacOS), the GOARCH values most commonly needed will be "amd64" or "386" for 64 for 32 bit versions of common desktop OSes.
 
-Note that if you run -compile with -dir, the -compile target will be *relative to the dir flag*.
+Note that if you run `-compile` with `-dir`, the `-compile` target will be *relative to the magefile dir*.
