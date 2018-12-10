@@ -34,6 +34,24 @@ The mage binary will be created in your $GOPATH/bin directory.
 You may also install a binary release from our
 [releases](https://github.com/magefile/mage/releases) page. 
 
+## Example Magefile
+
+```go
+//+build mage
+
+package main
+
+// Runs dep ensure and then installs the binary.
+func Build() error {
+    if err := sh.Run("dep", "ensure"); err != nil {
+        return err
+    }
+    return sh.Run("go", "install", "./...")
+}
+```
+
+Run the above `Build` target by simply running `mage build` in the same directory as the magefile.
+
 ## Demo
 
 {{< youtube Hoga60EF_1U >}}
