@@ -6,7 +6,7 @@ import (
 )
 
 func TestParse(t *testing.T) {
-	info, err := Package("./testdata", []string{"func.go", "command.go", "alias.go", "repeating_synopsis.go", "subcommands.go"})
+	info, err := PrimaryPackage("go", "./testdata", []string{"func.go", "command.go", "alias.go", "repeating_synopsis.go", "subcommands.go"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -47,6 +47,10 @@ func TestParse(t *testing.T) {
 			Receiver: "Build",
 			IsError:  false,
 		},
+	}
+
+	if info.DefaultFunc == nil {
+		t.Fatal("expected default func to exist, but was nil")
 	}
 
 	// DefaultIsError

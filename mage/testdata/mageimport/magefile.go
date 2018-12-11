@@ -18,8 +18,11 @@ import (
 	"github.com/magefile/mage/mage/testdata/mageimport/subdir2"
 )
 
-// just something to keep the import from being unused.
-var _ = mage.BuildSubdir2
+var Aliases = map[string]interface{}{
+	"nsd2": mage.NS.Deploy2,
+}
+
+var Default = mage.NS.Deploy2
 
 func Root() {
 	fmt.Println("root")

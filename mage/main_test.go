@@ -23,6 +23,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/magefile/mage/internal"
 	"github.com/magefile/mage/mg"
 )
 
@@ -60,7 +61,7 @@ func testmain(m *testing.M) int {
 }
 
 func TestTransitiveDepCache(t *testing.T) {
-	cache, err := outputDebug("go", "env", "gocache")
+	cache, err := internal.OutputDebug("go", "env", "gocache")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1254,6 +1255,10 @@ func TestNamespaceDefault(t *testing.T) {
 	if stdout.String() != expected {
 		t.Fatalf("expected %q, but got %q", expected, stdout.String())
 	}
+}
+
+func TestAliasToImport(t *testing.T) {
+
 }
 
 /// This code liberally borrowed from https://github.com/rsc/goversion/blob/master/version/exe.go
