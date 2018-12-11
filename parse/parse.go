@@ -319,24 +319,34 @@ func setImports(gocmd string, pi *PkgInfo) error {
 	importNames := map[string]string{}
 	rootImports := []string{}
 	for _, f := range pi.AstPkg.Files {
-		for _, imp := range f.Imports {
-			name, alias, ok := getImportPath(imp)
-			if !ok {
+		for _, d := range f.Decls {
+			gen, ok := d.(*ast.GenDecl)
+			if !ok || gen.Tok != token.IMPORT {
 				continue
 			}
-			if alias != "" {
-				debug.Printf("found %s: %s (%s)", importTag, name, alias)
-				if importNames[alias] != "" {
-					return fmt.Errorf("duplicate import alias: %q", alias)
+			for j := 0; j < len(gen.Specs); j++ {
+				spec := gen.Specs[j]
+				impspec := spec.(*ast.ImportSpec)
+				if len(gen.Specs) == 1 && gen.Lparen == token.NoPos && impspec.Doc == nil {
+					impspec.Doc = gen.Doc
 				}
-				importNames[alias] = name
-			} else {
-				debug.Printf("found %s: %s", importTag, name)
-				rootImports = append(rootImports, name)
+				name, alias, ok := getImportPath(impspec)
+				if !ok {
+					continue
+				}
+				if alias != "" {
+					debug.Printf("found %s: %s (%s)", importTag, name, alias)
+					if importNames[alias] != "" {
+						return fmt.Errorf("duplicate import alias: %q", alias)
+					}
+					importNames[alias] = name
+				} else {
+					debug.Printf("found %s: %s", importTag, name)
+					rootImports = append(rootImports, name)
+				}
 			}
 		}
 	}
-
 	imports, err := getNamedImports(gocmd, importNames)
 	if err != nil {
 		return err
