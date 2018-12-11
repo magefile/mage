@@ -166,3 +166,24 @@ func TestMageImportsAliasToNS(t *testing.T) {
 		t.Fatalf("expected: %q got: %q", expected, actual)
 	}
 }
+
+func TestMageImportsOneLine(t *testing.T) {
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:    "./testdata/mageimport/oneline",
+		Stdout: stdout,
+		Stderr: stderr,
+		Args:   []string{"build"},
+	}
+
+	code := Invoke(inv)
+	if code != 0 {
+		t.Fatalf("expected to exit with code 0, but got %v, stderr:\n%s", code, stderr)
+	}
+	actual := stdout.String()
+	expected := "build\n"
+	if actual != expected {
+		t.Fatalf("expected: %q got: %q", expected, actual)
+	}
+}
