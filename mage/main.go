@@ -1,7 +1,6 @@
 package mage
 
 import (
-	"bytes"
 	"crypto/sha1"
 	"errors"
 	"flag"
@@ -19,6 +18,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/magefile/mage/internal"
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/parse"
 	"github.com/magefile/mage/sh"
@@ -193,18 +193,18 @@ Commands:
 
 Options:
   -d <string> 
-           run magefiles in the given directory (default ".")
-  -debug   turn on debug messages
-  -h       show description of a target
-  -f       force recreation of compiled magefile
-  -keep    keep intermediate mage files around after running
+            run magefiles in the given directory (default ".")
+  -debug    turn on debug messages
+  -h        show description of a target
+  -f        force recreation of compiled magefile
+  -keep     keep intermediate mage files around after running
   -gocmd <string>
-		   use the given go binary to compile the output (default: "go")
-  -goos    sets the GOOS for the binary created by -compile (default: current OS)
-  -goarch  sets the GOARCH for the binary created by -compile (default: current arch)
+		    use the given go binary to compile the output (default: "go")
+  -goos     sets the GOOS for the binary created by -compile (default: current OS)
+  -goarch   sets the GOARCH for the binary created by -compile (default: current arch)
   -t <string>
-           timeout in duration parsable format (e.g. 5m30s)
-  -v       show verbose output when running mage targets
+            timeout in duration parsable format (e.g. 5m30s)
+  -v        show verbose output when running mage targets
 `[1:])
 	}
 	err = fs.Parse(args)
@@ -306,7 +306,7 @@ func Invoke(inv Invocation) int {
 	debug.Println("output exe is ", exePath)
 
 	useCache := false
-	if s, err := outputDebug(inv.GoCmd, "env", "GOCACHE"); err == nil {
+	if s, err := internal.OutputDebug(inv.GoCmd, "env", "GOCACHE"); err == nil {
 		// if GOCACHE exists, always rebuild, so we catch transitive
 		// dependencies that have changed.
 		if s != "" {
@@ -342,44 +342,10 @@ func Invoke(inv Invocation) int {
 		parse.EnableDebug()
 	}
 	debug.Println("parsing files")
-	info, err := parse.Package(inv.Dir, fnames)
+	info, err := parse.PrimaryPackage(inv.GoCmd, inv.Dir, fnames)
 	if err != nil {
 		errlog.Println("Error parsing magefiles:", err)
 		return 1
-	}
-
-	imports, err := getNamedImports(inv.GoCmd, info.Imports)
-	if err != nil {
-		errlog.Println(err)
-		return 1
-	}
-	for _, s := range info.RootImports {
-		imp, err := getImport(inv.GoCmd, s, "")
-		if err != nil {
-			errlog.Println(err)
-			return 1
-		}
-		imports = append(imports, imp)
-	}
-
-	if !checkDupes(info, imports) {
-		return 1
-	}
-
-	// have to set unique package names on imports
-	used := map[string]bool{}
-	for _, imp := range imports {
-		unique := imp.Name + "_mageimport"
-		x := 1
-		for used[unique] {
-			unique = fmt.Sprintf("%s_mageimport%d", imp.Name, x)
-			x++
-		}
-		used[unique] = true
-		imp.UniqueName = unique
-		for _, f := range imp.Info.Funcs {
-			f.Package = unique
-		}
 	}
 
 	main := filepath.Join(inv.Dir, mainfile)
@@ -388,7 +354,7 @@ func Invoke(inv Invocation) int {
 		binaryName = filepath.Base(inv.CompileOut)
 	}
 
-	err = GenerateMainfile(binaryName, main, info, imports)
+	err = GenerateMainfile(binaryName, main, info)
 	if err != nil {
 		errlog.Println("Error:", err)
 		return 1
@@ -417,96 +383,12 @@ func Invoke(inv Invocation) int {
 	return RunCompiled(inv, exePath, errlog)
 }
 
-func checkDupes(info *parse.PkgInfo, imports []*Import) (ok bool) {
-	funcs := map[string][]*parse.Function{}
-	for _, f := range info.Funcs {
-		funcs[strings.ToLower(f.TargetName())] = append(funcs[strings.ToLower(f.TargetName())], f)
-	}
-	for _, imp := range imports {
-		for _, f := range imp.Info.Funcs {
-			target := strings.ToLower(f.TargetName())
-			funcs[target] = append(funcs[target], f)
-		}
-	}
-	for alias, f := range info.Aliases {
-		if len(funcs[alias]) != 0 {
-			var ids []string
-			for _, f := range funcs[alias] {
-				ids = append(ids, f.ID())
-			}
-			fmt.Printf("ERROR: alias %q duplicates existing target(s): %s\n", alias, strings.Join(ids, ", "))
-		}
-		funcs[alias] = append(funcs[alias], f)
-	}
-	var dupes []string
-	for target, list := range funcs {
-		if len(list) > 1 {
-			dupes = append(dupes, target)
-		}
-	}
-	if len(dupes) == 0 {
-		return true
-	}
-	for _, d := range dupes {
-		var ids []string
-		for _, f := range funcs[d] {
-			ids = append(ids, f.ID())
-		}
-		fmt.Printf("ERROR: %q target has multiple definitions: %s\n", d, strings.Join(ids, ", "))
-	}
-	return false
-}
-
-func getNamedImports(gocmd string, pkgs map[string]string) ([]*Import, error) {
-	var imports []*Import
-	for alias, pkg := range pkgs {
-		debug.Printf("getting import package %q, alias %q", pkg, alias)
-		imp, err := getImport(gocmd, pkg, alias)
-		if err != nil {
-			return nil, err
-		}
-		imports = append(imports, imp)
-	}
-	return imports, nil
-}
-
-func getImport(gocmd, importpath, alias string) (*Import, error) {
-	out, err := outputDebug(gocmd, "list", "-f", "{{.Dir}}||{{.Name}}", importpath)
-	if err != nil {
-		return nil, err
-	}
-	parts := strings.Split(out, "||")
-	if len(parts) != 2 {
-		return nil, fmt.Errorf("incorrect data from go list: %s", out)
-	}
-	dir, name := parts[0], parts[1]
-	debug.Printf("parsing imported package %q from dir %q", importpath, dir)
-	info, err := parse.Package(dir, nil)
-	if err != nil {
-		return nil, err
-	}
-	for i := range info.Funcs {
-		debug.Printf("setting alias %q and package %q on func %v", alias, name, info.Funcs[i].Name)
-		info.Funcs[i].PkgAlias = alias
-		info.Funcs[i].ImportPath = importpath
-	}
-	return &Import{Alias: alias, Name: name, Path: importpath, Info: *info}, nil
-}
-
-type Import struct {
-	Alias      string
-	Name       string
-	UniqueName string // a name unique across all imports
-	Path       string
-	Info       parse.PkgInfo
-}
-
 type mainfileTemplateData struct {
 	Description string
 	Funcs       []*parse.Function
 	DefaultFunc parse.Function
 	Aliases     map[string]*parse.Function
-	Imports     []*Import
+	Imports     []*parse.Import
 	BinaryName  string
 }
 
@@ -520,7 +402,7 @@ func Magefiles(magePath, goos, goarch, goCmd string, stderr io.Writer, isDebug b
 		return nil, err
 	}
 
-	env, err := envWithGOOS(goos, goarch)
+	env, err := internal.EnvWithGOOS(goos, goarch)
 	if err != nil {
 		return nil, err
 	}
@@ -578,10 +460,10 @@ func Compile(goos, goarch, magePath, goCmd, compileTo string, gofiles []string, 
 	debug.Println("compiling to", compileTo)
 	debug.Println("compiling using gocmd:", goCmd)
 	if isDebug {
-		runDebug(goCmd, "version")
-		runDebug(goCmd, "env")
+		internal.RunDebug(goCmd, "version")
+		internal.RunDebug(goCmd, "env")
 	}
-	environ, err := envWithGOOS(goos, goarch)
+	environ, err := internal.EnvWithGOOS(goos, goarch)
 	if err != nil {
 		return err
 	}
@@ -604,47 +486,8 @@ func Compile(goos, goarch, magePath, goCmd, compileTo string, gofiles []string, 
 	return nil
 }
 
-func runDebug(cmd string, args ...string) error {
-	env, err := envWithCurrentGOOS()
-	if err != nil {
-		return err
-	}
-	buf := &bytes.Buffer{}
-	errbuf := &bytes.Buffer{}
-	debug.Println("running", cmd, strings.Join(args, " "))
-	c := exec.Command(cmd, args...)
-	c.Env = env
-	c.Stderr = errbuf
-	c.Stdout = buf
-	if err := c.Run(); err != nil {
-		debug.Print("error running '", cmd, strings.Join(args, " "), "': ", err, ": ", errbuf)
-		return err
-	}
-	debug.Println(buf)
-	return nil
-}
-
-func outputDebug(cmd string, args ...string) (string, error) {
-	env, err := envWithCurrentGOOS()
-	if err != nil {
-		return "", err
-	}
-	buf := &bytes.Buffer{}
-	errbuf := &bytes.Buffer{}
-	debug.Println("running", cmd, strings.Join(args, " "))
-	c := exec.Command(cmd, args...)
-	c.Env = env
-	c.Stderr = errbuf
-	c.Stdout = buf
-	if err := c.Run(); err != nil {
-		debug.Print("error running '", cmd, strings.Join(args, " "), "': ", err, ": ", errbuf)
-		return "", err
-	}
-	return strings.TrimSpace(buf.String()), nil
-}
-
 // GenerateMainfile generates the mage mainfile at path.
-func GenerateMainfile(binaryName, path string, info *parse.PkgInfo, imports []*Import) error {
+func GenerateMainfile(binaryName, path string, info *parse.PkgInfo) error {
 	debug.Println("Creating mainfile at", path)
 
 	f, err := os.Create(path)
@@ -656,7 +499,7 @@ func GenerateMainfile(binaryName, path string, info *parse.PkgInfo, imports []*I
 		Description: info.Description,
 		Funcs:       info.Funcs,
 		Aliases:     info.Aliases,
-		Imports:     imports,
+		Imports:     info.Imports,
 		BinaryName:  binaryName,
 	}
 
@@ -695,7 +538,7 @@ func ExeName(goCmd, cacheDir string, files []string) (string, error) {
 	// binary.
 	hashes = append(hashes, fmt.Sprintf("%x", sha1.Sum([]byte(mageMainfileTplString))))
 	sort.Strings(hashes)
-	ver, err := outputDebug(goCmd, "version")
+	ver, err := internal.OutputDebug(goCmd, "version")
 	if err != nil {
 		return "", err
 	}
@@ -804,61 +647,4 @@ func removeContents(dir string) error {
 	}
 	return nil
 
-}
-
-// splitEnv takes the results from os.Environ() (a []string of foo=bar values)
-// and makes a map[string]string out of it.
-func splitEnv(env []string) (map[string]string, error) {
-	out := map[string]string{}
-
-	for _, s := range env {
-		parts := strings.SplitN(s, "=", 2)
-		if len(parts) != 2 {
-			return nil, fmt.Errorf("badly formatted environment variable: %v", s)
-		}
-		out[parts[0]] = parts[1]
-	}
-	return out, nil
-}
-
-// joinEnv converts the given map into a list of foo=bar environment variables,
-// such as that outputted by os.Environ().
-func joinEnv(env map[string]string) []string {
-	vals := make([]string, 0, len(env))
-	for k, v := range env {
-		vals = append(vals, k+"="+v)
-	}
-	return vals
-}
-
-// envWithCurrentGOOS returns a copy of os.Environ with the GOOS and GOARCH set
-// to runtime.GOOS and runtime.GOARCH.
-func envWithCurrentGOOS() ([]string, error) {
-	vals, err := splitEnv(os.Environ())
-	if err != nil {
-		return nil, err
-	}
-	vals["GOOS"] = runtime.GOOS
-	vals["GOARCH"] = runtime.GOARCH
-	return joinEnv(vals), nil
-}
-
-// envWithGOOS retuns the os.Environ() values with GOOS and/or GOARCH either set
-// to their runtime value, or the given value if non-empty.
-func envWithGOOS(goos, goarch string) ([]string, error) {
-	env, err := splitEnv(os.Environ())
-	if err != nil {
-		return nil, err
-	}
-	if goos == "" {
-		env["GOOS"] = runtime.GOOS
-	} else {
-		env["GOOS"] = goos
-	}
-	if goarch == "" {
-		env["GOARCH"] = runtime.GOARCH
-	} else {
-		env["GOARCH"] = goarch
-	}
-	return joinEnv(env), nil
 }

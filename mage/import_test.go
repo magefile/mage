@@ -23,10 +23,12 @@ func TestMageImportsList(t *testing.T) {
 	expected := `
 Targets:
   root               
-  zz:nS:deploy2      deploys stuff.
+  zz:nS:deploy2*     deploys stuff.
   zz:buildSubdir2    Builds stuff.
   nS:deploy          deploys stuff.
   buildSubdir        Builds stuff.
+
+* default target
 `[1:]
 
 	if actual != expected {
@@ -97,6 +99,9 @@ func TestMageImportsNamedRoot(t *testing.T) {
 	if actual != expected {
 		t.Fatalf("expected: %q got: %q", expected, actual)
 	}
+	if stderr := stderr.String(); stderr != "" {
+		t.Fatal("unexpected output to stderr: ", stderr)
+	}
 }
 
 func TestMageImportsRootImportNS(t *testing.T) {
@@ -136,6 +141,27 @@ func TestMageImportsRootImport(t *testing.T) {
 	}
 	actual := stdout.String()
 	expected := "buildsubdir\n"
+	if actual != expected {
+		t.Fatalf("expected: %q got: %q", expected, actual)
+	}
+}
+
+func TestMageImportsAliasToNS(t *testing.T) {
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:    "./testdata/mageimport",
+		Stdout: stdout,
+		Stderr: stderr,
+		Args:   []string{"nsd2"},
+	}
+
+	code := Invoke(inv)
+	if code != 0 {
+		t.Fatalf("expected to exit with code 0, but got %v, stderr:\n%s", code, stderr)
+	}
+	actual := stdout.String()
+	expected := "deploy2\n"
 	if actual != expected {
 		t.Fatalf("expected: %q got: %q", expected, actual)
 	}
