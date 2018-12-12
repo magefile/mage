@@ -72,3 +72,9 @@ that's not just straight line execution of commands.  And if your project is
 written in Go, why introduce another language as idiosyncratic as bash?  Why not
 use the language your contributors are already comfortable with?
 
+# Thanks
+
+If you use mage and like it, or any of my other software, and you'd like to show your appreciation, you can do so on my patreon:
+
+[<img src=https://user-images.githubusercontent.com/3185864/49846051-64eddf80-fd97-11e8-9f59-d09f5652d214.png>](https://www.patreon.com/join/natefinch?)
+
