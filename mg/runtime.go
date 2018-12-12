@@ -19,8 +19,8 @@ const VerboseEnv = "MAGEFILE_VERBOSE"
 // debug mode when running mage.
 const DebugEnv = "MAGEFILE_DEBUG"
 
-// GoCmdEnv is the environment variable that indicates the user requested
-// verbose mode when running a magefile.
+// GoCmdEnv is the environment variable that indicates the go binary the user
+// desires to utilize for Magefile compilation.
 const GoCmdEnv = "MAGEFILE_GOCMD"
 
 // IgnoreDefaultEnv is the environment variable that indicates the user requested
