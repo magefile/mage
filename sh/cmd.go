@@ -120,8 +120,16 @@ func Exec(env map[string]string, stdout, stderr io.Writer, cmd string, args ...s
 func run(env map[string]string, stdout, stderr io.Writer, cmd string, args ...string) (ran bool, code int, err error) {
 	c := exec.Command(cmd, args...)
 	c.Env = os.Environ()
+	cwd := ""
 	for k, v := range env {
-		c.Env = append(c.Env, k+"="+v)
+		if k == "#CWD" {
+			cwd = v
+		} else {
+			c.Env = append(c.Env, k+"="+v)
+		}
+	}
+	if cwd != "" {
+		c.Dir = cwd
 	}
 	c.Stderr = stderr
 	c.Stdout = stdout
