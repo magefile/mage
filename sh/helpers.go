@@ -87,18 +87,31 @@ func CopyDir(dst, src string) error {
 // are:
 //
 // * (FAIL) No source.
+//
 // * (FAIL) Non existent source.
+//
 // * (PASS) File to non existent file.
+//
 // * (FAIL) File to more than one non existent elements in destination.
+//
 // * (PASS) File to file.
+//
 // * (PASS) File to directory.
+//
 // * (FAIL) Directory to file.
+//
 // * (PASS) Directory to non existent directory.
+//
 // * (FAIL) Directory to more than one non existent elements in destination.
+//
 // * (PASS) Directory to directory.
+//
 // * (FAIL) Directory to itself.
+//
 // * (FAIL) Multiple elements to file.
+//
 // * (PASS) Multiple elements to directory.
+//
 // * (FAIL) Bad permissions.
 func Cp(dst string, src ...string) error {
 	dfi, err := os.Stat(dst)
