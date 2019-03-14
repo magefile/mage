@@ -11,12 +11,12 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"sort"
 	"strings"
 	"text/template"
 	"time"
-	"unicode"
 
 	"github.com/magefile/mage/internal"
 	"github.com/magefile/mage/mg"
@@ -30,13 +30,28 @@ import (
 // change the inputs to the compiling process.
 const magicRebuildKey = "v0.3"
 
+// (Aaaa)(Bbbb) -> aaaaBbbb
+var firstWordRx = regexp.MustCompile(`^([[:upper:]][^[:upper:]]+)([[:upper:]].*)$`)
+
+// (AAAA)(Bbbb) -> aaaaBbbb
+var firstAbbrevRx = regexp.MustCompile(`^([[:upper:]]+)([[:upper:]][^[:upper:]].*)$`)
+
+func lowerFirstWord(s string) string {
+	if match := firstWordRx.FindStringSubmatch(s); match != nil {
+		return strings.ToLower(match[1]) + match[2]
+	}
+	if match := firstAbbrevRx.FindStringSubmatch(s); match != nil {
+		return strings.ToLower(match[1]) + match[2]
+	}
+	return strings.ToLower(s)
+}
+
 var mainfileTemplate = template.Must(template.New("").Funcs(map[string]interface{}{
 	"lower": strings.ToLower,
 	"lowerFirst": func(s string) string {
 		parts := strings.Split(s, ":")
 		for i, t := range parts {
-			r := []rune(t)
-			parts[i] = string(unicode.ToLower(r[0])) + string(r[1:])
+			parts[i] = lowerFirstWord(t)
 		}
 		return strings.Join(parts, ":")
 	},
