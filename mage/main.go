@@ -604,6 +604,9 @@ func RunCompiled(inv Invocation, exePath string, errlog *log.Logger) int {
 	if inv.Debug {
 		c.Env = append(c.Env, "MAGEFILE_DEBUG=1")
 	}
+	if inv.GoCmd != "" {
+		c.Env = append(c.Env, fmt.Sprintf("MAGEFILE_GOCMD=%s", inv.GoCmd))
+	}
 	if inv.Timeout > 0 {
 		c.Env = append(c.Env, fmt.Sprintf("MAGEFILE_TIMEOUT=%s", inv.Timeout.String()))
 	}
