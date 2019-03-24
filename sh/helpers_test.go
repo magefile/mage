@@ -74,79 +74,6 @@ func TestHelpers(t *testing.T) {
 		}
 	})
 
-	t.Run("sh/copydir", func(t *testing.T) {
-		cpddir := filepath.Join(mytmpdir, "copydir-dir")
-		if cerr := os.Mkdir(cpddir, 0744); cerr != nil {
-			t.Fatalf("can't create CopyDir test directory: %v", cerr)
-		}
-
-		// Directory to non existent directory.
-
-		neDir := filepath.Join(mytmpdir, "copydir-non-existent-directory")
-		if cerr := sh.CopyDir(neDir, cpddir); cerr != nil {
-			msg := "test directory copy from %s to %s failed: %v"
-			t.Errorf(msg, cpddir, neDir, cerr)
-		}
-
-		if cerr := compareDirs(cpddir, neDir); cerr != nil {
-			t.Errorf("test directory copy verification failed: %v", cerr)
-		}
-
-		// Directory to directory.
-
-		if cerr := sh.CopyDir(neDir, cpddir); cerr != nil {
-			msg := "test directory copy from %s to %s failed: %v"
-			t.Errorf(msg, cpddir, neDir, cerr)
-		}
-
-		ndir := filepath.Join(neDir, "copydir-dir")
-		if cerr := compareDirs(cpddir, ndir); cerr != nil {
-			t.Errorf("test directory copy verification failed: %v", cerr)
-		}
-	})
-
-	t.Run("sh/copydir/ne", func(t *testing.T) {
-		ned := filepath.Join(mytmpdir, "copydir-ne-dir")
-		if cerr := sh.CopyDir(destname, ned); cerr == nil {
-			t.Errorf("sh.CopyDir succeeded copying nonexistent directory %s", ned)
-		}
-	})
-
-	t.Run("sh/copydir/files", func(t *testing.T) {
-		if cerr := sh.CopyDir(mytmpdir, srcname); cerr == nil {
-			t.Error("sh.CopyDir succeeded using file as source")
-		}
-
-		otherd := filepath.Join(mytmpdir, "copydir-files-dir")
-		if cerr := os.Mkdir(otherd, 0744); cerr != nil {
-			t.Fatalf("can't create other test directory: %v", cerr)
-		}
-
-		if cerr := sh.CopyDir(destname, otherd); cerr == nil {
-			t.Error("sh.CopyDir succeeded using file as destination")
-		}
-	})
-
-	t.Run("sh/copydir/d2itself", func(t *testing.T) {
-		ii := filepath.Join(mytmpdir, "copydir-d2itself-dir")
-		if cerr := sh.CopyDir(ii, mytmpdir); cerr == nil {
-			t.Error("sh.CopyDir succeeded copying folders into itself")
-		}
-	})
-
-	t.Run("sh/copydir/lne", func(t *testing.T) {
-		otherd := filepath.Join(mytmpdir, "copydir-lne-dir")
-		if cerr := os.Mkdir(otherd, 0744); cerr != nil {
-			t.Fatalf("can't create other test directory: %v", cerr)
-		}
-
-		ned := filepath.Join(mytmpdir, "long", "non", "existent", "directory")
-		if cerr := sh.CopyDir(ned, otherd); cerr == nil {
-			msg := "sh.CopyDir succeeded copying to a long nonexistent directory %s"
-			t.Errorf(msg, ned)
-		}
-	})
-
 	t.Run("sh/cp", func(t *testing.T) {
 		cpdir := filepath.Join(mytmpdir, "cp-dir")
 		if cerr := os.Mkdir(cpdir, 0744); cerr != nil {
@@ -219,12 +146,12 @@ func TestHelpers(t *testing.T) {
 
 		// Multiple elements to directory.
 
-		mdir := filepath.Join(mytmpdir, "cp-multiple-elements")
+		mdir := filepath.Join(mytmpdir, "cp-m2d")
 		if cerr := os.Mkdir(mdir, 0744); cerr != nil {
-			t.Fatalf("can't create multiple type test directory: %v", cerr)
+			t.Fatalf("can't create test directory: %v", cerr)
 		}
 
-		if cerr := sh.Cp(mdir, cpdir, srcname, destname); cerr != nil {
+		if cerr := sh.Cp(mdir, cpdir, srcname, otherf); cerr != nil {
 			msg := "test multiple copy to %s failed: %v"
 			t.Errorf(msg, mdir, cerr)
 		}
@@ -239,8 +166,8 @@ func TestHelpers(t *testing.T) {
 			t.Errorf("test file copy verification failed: %v", cerr)
 		}
 
-		nfile = filepath.Join(mdir, "test2.txt")
-		if cerr := compareFiles(destname, nfile); cerr != nil {
+		nfile = filepath.Join(mdir, "other.txt")
+		if cerr := compareFiles(otherf, nfile); cerr != nil {
 			t.Errorf("test file copy verification failed: %v", cerr)
 		}
 	})
@@ -259,10 +186,39 @@ func TestHelpers(t *testing.T) {
 	})
 
 	t.Run("sh/cp/f2lne", func(t *testing.T) {
-		ned := filepath.Join(mytmpdir, "long", "non", "existent", "directory")
+		ned := filepath.Join(mytmpdir, "long/non/existent/directory")
 		if cerr := sh.Cp(ned, srcname); cerr == nil {
-			msg := "sh.Cp succeeded copying to a long nonexistent directory %s"
+			msg := "sh.Cp succeeded copying to a long non existent directory %s"
 			t.Errorf(msg, ned)
+		}
+	})
+
+	t.Run("sh/cp/forbidden", func(t *testing.T) {
+		fd, err := ioutil.TempDir(mytmpdir, "cp-forbidden")
+		if err != nil {
+			t.Fatalf("can't create test directory: %v", err)
+		}
+
+		allowed := filepath.Join(fd, "allowed")
+		if cerr := os.Mkdir(allowed, 0744); cerr != nil {
+			t.Fatalf("can't create directory: %v", cerr)
+		}
+
+		if cerr := sh.Cp(allowed, srcname); cerr != nil {
+			t.Errorf("can't copy file: %v", cerr)
+		}
+
+		forbidden := filepath.Join(allowed, "forbidden")
+		if cerr := os.Mkdir(forbidden, 0000); cerr != nil {
+			t.Fatalf("can't create a forbidden directory: %v", cerr)
+		}
+
+		if cerr := sh.Cp(forbidden, srcname); cerr == nil {
+			t.Error("sh.Cp succeeded copying elements to forbidden directory")
+		}
+
+		if cerr := sh.Cp(fd, allowed); cerr == nil {
+			t.Error("sh.Cp succeeded copying forbidden elements")
 		}
 	})
 
@@ -273,28 +229,14 @@ func TestHelpers(t *testing.T) {
 		}
 
 		if cerr := sh.Cp(destname, otherd); cerr == nil {
-			t.Error("sh.Cp replaces files with folders")
+			t.Error("sh.Cp replaces files with directories")
 		}
 	})
 
-	t.Run("sh/cp/d2lne", func(t *testing.T) {
-		otherd := filepath.Join(mytmpdir, "cp-d2lne-dir")
-		if cerr := os.Mkdir(otherd, 0744); cerr != nil {
-			t.Fatalf("can't create other test directory: %v", cerr)
-		}
-
-		ned := filepath.Join(mytmpdir, "long", "non", "existent", "directory")
-		if cerr := sh.Cp(ned, otherd); cerr == nil {
-			msg := "sh.Cp succeeded copying to a long nonexistent directory %s"
-			t.Errorf(msg, ned)
-		}
-	})
-
-	t.Run("sh/cp/dne", func(t *testing.T) {
-		ned := filepath.Join(mytmpdir, "cp_dir_not_exist")
-
-		if cerr := sh.Cp(ned, srcname, srcname); cerr == nil {
-			t.Errorf("sh.Cp succeeded copying to nonexistent destination %s", ned)
+	t.Run("sh/cp/d2itself", func(t *testing.T) {
+		destname := filepath.Join(mytmpdir, "cp-d2itself")
+		if cerr := sh.Cp(destname, mytmpdir); cerr == nil {
+			t.Error("sh.Cp copies directory to it self")
 		}
 	})
 
@@ -304,19 +246,10 @@ func TestHelpers(t *testing.T) {
 		}
 	})
 
-	t.Run("sh/cp/forbidden", func(t *testing.T) {
-		fd, err := ioutil.TempDir("", "mage-forbidden")
-		if err != nil {
-			t.Fatalf("can't create test directory: %v", err)
-		}
-
-		forbidden := filepath.Join(fd, "forbidden")
-		if cerr := os.Mkdir(forbidden, 0000); cerr != nil {
-			t.Fatalf("can't create a forbidden directory: %v", cerr)
-		}
-
-		if cerr := sh.Cp(forbidden, mytmpdir); cerr == nil {
-			t.Error("sh.Cp succeeded copying elements to forbidden folder")
+	t.Run("sh/cp/m2ned", func(t *testing.T) {
+		destname := filepath.Join(mytmpdir, "cp-m2ned")
+		if cerr := sh.Cp(destname, srcname, srcname); cerr == nil {
+			t.Error("sh.Cp succeeded copying elements to non existent destination")
 		}
 	})
 

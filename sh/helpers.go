@@ -21,98 +21,53 @@ func Rm(path string) error {
 
 // Copy robustly copies the source file to the destination, overwriting the destination if necessary.
 func Copy(dst string, src string) error {
-	from, err := os.Open(src)
-	if err != nil {
-		return fmt.Errorf(`can't copy %s: %v`, src, err)
-	}
-	defer from.Close()
-	finfo, err := from.Stat()
+	finfo, err := os.Stat(src)
 	if err != nil {
 		return fmt.Errorf(`can't stat %s: %v`, src, err)
 	}
-	to, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, finfo.Mode())
-	if err != nil {
-		return fmt.Errorf(`can't copy to %s: %v`, dst, err)
+
+	if err = copyFile(dst, src, finfo); err != nil {
+		return fmt.Errorf(`can't copy %s to %s: %v`, src, dst, err)
 	}
-	_, err = io.Copy(to, from)
-	if err != nil {
-		return fmt.Errorf(`error copying %s to %s: %v`, src, dst, err)
-	}
+
 	return nil
-}
-
-// CopyDir copies recursively the source directory content to the destination,
-// overwriting files in the destination if necessary. Errors will be wrapped
-// into a single error.
-func CopyDir(dst, src string) error {
-	sfi, err := os.Stat(src)
-	if err != nil {
-		return err
-	}
-
-	if !sfi.IsDir() {
-		return fmt.Errorf("cannot use file %v as source", src)
-	}
-
-	srcabs, err := filepath.Abs(src)
-	if err != nil {
-		return err
-	}
-
-	dstabs, err := filepath.Abs(dst)
-	if err != nil {
-		return err
-	}
-
-	if strings.HasPrefix(dstabs, srcabs) {
-		return fmt.Errorf("cannot copy directory %v into itself", dst)
-	}
-
-	dfi, err := os.Stat(dst)
-	if os.IsNotExist(err) {
-		if err := os.Mkdir(dst, sfi.Mode()); err != nil {
-			return err
-		}
-	} else if err != nil {
-		return err
-	} else if !dfi.IsDir() {
-		msg := "cannot overwrite non-directory %v with directory %v"
-		return fmt.Errorf(msg, dst, src)
-	}
-
-	return copyDir(dst, src)
 }
 
 // Cp behaves like the Unix command cp with -rf flags. The possible scenarios
 // are:
 //
-// * (FAIL) No source.
+// * [FAIL] No source.
 //
-// * (FAIL) Non existent source.
+// * [FAIL] Non existent source.
 //
-// * (PASS) File to non existent file.
+// * [FAIL] Multiple non existent elements in destination path.
 //
-// * (FAIL) File to more than one non existent elements in destination.
+// * [FAIL] Bad permissions.
 //
-// * (PASS) File to file.
+// * [PASS] File to non existent file, dst will be created with the same
+// content as src.
 //
-// * (PASS) File to directory.
+// * [PASS] File to file, dst will be overwritten by src.
 //
-// * (FAIL) Directory to file.
+// * [PASS] File to directory, dst will be a file inside dst with the same base
+// name as src.
 //
-// * (PASS) Directory to non existent directory.
+// * [FAIL] Directory to file.
 //
-// * (FAIL) Directory to more than one non existent elements in destination.
+// * [PASS] Directory to non existent directory, dst will be created with the
+// same content as src.
 //
-// * (PASS) Directory to directory.
+// * [PASS] Directory to directory, dst will be a directory inside dst with the
+// same base name as src.
 //
-// * (FAIL) Directory to itself.
+// * [FAIL] Directory to itself.
 //
-// * (FAIL) Multiple elements to file.
+// * [FAIL] Multiple elements to file.
 //
-// * (PASS) Multiple elements to directory.
+// * [FAIL] Multiple elements to non existent directory.
 //
-// * (FAIL) Bad permissions.
+// * [PASS] Multiple elements to directory, any src elements will be
+// created/overwritten in dst.
 func Cp(dst string, src ...string) error {
 	dfi, err := os.Stat(dst)
 	if err != nil && !os.IsNotExist(err) {
@@ -124,6 +79,8 @@ func Cp(dst string, src ...string) error {
 	switch {
 	case n == 0:
 		return errors.New("missing source")
+	case n == 1 && dfi != nil && dfi.IsDir():
+		dst = filepath.Join(dst, filepath.Base(src[0]))
 	case n > 1 && dfi == nil:
 		return fmt.Errorf("%v doesn't exists", dst)
 	case n > 1 && !dfi.IsDir():
@@ -131,27 +88,27 @@ func Cp(dst string, src ...string) error {
 	}
 
 	var errs []string
-	var fn func(string, string) error
+	var fn func(string, string, os.FileInfo) error
 
 	for _, entry := range src {
-		dst := dst
-
 		sfi, err := os.Stat(entry)
 		if err != nil {
-			return err
-		}
-
-		if dfi != nil && dfi.IsDir() {
-			dst = filepath.Join(dst, sfi.Name())
+			errs = append(errs, err.Error())
+			continue
 		}
 
 		if sfi.IsDir() {
-			fn = CopyDir
+			fn = copyDir
 		} else {
-			fn = Copy
+			fn = copyFile
 		}
 
-		if err := fn(dst, entry); err != nil {
+		dst := dst
+		if n > 1 {
+			dst = filepath.Join(dst, sfi.Name())
+		}
+
+		if err := fn(dst, entry, sfi); err != nil {
 			errs = append(errs, err.Error())
 		}
 	}
@@ -163,7 +120,25 @@ func Cp(dst string, src ...string) error {
 	return nil
 }
 
-func copyDir(dst, src string) error {
+func copyDir(dst, src string, sfi os.FileInfo) error {
+	srcabs, err := filepath.Abs(src)
+	if err != nil {
+		return err
+	}
+
+	dstabs, err := filepath.Abs(dst)
+	if err != nil {
+		return err
+	}
+
+	if strings.HasPrefix(dstabs, srcabs) {
+		return fmt.Errorf("cannot copy directory %v into itself (%s)", src, dst)
+	}
+
+	if err := os.Mkdir(dst, sfi.Mode()); err != nil {
+		return err
+	}
+
 	var errs []string
 
 	fn := func(srcpath string, fi os.FileInfo, err error) error {
@@ -184,7 +159,7 @@ func copyDir(dst, src string) error {
 				return nil
 			}
 		} else {
-			if err := Copy(dst, srcpath); err != nil {
+			if err := copyFile(dst, srcpath, fi); err != nil {
 				errs = append(errs, err.Error())
 				return nil
 			}
@@ -199,6 +174,28 @@ func copyDir(dst, src string) error {
 
 	if len(errs) > 0 {
 		return errors.New(strings.Join(errs, "\n"))
+	}
+
+	return nil
+}
+
+func copyFile(dst, src string, sfi os.FileInfo) error {
+	from, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+
+	defer from.Close()
+
+	to, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, sfi.Mode())
+	if err != nil {
+		return err
+	}
+
+	defer to.Close()
+
+	if _, err = io.Copy(to, from); err != nil {
+		return err
 	}
 
 	return nil
