@@ -23,10 +23,10 @@ func TestMageImportsList(t *testing.T) {
 	expected := `
 Targets:
   buildSubdir        Builds stuff.
-  nS:deploy          deploys stuff.
+  ns:deploy          deploys stuff.
   root               
   zz:buildSubdir2    Builds stuff.
-  zz:nS:deploy2*     deploys stuff.
+  zz:ns:deploy2*     deploys stuff.
 
 * default target
 `[1:]

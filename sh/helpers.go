@@ -188,6 +188,7 @@ func copyFile(dst, src string, sfi os.FileInfo) error {
 	defer from.Close()
 
 	to, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, sfi.Mode())
+
 	if err != nil {
 		return err
 	}
