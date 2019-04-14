@@ -18,13 +18,21 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"regexp"
 	"text/tabwriter"
 	"time"
 	{{range .Imports}}{{.UniqueName}} "{{.Path}}"
 	{{end}}
 )
 
+// MageTargetArgsPrefix -
+const MageTargetArgsPrefix = "mage-target-args:"
+
+// MageStopProcArgsPrefix -
+const MageStopProcArgsPrefix = "mage-stop:"
+
 func main() {
+
 	// Use local types and functions in order to avoid name conflicts with additional magefiles.
 	type arguments struct {
 		Verbose       bool          // print out log statements
@@ -38,7 +46,7 @@ func main() {
 		val := os.Getenv(env)
 		if val == "" {
 			return false
-		}		
+		}
 		b, err := strconv.ParseBool(val)
 		if err != nil {
 			log.Printf("warning: environment variable %s is not a valid bool value: %v", env, val)
@@ -51,7 +59,7 @@ func main() {
 		val := os.Getenv(env)
 		if val == "" {
 			return 0
-		}		
+		}
 		d, err := time.ParseDuration(val)
 		if err != nil {
 			log.Printf("warning: environment variable %s is not a valid duration value: %v", env, val)
@@ -92,7 +100,7 @@ Options:
 		fs.Usage()
 		return
 	}
-	  
+
 	list := func() error {
 		{{with .Description}}fmt.Println(` + "`{{.}}\n`" + `)
 		{{- end}}
@@ -214,11 +222,50 @@ Options:
 	}
 
 	var unknown []string
-	for _, arg := range args.Args {
+	var prevTarget string
+	var ignoreRest bool
+	ignoreRest = false
+	re := regexp.MustCompile(` + "`" + `(^\w+\=\S*)|(^-{1,2}\w+\=\S*)|(^-{1,2}\w+$)` + "`" + `)
+	for i, arg := range args.Args {
 		if !targets[strings.ToLower(arg)] {
-			unknown = append(unknown, arg)
+			if arg == "--" {
+				args.Args[i] = MageStopProcArgsPrefix
+				ignoreRest = true
+				continue
+			}
+			if ignoreRest {
+				continue
+			}
+			//-----------------------------------------------------------------------------
+			// Add to unknown targets only if arg is not matching above regex pattern e.g:
+			// --                                          : stop processing any more arguments
+			// -f --f -flag --flag                         : boolean flags only
+			// -f=value --f=value -flag=value --flag=value : boolean, integer, string flags
+			// f=value flag=value                          : boolean, integer, string flags (this gets converted to --var=value implicitly)
+			//-----------------------------------------------------------------------------
+			if re.FindString(arg) == "" {
+				unknown = append(unknown, arg)
+			}
+			if prevTarget == "" {
+				logger.Printf("Argument for non-existent target: %q\n", arg)
+				os.Exit(1)
+			}
+			// all mage targets originates in main. package e.g.: for target "help" we will set it as "main.help"
+			args.Args[i] = MageTargetArgsPrefix + "main." + prevTarget + ":" + arg
+		} else {
+			// target is always first, then args follows
+			switch strings.ToLower(arg) {
+			{{range $alias, $func := .Aliases}}
+				case "{{lower $alias}}":
+					prevTarget = "{{$func.TargetName}}"
+			{{- end}}
+				default:
+					prevTarget = arg
+			}
+			prevTarget = strings.ToLower(prevTarget)
 		}
 	}
+
 	if len(unknown) == 1 {
 		logger.Println("Unknown target specified:", unknown[0])
 		os.Exit(2)
@@ -283,6 +330,12 @@ Options:
 			case "{{lower $alias}}":
 				target = "{{$func.TargetName}}"
 		{{- end}}
+		}
+		if strings.HasPrefix(target, MageStopProcArgsPrefix) {
+			break
+		}
+		if strings.HasPrefix(target, MageTargetArgsPrefix) {
+			continue
 		}
 		switch strings.ToLower(target) {
 		{{range .Funcs }}
