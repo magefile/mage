@@ -246,10 +246,6 @@ Options:
 			if re.FindString(arg) == "" {
 				unknown = append(unknown, arg)
 			}
-			if prevTarget == "" {
-				logger.Printf("Argument for non-existent target: %q\n", arg)
-				os.Exit(1)
-			}
 			// all mage targets originates in main. package e.g.: for target "help" we will set it as "main.help"
 			args.Args[i] = MageTargetArgsPrefix + "main." + prevTarget + ":" + arg
 		} else {
