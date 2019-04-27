@@ -193,7 +193,7 @@ func Parse(stderr, stdout io.Writer, args []string) (inv Invocation, cmd Command
 
 	fs.Usage = func() {
 		fmt.Fprint(stdout, `
-mage [options] [target]
+mage [options] [target] [<flags>]
 
 Mage is a make-like command runner.  See https://magefile.org for full docs.
 
@@ -207,19 +207,27 @@ Commands:
   -version  show version info for the mage binary
 
 Options:
-  -d <string> 
+  -d <string>
             run magefiles in the given directory (default ".")
   -debug    turn on debug messages
   -h        show description of a target
   -f        force recreation of compiled magefile
   -keep     keep intermediate mage files around after running
   -gocmd <string>
-		    use the given go binary to compile the output (default: "go")
+            use the given go binary to compile the output (default: "go")
   -goos     sets the GOOS for the binary created by -compile (default: current OS)
   -goarch   sets the GOARCH for the binary created by -compile (default: current arch)
   -t <string>
             timeout in duration parsable format (e.g. 5m30s)
   -v        show verbose output when running mage targets
+
+Flags (per target, optional), supported formats:
+  --        stop processing any further flags
+  -f -flag --f --flag
+            boolean flags only
+  -f=value -flag=value --f=value --flag=value
+            boolean, integer, string flags
+            note: file paths passed as values has to be wrapped in quotes
 `[1:])
 	}
 	err = fs.Parse(args)

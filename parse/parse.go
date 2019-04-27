@@ -25,7 +25,7 @@ func EnableDebug() {
 	debug.SetOutput(os.Stderr)
 }
 
-// PkgInfo contains inforamtion about a package of files according to mage's
+// PkgInfo contains information about a package of files according to mage's
 // parsing rules.
 type PkgInfo struct {
 	AstPkg      *ast.Package
@@ -81,29 +81,34 @@ func (f Function) TargetName() string {
 // runTarget requires.
 func (f Function) ExecCode() (string, error) {
 	name := f.Name
+	cliName := name
 	if f.Receiver != "" {
 		name = f.Receiver + "{}." + name
+		cliName = f.Receiver + ":" + cliName
 	}
 	if f.Package != "" {
 		name = f.Package + "." + name
 	}
+	cliName = strings.ToLower(cliName)
 
 	if f.IsContext && f.IsError {
 		out := `
 			wrapFn := func(ctx context.Context) error {
+				ctx = context.WithValue(ctx, "flags", perTargetFlagsMap["%s"])
 				return %s(ctx)
 			}
 			err := runTarget(wrapFn)`[1:]
-		return fmt.Sprintf(out, name), nil
+		return fmt.Sprintf(out, cliName, name), nil
 	}
 	if f.IsContext && !f.IsError {
 		out := `
 			wrapFn := func(ctx context.Context) error {
+				ctx = context.WithValue(ctx, "flags", perTargetFlagsMap["%s"])
 				%s(ctx)
 				return nil
 			}
 			err := runTarget(wrapFn)`[1:]
-		return fmt.Sprintf(out, name), nil
+		return fmt.Sprintf(out, cliName, name), nil
 	}
 	if !f.IsContext && f.IsError {
 		out := `

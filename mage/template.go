@@ -25,12 +25,6 @@ import (
 	{{end}}
 )
 
-// MageTargetArgsPrefix -
-const MageTargetArgsPrefix = "mage-target-args:"
-
-// MageStopProcArgsPrefix -
-const MageStopProcArgsPrefix = "mage-stop:"
-
 func main() {
 
 	// Use local types and functions in order to avoid name conflicts with additional magefiles.
@@ -223,44 +217,43 @@ Options:
 
 	var unknown []string
 	var prevTarget string
-	var ignoreRest bool
-	ignoreRest = false
-	re := regexp.MustCompile(` + "`" + `(^\w+\=\S*)|(^-{1,2}\w+\=\S*)|(^-{1,2}\w+$)` + "`" + `)
-	for i, arg := range args.Args {
-		if !targets[strings.ToLower(arg)] {
-			if arg == "--" {
-				args.Args[i] = MageStopProcArgsPrefix
-				ignoreRest = true
-				continue
-			}
-			if ignoreRest {
-				continue
-			}
+	var filteredTargets = []string{}
+	var perTargetFlagsMap = make(map[string][]string)
+	var argLow string
+	re := regexp.MustCompile(` + "`" + `(^-{1,2}\w+\=\S*)|(^-{1,2}\w+$)` + "`" + `)
+	for _, arg := range args.Args {
+		// don't process any more arguments if you detect '--' chars
+		if arg == "--" {
+			break
+		}
+		// convert alias to full target name
+		switch strings.ToLower(arg) {
+		{{range $alias, $func := .Aliases}}
+			case "{{lower $alias}}":
+				arg = "{{$func.TargetName}}"
+		{{- end}}
+		}
+		argLow = strings.ToLower(arg)
+		if !targets[argLow] {
 			//-----------------------------------------------------------------------------
 			// Add to unknown targets only if arg is not matching above regex pattern e.g:
 			// --                                          : stop processing any more arguments
 			// -f --f -flag --flag                         : boolean flags only
 			// -f=value --f=value -flag=value --flag=value : boolean, integer, string flags
-			// f=value flag=value                          : boolean, integer, string flags (this gets converted to --var=value implicitly)
 			//-----------------------------------------------------------------------------
 			if re.FindString(arg) == "" {
 				unknown = append(unknown, arg)
 			}
-			// all mage targets originates in main. package e.g.: for target "help" we will set it as "main.help"
-			args.Args[i] = MageTargetArgsPrefix + "main." + prevTarget + ":" + arg
+			perTargetFlagsMap[prevTarget] = append(perTargetFlagsMap[prevTarget], arg)
 		} else {
 			// target is always first, then args follows
-			switch strings.ToLower(arg) {
-			{{range $alias, $func := .Aliases}}
-				case "{{lower $alias}}":
-					prevTarget = "{{$func.TargetName}}"
-			{{- end}}
-				default:
-					prevTarget = arg
-			}
-			prevTarget = strings.ToLower(prevTarget)
+			prevTarget = argLow
+			filteredTargets = append(filteredTargets, argLow)
 		}
 	}
+
+	// all ok, save filtered targets names
+	args.Args = filteredTargets
 
 	if len(unknown) == 1 {
 		logger.Println("Unknown target specified:", unknown[0])
@@ -326,12 +319,6 @@ Options:
 			case "{{lower $alias}}":
 				target = "{{$func.TargetName}}"
 		{{- end}}
-		}
-		if strings.HasPrefix(target, MageStopProcArgsPrefix) {
-			break
-		}
-		if strings.HasPrefix(target, MageTargetArgsPrefix) {
-			continue
 		}
 		switch strings.ToLower(target) {
 		{{range .Funcs }}
