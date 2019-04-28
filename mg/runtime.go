@@ -78,5 +78,8 @@ type Namespace struct{}
 // GetFlagsFromContext - Helper function
 // for extracting flags from context of a target
 func GetFlagsFromContext(ctx context.Context) []string {
-	return ctx.Value("flags").([]string)
+	if ctx != nil && ctx.Value("flags") != nil {
+		return ctx.Value("flags").([]string)
+	}
+	return []string{}
 }
