@@ -12,244 +12,63 @@ import (
 	"github.com/magefile/mage/sh"
 )
 
-// compareFiles checks that two files are identical for testing purposes. That means they have the same length,
-// the same contents, and the same permissions. It does NOT mean they have the same timestamp, as that is expected
-// to change in normal Mage sh.Copy operation.
-func compareFiles(file1 string, file2 string) error {
-	s1, err := os.Stat(file1)
-	if err != nil {
-		return fmt.Errorf("can't stat %s: %v", file1, err)
-	}
-	s2, err := os.Stat(file2)
-	if err != nil {
-		return fmt.Errorf("can't stat %s: %v", file2, err)
-	}
-	if s1.Size() != s2.Size() {
-		return fmt.Errorf("files %s and %s have different sizes: %d vs %d", file1, file2, s1.Size(), s2.Size())
-	}
-	if s1.Mode() != s2.Mode() {
-		return fmt.Errorf("files %s and %s have different permissions: %#4o vs %#4o", file1, file2, s1.Mode(), s2.Mode())
-	}
-	f1bytes, err := ioutil.ReadFile(file1)
-	if err != nil {
-		return fmt.Errorf("can't read %s: %v", file1, err)
-	}
-	f2bytes, err := ioutil.ReadFile(file2)
-	if err != nil {
-		return fmt.Errorf("can't read %s: %v", file2, err)
-	}
-	if !bytes.Equal(f1bytes, f2bytes) {
-		return fmt.Errorf("files %s and %s have different contents", file1, file2)
-	}
-	return nil
-}
 
 func TestHelpers(t *testing.T) {
-
 	mytmpdir, err := ioutil.TempDir("", "mage")
 	if err != nil {
 		t.Fatalf("can't create test directory: %v", err)
 	}
+
 	defer func() {
 		derr := os.RemoveAll(mytmpdir)
 		if derr != nil {
 			fmt.Printf("error cleaning up after TestHelpers: %v", derr)
 		}
 	}()
+
 	srcname := filepath.Join(mytmpdir, "test1.txt")
-	err = ioutil.WriteFile(srcname, []byte("All work and no play makes Jack a dull boy."), 0644)
+	content := []byte("All work and no play makes Jack a dull boy.")
+	err = ioutil.WriteFile(srcname, content, 0644)
 	if err != nil {
 		t.Fatalf("can't create test file %s: %v", srcname, err)
 	}
+
 	destname := filepath.Join(mytmpdir, "test2.txt")
 
 	t.Run("sh/copy", func(t *testing.T) {
 		cerr := sh.Copy(destname, srcname)
 		if cerr != nil {
-			t.Errorf("test file copy from %s to %s failed: %v", srcname, destname, cerr)
+			msg := "test file copy from %s to %s failed: %v"
+			t.Errorf(msg, srcname, destname, cerr)
 		}
-		cerr = compareFiles(srcname, destname)
+
+		cerr = compareFiles(destname, srcname)
 		if cerr != nil {
 			t.Errorf("test file copy verification failed: %v", cerr)
 		}
 	})
 
-	t.Run("sh/cp", func(t *testing.T) {
-		cpdir := filepath.Join(mytmpdir, "cp-dir")
-		if cerr := os.Mkdir(cpdir, 0744); cerr != nil {
-			t.Fatalf("can't create cp test directory: %v", cerr)
-		}
-
-		// File to non existent file.
-
-		cpdestname := filepath.Join(cpdir, "cp-test.txt")
-		if cerr := sh.Cp(cpdestname, srcname); cerr != nil {
-			msg := "test file copy from %s to %s failed: %v"
-			t.Errorf(msg, srcname, cpdestname, cerr)
-		}
-
-		if cerr := compareFiles(srcname, cpdestname); cerr != nil {
-			t.Errorf("test file copy verification failed: %v", cerr)
-		}
-
-		// File to file.
-
-		otherf := filepath.Join(mytmpdir, "other.txt")
-		if cerr := ioutil.WriteFile(otherf, []byte("Content"), 0644); err != nil {
-			t.Fatalf("can't create other test file %s: %v", otherf, cerr)
-		}
-
-		if cerr := sh.Cp(cpdestname, otherf); cerr != nil {
-			msg := "test file copy from %s to %s failed: %v"
-			t.Errorf(msg, otherf, cpdestname, cerr)
-		}
-
-		if cerr := compareFiles(otherf, cpdestname); cerr != nil {
-			t.Errorf("test file copy verification failed: %v", cerr)
-		}
-
-		// File to directory.
-
-		if cerr := sh.Cp(cpdir, srcname); cerr != nil {
-			msg := "test file copy from %s to %s/ failed: %v"
-			t.Errorf(msg, srcname, cpdir, cerr)
-		}
-
-		cpdestname = filepath.Join(cpdir, filepath.Base(srcname))
-		if cerr := compareFiles(srcname, cpdestname); cerr != nil {
-			t.Errorf("test file copy verification failed: %v", cerr)
-		}
-
-		// Directory to non existent directory.
-
-		neDir := filepath.Join(mytmpdir, "cp-non-existent-directory")
-		if cerr := sh.Cp(neDir, cpdir); cerr != nil {
-			msg := "test directory copy from %s to %s failed: %v"
-			t.Errorf(msg, cpdir, neDir, cerr)
-		}
-
-		if cerr := compareDirs(cpdir, neDir); cerr != nil {
-			t.Errorf("test directory copy verification failed: %v", cerr)
-		}
-
-		// Directory to directory.
-
-		if cerr := sh.Cp(cpdir, neDir); cerr != nil {
-			msg := "test directory copy from %s to %s failed: %v"
-			t.Errorf(msg, neDir, cpdir, cerr)
-		}
-
-		ndir := filepath.Join(cpdir, "cp-non-existent-directory")
-		if cerr := compareDirs(neDir, ndir); cerr != nil {
-			t.Errorf("test directory copy verification failed: %v", cerr)
-		}
-
-		// Multiple elements to directory.
-
-		mdir := filepath.Join(mytmpdir, "cp-m2d")
-		if cerr := os.Mkdir(mdir, 0744); cerr != nil {
-			t.Fatalf("can't create test directory: %v", cerr)
-		}
-
-		if cerr := sh.Cp(mdir, cpdir, srcname, otherf); cerr != nil {
-			msg := "test multiple copy to %s failed: %v"
-			t.Errorf(msg, mdir, cerr)
-		}
-
-		ndir = filepath.Join(mdir, "cp-dir")
-		if cerr := compareDirs(cpdir, ndir); cerr != nil {
-			t.Errorf("test directory copy verification failed: %v", cerr)
-		}
-
-		nfile := filepath.Join(mdir, "test1.txt")
-		if cerr := compareFiles(srcname, nfile); cerr != nil {
-			t.Errorf("test file copy verification failed: %v", cerr)
-		}
-
-		nfile = filepath.Join(mdir, "other.txt")
-		if cerr := compareFiles(otherf, nfile); cerr != nil {
-			t.Errorf("test file copy verification failed: %v", cerr)
+	t.Run("sh/copy/directory", func(t *testing.T) {
+		if cerr := sh.Copy(destname, mytmpdir); cerr == nil {
+			t.Error("sh.Copy succeeded copying from forbidden source")
 		}
 	})
 
-	t.Run("sh/cp/ns", func(t *testing.T) {
-		if cerr := sh.Cp(destname); cerr == nil {
-			t.Error("sh.Cp succeeded without sources")
-		}
-	})
-
-	t.Run("sh/cp/ne", func(t *testing.T) {
-		nef := filepath.Join(mytmpdir, "cp_file_not_exist.txt")
-		if cerr := sh.Cp(destname, nef); cerr == nil {
-			t.Errorf("sh.Cp succeeded copying nonexistent file %s", nef)
-		}
-	})
-
-	t.Run("sh/cp/f2lne", func(t *testing.T) {
-		ned := filepath.Join(mytmpdir, "long/non/existent/directory")
-		if cerr := sh.Cp(ned, srcname); cerr == nil {
-			msg := "sh.Cp succeeded copying to a long non existent directory %s"
-			t.Errorf(msg, ned)
-		}
-	})
-
-	t.Run("sh/cp/forbidden", func(t *testing.T) {
-		fd, err := ioutil.TempDir(mytmpdir, "cp-forbidden")
+	t.Run("sh/copy/forbidden", func(t *testing.T) {
+		forbidden := filepath.Join(mytmpdir, "forbidden.txt")
+		content := []byte("You are not prepared!")
+		err = ioutil.WriteFile(forbidden, content, 0000)
 		if err != nil {
-			t.Fatalf("can't create test directory: %v", err)
+			t.Fatalf("can't create test file %s: %v", forbidden, err)
 		}
 
-		allowed := filepath.Join(fd, "allowed")
-		if cerr := os.Mkdir(allowed, 0744); cerr != nil {
-			t.Fatalf("can't create directory: %v", cerr)
+		allowed := filepath.Join(mytmpdir, "allowed.txt")
+		if cerr := sh.Copy(allowed, forbidden); cerr == nil {
+			t.Error("sh.Copy succeeded copying from forbidden source")
 		}
 
-		if cerr := sh.Cp(allowed, srcname); cerr != nil {
-			t.Errorf("can't copy file: %v", cerr)
-		}
-
-		forbidden := filepath.Join(allowed, "forbidden")
-		if cerr := os.Mkdir(forbidden, 0000); cerr != nil {
-			t.Fatalf("can't create a forbidden directory: %v", cerr)
-		}
-
-		if cerr := sh.Cp(forbidden, srcname); cerr == nil {
-			t.Error("sh.Cp succeeded copying elements to forbidden directory")
-		}
-
-		if cerr := sh.Cp(fd, allowed); cerr == nil {
-			t.Error("sh.Cp succeeded copying forbidden elements")
-		}
-	})
-
-	t.Run("sh/cp/d2f", func(t *testing.T) {
-		otherd := filepath.Join(mytmpdir, "cp-d2f-dir")
-		if cerr := os.Mkdir(otherd, 0744); cerr != nil {
-			t.Fatalf("can't create other test directory: %v", cerr)
-		}
-
-		if cerr := sh.Cp(destname, otherd); cerr == nil {
-			t.Error("sh.Cp replaces files with directories")
-		}
-	})
-
-	t.Run("sh/cp/d2itself", func(t *testing.T) {
-		destname := filepath.Join(mytmpdir, "cp-d2itself")
-		if cerr := sh.Cp(destname, mytmpdir); cerr == nil {
-			t.Error("sh.Cp copies directory to it self")
-		}
-	})
-
-	t.Run("sh/cp/m2f", func(t *testing.T) {
-		if cerr := sh.Cp(destname, srcname, srcname); cerr == nil {
-			t.Error("sh.Cp succeeded copying multiple elements to file")
-		}
-	})
-
-	t.Run("sh/cp/m2ned", func(t *testing.T) {
-		destname := filepath.Join(mytmpdir, "cp-m2ned")
-		if cerr := sh.Cp(destname, srcname, srcname); cerr == nil {
-			t.Error("sh.Cp succeeded copying elements to non existent destination")
+		if cerr := sh.Copy(forbidden, srcname); cerr == nil {
+			t.Error("sh.Copy succeeded copying to forbidden destination")
 		}
 	})
 
@@ -258,7 +77,8 @@ func TestHelpers(t *testing.T) {
 		nef := filepath.Join(mytmpdir, "file_not_exist.txt")
 		rerr := sh.Rm(nef)
 		if rerr != nil {
-			t.Errorf("sh.Rm complained when removing nonexistent file %s: %v", nef, rerr)
+			msg := "sh.Rm complained when removing nonexistent file %s: %v"
+			t.Errorf(msg, nef, rerr)
 		}
 	})
 
@@ -277,14 +97,17 @@ func TestHelpers(t *testing.T) {
 		if rerr != nil {
 			t.Errorf("failed to remove file %s: %v", destname, rerr)
 		}
+
 		rerr = sh.Rm(srcname)
 		if rerr != nil {
 			t.Errorf("failed to remove file %s: %v", srcname, rerr)
 		}
+
 		rerr = sh.Rm(mytmpdir)
 		if rerr != nil {
 			t.Errorf("failed to remove dir %s: %v", mytmpdir, rerr)
 		}
+
 		_, rerr = os.Stat(mytmpdir)
 		if rerr == nil {
 			t.Errorf("removed dir %s but it's still there?", mytmpdir)
@@ -297,22 +120,76 @@ func TestHelpers(t *testing.T) {
 			t.Errorf("sh.Rm complained removing nonexistent dir %s", mytmpdir)
 		}
 	})
-
 }
 
-func compareDirs(src, dst string) error {
+// compareDirs checks that two directories are identical for testing purposes.
+// That means they have the same contents, and the same permissions. It does
+// NOT mean they have the same timestamp, as that is expected to change in
+// normal Mage sh helpers operation.
+func compareDirs(dst, src string) error {
 	fn := func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
 
+		newDst := filepath.Clean(strings.Replace(path, src, dst, 1))
+
 		if info.IsDir() {
-			return nil
+			return compareStats(newDst, path)
 		}
 
-		dstfile := filepath.Clean(strings.Replace(path, src, dst, 1))
-		return compareFiles(path, dstfile)
+		return compareFiles(newDst, path)
 	}
 
 	return filepath.Walk(src, fn)
+}
+
+// compareFiles checks that two files are identical for testing purposes. That
+// means they have the same length, the same contents, and the same
+// permissions. It does NOT mean they have the same timestamp, as that is
+// expected to change in normal Mage sh.Copy operation.
+func compareFiles(dst, src string) error {
+	if err := compareStats(dst, src); err != nil {
+		return err
+	}
+
+	dbytes, err := ioutil.ReadFile(dst)
+	if err != nil {
+		return fmt.Errorf("can't read %s: %v", dst, err)
+	}
+
+	sbytes, err := ioutil.ReadFile(src)
+	if err != nil {
+		return fmt.Errorf("can't read %s: %v", src, err)
+	}
+
+	if !bytes.Equal(dbytes, sbytes) {
+		return fmt.Errorf("files %s and %s have different contents", src, dst)
+	}
+
+	return nil
+}
+
+func compareStats(dst, src string) error {
+	dfi, err := os.Stat(dst)
+	if err != nil {
+		return fmt.Errorf("can't stat %s: %v", dst, err)
+	}
+
+	sfi, err := os.Stat(src)
+	if err != nil {
+		return fmt.Errorf("can't stat %s: %v", src, err)
+	}
+
+	if dfi.Size() != sfi.Size() {
+		msg := "files %s and %s have different sizes: %d vs %d"
+		return fmt.Errorf(msg, dst, src, dfi.Size(), sfi.Size())
+	}
+
+	if dfi.Mode() != sfi.Mode() {
+		msg := "files %s and %s have different permissions: %#4o vs %#4o"
+		return fmt.Errorf(msg, dst, src, dfi.Mode(), sfi.Mode())
+	}
+
+	return nil
 }
