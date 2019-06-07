@@ -47,6 +47,21 @@ func TestEnv(t *testing.T) {
 	}
 }
 
+func TestCwd(t *testing.T) {
+	env := "SOME_REALLY_LONG_MAGEFILE_SPECIFIC_THING"
+	out := &bytes.Buffer{}
+	ran, err := Exec(map[string]string{"#CWD": "/tmp"}, out, nil, "pwd", env)
+	if err != nil {
+		t.Fatalf("unexpected error from runner: %#v", err)
+	}
+	if !ran {
+		t.Errorf("expected ran to be true but was false.")
+	}
+	if out.String() != "/tmp\n" {
+		t.Errorf("expected /tmp, got %q", out)
+	}
+}
+
 func TestNotRun(t *testing.T) {
 	ran, err := Exec(nil, nil, nil, "thiswontwork")
 	if err == nil {

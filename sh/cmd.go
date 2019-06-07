@@ -88,8 +88,10 @@ func OutputWith(env map[string]string, cmd string, args ...string) (string, erro
 // an error that, if returned from a target or mg.Deps call, will cause mage to
 // exit with the same code as the command failed with.  Env is a list of
 // environment variables to set when running the command, these override the
-// current environment variables set (which are also passed to the command). cmd
-// and args may include references to environment variables in $FOO format, in
+// current environment variables set (which are also passed to the command).
+// If the variable #CWD is set, the value will be used as working directory
+// when running the command.
+// cmd and args may include references to environment variables in $FOO format, in
 // which case these will be expanded before the command is run.
 //
 // Ran reports if the command ran (rather than was not found or not executable).
@@ -121,6 +123,11 @@ func run(env map[string]string, stdout, stderr io.Writer, cmd string, args ...st
 	c := exec.Command(cmd, args...)
 	c.Env = os.Environ()
 	for k, v := range env {
+		// if environment variable #CWD is set, use the value as working directory by setting Cmd.Dir
+		if k == "#CWD" {
+			c.Dir = v
+			continue
+		}
 		c.Env = append(c.Env, k+"="+v)
 	}
 	c.Stderr = stderr
