@@ -92,6 +92,10 @@ func CtxDeps(ctx context.Context, fns ...interface{}) {
 
 // runDeps assumes you've already called checkFns.
 func runDeps(ctx context.Context, types []funcType, fns []interface{}) {
+	if os.Getenv(NoDepsEnv) == "1" {
+		return
+	}
+
 	mu := &sync.Mutex{}
 	var errs []string
 	var exit int

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"os"
 	"testing"
 	"time"
 )
@@ -191,4 +192,63 @@ func TestDepsErrors(t *testing.T) {
 		}
 	}()
 	f()
+}
+
+func TestDepsWithNoDepsSet(t *testing.T) {
+	if err := os.Setenv(NoDepsEnv, "1"); err != nil {
+		t.Fatalf("Failed to set %s for test", NoDepsEnv)
+	}
+	defer func() {
+		if err := os.Unsetenv(NoDepsEnv); err != nil {
+			t.Fatalf("Failed to clear %s after test", NoDepsEnv)
+		}
+	}()
+
+	ch := make(chan string, 3)
+	// this->f->g->h
+	h := func() {
+		ch <- "h"
+	}
+	g := func() {
+		Deps(h)
+		ch <- "g"
+	}
+	f := func() {
+		Deps(g)
+		ch <- "f"
+	}
+	Deps(f)
+
+	if len(ch) != 0 {
+		t.Errorf("Expected no deps to run but %d ran", len(ch))
+	}
+}
+
+func TestSerialDepsWithNoDepsSet(t *testing.T) {
+	if err := os.Setenv(NoDepsEnv, "1"); err != nil {
+		t.Fatalf("Failed to set %s for test", NoDepsEnv)
+	}
+	defer func() {
+		if err := os.Unsetenv(NoDepsEnv); err != nil {
+			t.Fatalf("Failed to clear %s after test", NoDepsEnv)
+		}
+	}()
+
+	ch := make(chan string, 3)
+	// this->f->g->h
+	h := func() {
+		ch <- "h"
+	}
+	g := func() {
+		ch <- "g"
+	}
+	f := func() {
+		SerialDeps(g, h)
+		ch <- "f"
+	}
+	Deps(f)
+
+	if len(ch) != 0 {
+		t.Errorf("Expected no deps to run but %d ran", len(ch))
+	}
 }

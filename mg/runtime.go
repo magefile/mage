@@ -27,6 +27,10 @@ const GoCmdEnv = "MAGEFILE_GOCMD"
 // to ignore the default target specified in the magefile.
 const IgnoreDefaultEnv = "MAGEFILE_IGNOREDEFAULT"
 
+// NoDepsEnv is the environment variable that indicates the user requested
+// that dependencies of the target not be executed
+const NoDepsEnv = "MAGEFILE_NODEPS"
+
 // Verbose reports whether a magefile was run with the verbose flag.
 func Verbose() bool {
 	b, _ := strconv.ParseBool(os.Getenv(VerboseEnv))

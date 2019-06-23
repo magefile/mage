@@ -100,6 +100,7 @@ type Invocation struct {
 	List       bool          // tells the magefile to print out a list of targets
 	Help       bool          // tells the magefile to print out help for a specific target
 	Keep       bool          // tells mage to keep the generated main file after compiling
+	NoDeps     bool          // tells mage to execute the given target without dependencies
 	Timeout    time.Duration // tells mage to set a timeout to running the targets
 	CompileOut string        // tells mage to compile a static binary to this path, but not execute
 	GOOS       string        // sets the GOOS when producing a binary with -compileout
@@ -174,6 +175,7 @@ func Parse(stderr, stdout io.Writer, args []string) (inv Invocation, cmd Command
 	fs.BoolVar(&inv.Help, "h", false, "show this help")
 	fs.DurationVar(&inv.Timeout, "t", 0, "timeout in duration parsable format (e.g. 5m30s)")
 	fs.BoolVar(&inv.Keep, "keep", false, "keep intermediate mage files around after running")
+	fs.BoolVar(&inv.NoDeps, "nodeps", false, "execute the given target without it's dependencies")
 	fs.StringVar(&inv.Dir, "d", ".", "run magefiles in the given directory")
 	fs.StringVar(&inv.GoCmd, "gocmd", mg.GoCmd(), "use the given go binary to compile the output")
 	fs.StringVar(&inv.GOOS, "goos", "", "set GOOS for binary produced with -compile")
@@ -213,6 +215,7 @@ Options:
   -h        show description of a target
   -f        force recreation of compiled magefile
   -keep     keep intermediate mage files around after running
+  -nodeps   execute the given target without it's dependencies
   -gocmd <string>
 		    use the given go binary to compile the output (default: "go")
   -goos     sets the GOOS for the binary created by -compile (default: current OS)
@@ -624,6 +627,9 @@ func RunCompiled(inv Invocation, exePath string, errlog *log.Logger) int {
 	}
 	if inv.Timeout > 0 {
 		c.Env = append(c.Env, fmt.Sprintf("MAGEFILE_TIMEOUT=%s", inv.Timeout.String()))
+	}
+	if inv.NoDeps {
+		c.Env = append(c.Env, "MAGEFILE_NODEPS=1")
 	}
 	debug.Print("running magefile with mage vars:\n", strings.Join(filter(c.Env, "MAGEFILE"), "\n"))
 	err := c.Run()
