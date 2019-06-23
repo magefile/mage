@@ -72,3 +72,13 @@ Build running
 Note that since f and g do not depend on each other, and they're running in
 their own goroutines, their order is non-deterministic, other than they are
 guaranteed to run after h has finished, and before Build continues.
+
+### Skipping Dependencies
+
+You can tell mage to execute a target but not its dependencies by passing
+the `-nodeps` flag when running mage. Using the example above, running
+`mage -nodeps build` will produce the following output:
+
+```bash
+Build running
+```
