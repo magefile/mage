@@ -18,6 +18,7 @@ import (
 	"reflect"
 	"regexp"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 	"testing"
@@ -1259,6 +1260,25 @@ func TestNamespaceDefault(t *testing.T) {
 
 func TestAliasToImport(t *testing.T) {
 
+}
+
+func TestCustomDependency(t *testing.T) {
+	stdout := &bytes.Buffer{}
+	inv := Invocation{
+		Dir: "./testdata/custom_dep",
+		//		Stderr: ioutil.Discard,
+		Stdout: stdout,
+	}
+	code := Invoke(inv)
+	if code != 0 {
+		t.Fatalf("expected 0, but got %v", code)
+	}
+	stdoutLines := strings.Split(stdout.String(), "\n")
+	sort.Strings(stdoutLines)
+	expected := "123456"
+	if strings.Join(stdoutLines, "") != expected {
+		t.Fatalf("expected %q, but got %q", expected, stdoutLines)
+	}
 }
 
 /// This code liberally borrowed from https://github.com/rsc/goversion/blob/master/version/exe.go

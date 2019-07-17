@@ -309,6 +309,10 @@ func (o *onceFun) run() error {
 
 // wrapFn tests if a function is one of funcType and wraps in into a corresponding dep type
 func wrapFn(fn interface{}) (dep, error) {
+	if d, ok := fn.(dep); ok {
+		return d, nil
+	}
+
 	switch typedFn := fn.(type) {
 	case func():
 		return voidFn(typedFn), nil
