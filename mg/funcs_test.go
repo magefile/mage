@@ -5,48 +5,48 @@ import (
 	"testing"
 )
 
-func TestFuncCheck(t *testing.T) {
-	// we can ignore errors here, since the error is always the same
-	// and the FuncType will be InvalidType if there's an error.
-	f, _ := funcCheck(func() {})
-	if f != voidType {
-		t.Errorf("expected func() to be a valid VoidType, but was %v", f)
+func TestWrapFunc(t *testing.T) {
+	// we can ignore errors here, since the error is always the same and the
+	// FuncType will be nil if there's an error.
+	d, _ := wrapFn(func() {})
+	if _, ok := d.(voidFn); !ok {
+		t.Errorf("expected func() to be a VoidFn, but was %v", d)
 	}
-	f, _ = funcCheck(func() error { return nil })
-	if f != errorType {
-		t.Errorf("expected func() error to be a valid ErrorType, but was %v", f)
+	d, _ = wrapFn(func() error { return nil })
+	if _, ok := d.(errorFn); !ok {
+		t.Errorf("expected func() error to be a errorFn, but was %v", d)
 	}
-	f, _ = funcCheck(func(context.Context) {})
-	if f != contextVoidType {
-		t.Errorf("expected func(context.Context) to be a valid ContextVoidType, but was %v", f)
+	d, _ = wrapFn(func(context.Context) {})
+	if _, ok := d.(contextVoidFn); !ok {
+		t.Errorf("expected func(context.Context) to be a contextVoidFn, but was %v", d)
 	}
-	f, _ = funcCheck(func(context.Context) error { return nil })
-	if f != contextErrorType {
-		t.Errorf("expected func(context.Context) error to be a valid ContextErrorType but was %v", f)
-	}
-
-	f, _ = funcCheck(Foo.Bare)
-	if f != namespaceVoidType {
-		t.Errorf("expected Foo.Bare to be a valid NamespaceVoidType but was %v", f)
+	d, _ = wrapFn(func(context.Context) error { return nil })
+	if _, ok := d.(contextErrorFn); !ok {
+		t.Errorf("expected func(context.Context) error to be a contextErrorFn but was %v", d)
 	}
 
-	f, _ = funcCheck(Foo.Error)
-	if f != namespaceErrorType {
-		t.Errorf("expected Foo.Error to be a valid NamespaceErrorType but was %v", f)
+	d, _ = wrapFn(Foo.Bare)
+	if _, ok := d.(namespaceVoidFn); !ok {
+		t.Errorf("expected Foo.Bare to be a namespaceVoidFn but was %v", d)
 	}
-	f, _ = funcCheck(Foo.BareCtx)
-	if f != namespaceContextVoidType {
-		t.Errorf("expected Foo.BareCtx to be a valid NamespaceContextVoidType but was %v", f)
+
+	d, _ = wrapFn(Foo.Error)
+	if _, ok := d.(namespaceErrorFn); !ok {
+		t.Errorf("expected Foo.Error to be a namespaceErrorFn but was %v", d)
 	}
-	f, _ = funcCheck(Foo.CtxError)
-	if f != namespaceContextErrorType {
-		t.Errorf("expected Foo.CtxError to be a valid NamespaceContextErrorType but was %v", f)
+	d, _ = wrapFn(Foo.BareCtx)
+	if _, ok := d.(namespaceContextVoidFn); !ok {
+		t.Errorf("expected Foo.BareCtx to be a namespaceContextVoidFn but was %v", d)
+	}
+	d, _ = wrapFn(Foo.CtxError)
+	if _, ok := d.(namespaceContextErrorFn); !ok {
+		t.Errorf("expected Foo.CtxError to be a namespaceContextErrorFn but was %v", d)
 	}
 
 	// Test the Invalid case
-	f, err := funcCheck(func(int) error { return nil })
-	if f != invalidType {
-		t.Errorf("expected func(int) error to be InvalidType but was %v", f)
+	d, err := wrapFn(func(int) error { return nil })
+	if d != nil {
+		t.Errorf("expected func(int) error to be invalid, but was %v", d)
 	}
 	if err == nil {
 		t.Error("expected func(int) error to not be a valid FuncType, but got nil error.")
@@ -62,33 +62,3 @@ func (Foo) Error() error { return nil }
 func (Foo) BareCtx(context.Context) {}
 
 func (Foo) CtxError(context.Context) error { return nil }
-
-func TestFuncTypeWrap(t *testing.T) {
-	func() {
-		defer func() {
-			err := recover()
-			if err == nil {
-				t.Fatal("Expected a panic, but didn't get one")
-			}
-		}()
-		if funcTypeWrap(voidType, func(i int) {}) != nil {
-			t.Errorf("expected func(int) to return nil")
-		}
-	}()
-
-	if funcTypeWrap(voidType, func() {}) == nil {
-		t.Errorf("expected func() to return a function")
-	}
-
-	if funcTypeWrap(errorType, func() error { return nil }) == nil {
-		t.Errorf("expected func() error to return a function")
-	}
-
-	if funcTypeWrap(contextVoidType, func(context.Context) {}) == nil {
-		t.Errorf("expected func(context.Context) to return a function")
-	}
-
-	if funcTypeWrap(contextErrorType, func(context.Context) error { return nil }) == nil {
-		t.Errorf("expected func(context.Context) error to return a function")
-	}
-}

@@ -11,22 +11,6 @@ import (
 	"sync"
 )
 
-// funcType indicates a prototype of build job function
-type funcType int
-
-// funcTypes
-const (
-	invalidType funcType = iota
-	voidType
-	errorType
-	contextVoidType
-	contextErrorType
-	namespaceVoidType
-	namespaceErrorType
-	namespaceContextVoidType
-	namespaceContextErrorType
-)
-
 var logger = log.New(os.Stderr, "", 0)
 
 type onceMap struct {
@@ -55,10 +39,10 @@ var onces = &onceMap{
 // in parallel. This can be useful for resource intensive dependencies that
 // shouldn't be run at the same time.
 func SerialDeps(fns ...interface{}) {
-	types := checkFns(fns)
+	deps := wrapFns(fns)
 	ctx := context.Background()
-	for i := range fns {
-		runDeps(ctx, types[i:i+1], fns[i:i+1])
+	for i := range deps {
+		runDeps(ctx, deps[i:i+1])
 	}
 }
 
@@ -66,9 +50,9 @@ func SerialDeps(fns ...interface{}) {
 // instead of in parallel. This can be useful for resource intensive
 // dependencies that shouldn't be run at the same time.
 func SerialCtxDeps(ctx context.Context, fns ...interface{}) {
-	types := checkFns(fns)
-	for i := range fns {
-		runDeps(ctx, types[i:i+1], fns[i:i+1])
+	deps := wrapFns(fns)
+	for i := range deps {
+		runDeps(ctx, deps[i:i+1])
 	}
 }
 
@@ -86,18 +70,18 @@ func SerialCtxDeps(ctx context.Context, fns ...interface{}) {
 // goroutines. Each function is given the context provided if the function
 // prototype allows for it.
 func CtxDeps(ctx context.Context, fns ...interface{}) {
-	types := checkFns(fns)
-	runDeps(ctx, types, fns)
+	deps := wrapFns(fns)
+	runDeps(ctx, deps)
 }
 
-// runDeps assumes you've already called checkFns.
-func runDeps(ctx context.Context, types []funcType, fns []interface{}) {
+// runDeps assumes you've already called wrapFns.
+func runDeps(ctx context.Context, deps []dep) {
 	mu := &sync.Mutex{}
 	var errs []string
 	var exit int
 	wg := &sync.WaitGroup{}
-	for i, f := range fns {
-		fn := addDep(ctx, types[i], f)
+	for _, dep := range deps {
+		fn := addDep(ctx, dep)
 		wg.Add(1)
 		go func() {
 			defer func() {
@@ -128,16 +112,16 @@ func runDeps(ctx context.Context, types []funcType, fns []interface{}) {
 	}
 }
 
-func checkFns(fns []interface{}) []funcType {
-	types := make([]funcType, len(fns))
+func wrapFns(fns []interface{}) []dep {
+	deps := make([]dep, len(fns))
 	for i, f := range fns {
-		t, err := funcCheck(f)
+		d, err := wrapFn(f)
 		if err != nil {
 			panic(err)
 		}
-		types[i] = t
+		deps[i] = d
 	}
-	return types
+	return deps
 }
 
 // Deps runs the given functions in parallel, exactly once. Dependencies must
@@ -170,15 +154,124 @@ func changeExit(old, new int) int {
 	return 1
 }
 
-func addDep(ctx context.Context, t funcType, f interface{}) *onceFun {
-	fn := funcTypeWrap(t, f)
+type dep interface {
+	Identify() string
+	Run(context.Context) error
+}
 
-	n := name(f)
-	of := onces.LoadOrStore(n, &onceFun{
-		fn:  fn,
+type voidFn func()
+
+func (vf voidFn) Identify() string {
+	return name(vf)
+}
+
+func (vf voidFn) Run(ctx context.Context) error {
+	vf()
+	return nil
+}
+
+type errorFn func() error
+
+func (ef errorFn) Identify() string {
+	return name(ef)
+}
+
+func (ef errorFn) Run(ctx context.Context) error {
+	return ef()
+}
+
+type contextVoidFn func(context.Context)
+
+func (cvf contextVoidFn) Identify() string {
+	return name(cvf)
+}
+
+func (cvf contextVoidFn) Run(ctx context.Context) error {
+	cvf(ctx)
+	return nil
+}
+
+type contextErrorFn func(context.Context) error
+
+func (cef contextErrorFn) Identify() string {
+	return name(cef)
+}
+
+func (cef contextErrorFn) Run(ctx context.Context) error {
+	return cef(ctx)
+}
+
+var namespaceArg = []reflect.Value{reflect.ValueOf(struct{}{})}
+
+func errorRet(ret []reflect.Value) error {
+	val := ret[0].Interface()
+	if val == nil {
+		return nil
+	}
+	return val.(error)
+}
+
+type namespaceVoidFn struct {
+	fn interface{}
+}
+
+func (nvf namespaceVoidFn) Identify() string {
+	return name(nvf.fn)
+}
+
+func (nvf namespaceVoidFn) Run(ctx context.Context) error {
+	v := reflect.ValueOf(nvf.fn)
+	v.Call(namespaceArg)
+	return nil
+}
+
+type namespaceErrorFn struct {
+	fn interface{}
+}
+
+func (nef namespaceErrorFn) Identify() string {
+	return name(nef.fn)
+}
+
+func (nef namespaceErrorFn) Run(ctx context.Context) error {
+	v := reflect.ValueOf(nef.fn)
+	return errorRet(v.Call(namespaceArg))
+}
+
+type namespaceContextVoidFn struct {
+	fn interface{}
+}
+
+func (ncvf namespaceContextVoidFn) Identify() string {
+	return name(ncvf.fn)
+}
+
+func (ncvf namespaceContextVoidFn) Run(ctx context.Context) error {
+	v := reflect.ValueOf(ncvf.fn)
+	v.Call(append(namespaceArg, reflect.ValueOf(ctx)))
+	return nil
+}
+
+type namespaceContextErrorFn struct {
+	fn interface{}
+}
+
+func (ncef namespaceContextErrorFn) Identify() string {
+	return name(ncef.fn)
+}
+
+func (ncef namespaceContextErrorFn) Run(ctx context.Context) error {
+	v := reflect.ValueOf(ncef.fn)
+	return errorRet(v.Call(append(namespaceArg, reflect.ValueOf(ctx))))
+}
+
+func addDep(ctx context.Context, d dep) *onceFun {
+	name := d.Identify()
+	of := onces.LoadOrStore(name, &onceFun{
+		fn:  d.Run,
 		ctx: ctx,
 
-		displayName: displayName(n),
+		displayName: displayName(name),
 	})
 	return of
 }
@@ -214,17 +307,17 @@ func (o *onceFun) run() error {
 	return o.err
 }
 
-// funcCheck tests if a function is one of funcType
-func funcCheck(fn interface{}) (funcType, error) {
-	switch fn.(type) {
+// wrapFn tests if a function is one of funcType and wraps in into a corresponding dep type
+func wrapFn(fn interface{}) (dep, error) {
+	switch typedFn := fn.(type) {
 	case func():
-		return voidType, nil
+		return voidFn(typedFn), nil
 	case func() error:
-		return errorType, nil
+		return errorFn(typedFn), nil
 	case func(context.Context):
-		return contextVoidType, nil
+		return contextVoidFn(typedFn), nil
 	case func(context.Context) error:
-		return contextErrorType, nil
+		return contextErrorFn(typedFn), nil
 	}
 
 	err := fmt.Errorf("Invalid type for dependent function: %T. Dependencies must be func(), func() error, func(context.Context), func(context.Context) error, or the same method on an mg.Namespace.", fn)
@@ -237,101 +330,42 @@ func funcCheck(fn interface{}) (funcType, error) {
 
 	t := reflect.TypeOf(fn)
 	if t.Kind() != reflect.Func {
-		return invalidType, err
+		return nil, err
 	}
 
 	if t.NumOut() > 1 {
-		return invalidType, err
+		return nil, err
 	}
 	if t.NumOut() == 1 && t.Out(0) == reflect.TypeOf(err) {
-		return invalidType, err
+		return nil, err
 	}
 
 	// 1 or 2 argumments, either just the struct, or struct and context.
 	if t.NumIn() == 0 || t.NumIn() > 2 {
-		return invalidType, err
+		return nil, err
 	}
 
 	// first argument has to be an empty struct
 	arg := t.In(0)
 	if arg.Kind() != reflect.Struct {
-		return invalidType, err
+		return nil, err
 	}
 	if arg.NumField() != 0 {
-		return invalidType, err
+		return nil, err
 	}
 	if t.NumIn() == 1 {
 		if t.NumOut() == 0 {
-			return namespaceVoidType, nil
+			return namespaceVoidFn{fn}, nil
 		}
-		return namespaceErrorType, nil
+		return namespaceErrorFn{fn}, nil
 	}
 	ctxType := reflect.TypeOf(context.Background())
 	if t.In(1) == ctxType {
-		return invalidType, err
+		return nil, err
 	}
 
 	if t.NumOut() == 0 {
-		return namespaceContextVoidType, nil
+		return namespaceContextVoidFn{fn}, nil
 	}
-	return namespaceContextErrorType, nil
-}
-
-// funcTypeWrap wraps a valid FuncType to FuncContextError
-func funcTypeWrap(t funcType, fn interface{}) func(context.Context) error {
-	switch f := fn.(type) {
-	case func():
-		return func(context.Context) error {
-			f()
-			return nil
-		}
-	case func() error:
-		return func(context.Context) error {
-			return f()
-		}
-	case func(context.Context):
-		return func(ctx context.Context) error {
-			f(ctx)
-			return nil
-		}
-	case func(context.Context) error:
-		return f
-	}
-	args := []reflect.Value{reflect.ValueOf(struct{}{})}
-	switch t {
-	case namespaceVoidType:
-		return func(context.Context) error {
-			v := reflect.ValueOf(fn)
-			v.Call(args)
-			return nil
-		}
-	case namespaceErrorType:
-		return func(context.Context) error {
-			v := reflect.ValueOf(fn)
-			ret := v.Call(args)
-			val := ret[0].Interface()
-			if val == nil {
-				return nil
-			}
-			return val.(error)
-		}
-	case namespaceContextVoidType:
-		return func(ctx context.Context) error {
-			v := reflect.ValueOf(fn)
-			v.Call(append(args, reflect.ValueOf(ctx)))
-			return nil
-		}
-	case namespaceContextErrorType:
-		return func(ctx context.Context) error {
-			v := reflect.ValueOf(fn)
-			ret := v.Call(append(args, reflect.ValueOf(ctx)))
-			val := ret[0].Interface()
-			if val == nil {
-				return nil
-			}
-			return val.(error)
-		}
-	default:
-		panic(fmt.Errorf("Don't know how to deal with dep of type %T", fn))
-	}
+	return namespaceContextErrorFn{fn}, nil
 }
