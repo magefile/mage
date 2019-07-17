@@ -18,6 +18,7 @@ import (
 	"reflect"
 	"regexp"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 	"testing"
@@ -1277,6 +1278,25 @@ func TestWrongDependency(t *testing.T) {
 	actual := stderr.String()
 	if !wrongDepRx.MatchString(actual) {
 		t.Fatalf("expected matching %q, but got %q", wrongDepRx, actual)
+	}
+}
+
+func TestCustomDependency(t *testing.T) {
+	stdout := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:    "./testdata/custom_dep",
+		Stderr: ioutil.Discard,
+		Stdout: stdout,
+	}
+	code := Invoke(inv)
+	if code != 0 {
+		t.Fatalf("expected 0, but got %v", code)
+	}
+	stdoutLines := strings.Split(stdout.String(), "\n")
+	sort.Strings(stdoutLines)
+	expected := "123456"
+	if strings.Join(stdoutLines, "") != expected {
+		t.Fatalf("expected %q, but got %q", expected, stdoutLines)
 	}
 }
 

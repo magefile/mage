@@ -43,6 +43,12 @@ func TestWrapFunc(t *testing.T) {
 		t.Errorf("expected Foo.CtxError to be a namespaceContextErrorFn but was %v", d)
 	}
 
+	// Custom dependencies
+	d, _ = wrapFn(customDep{})
+	if _, ok := d.(customDep); !ok {
+		t.Errorf("expected d to be customDep{}, but was %v", d)
+	}
+
 	// Test the Invalid case
 	d, err := wrapFn(func(int) error { return nil })
 	if d != nil {
@@ -62,3 +68,13 @@ func (Foo) Error() error { return nil }
 func (Foo) BareCtx(context.Context) {}
 
 func (Foo) CtxError(context.Context) error { return nil }
+
+type customDep struct{}
+
+func (cd customDep) Identify() string {
+	return ""
+}
+
+func (cd customDep) Run(context.Context) error {
+	return nil
+}
