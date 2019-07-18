@@ -1261,6 +1261,25 @@ func TestAliasToImport(t *testing.T) {
 
 }
 
+var wrongDepRx = regexp.MustCompile("^Error: Invalid type for dependent function.*@ main.FooBar .*magefile.go")
+
+func TestWrongDependency(t *testing.T) {
+	stderr := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:    "./testdata/wrong_dep",
+		Stderr: stderr,
+		Stdout: ioutil.Discard,
+	}
+	code := Invoke(inv)
+	if code != 1 {
+		t.Fatalf("expected 1, but got %v", code)
+	}
+	actual := stderr.String()
+	if !wrongDepRx.MatchString(actual) {
+		t.Fatalf("expected matching %q, but got %q", wrongDepRx, actual)
+	}
+}
+
 /// This code liberally borrowed from https://github.com/rsc/goversion/blob/master/version/exe.go
 
 type exeType int
