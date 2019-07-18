@@ -110,6 +110,7 @@ type Invocation struct {
 	Args       []string      // args to pass to the compiled binary
 	GoCmd      string        // the go binary command to run
 	CacheDir   string        // the directory where we should store compiled binaries
+	HashFast   bool          // don't rely on GOCACHE, just hash the magefiles
 }
 
 // ParseAndRun parses the command line, and then compiles and runs the mage
@@ -282,7 +283,7 @@ Options:
 	if len(inv.Args) > 0 && cmd != None {
 		return inv, cmd, fmt.Errorf("unexpected arguments to command: %q", inv.Args)
 	}
-
+	inv.HashFast = mg.HashFast()
 	return inv, cmd, err
 }
 
@@ -321,12 +322,16 @@ func Invoke(inv Invocation) int {
 	debug.Println("output exe is ", exePath)
 
 	useCache := false
-	if s, err := internal.OutputDebug(inv.GoCmd, "env", "GOCACHE"); err == nil {
-		// if GOCACHE exists, always rebuild, so we catch transitive
-		// dependencies that have changed.
-		if s != "" {
-			debug.Println("build cache exists, will ignore any compiled binary")
-			useCache = true
+	if inv.HashFast {
+		debug.Println("user has set MAGEFILE_HASHFAST, so we'll ignore GOCACHE")
+	} else {
+		if s, err := internal.OutputDebug(inv.GoCmd, "env", "GOCACHE"); err == nil {
+			// if GOCACHE exists, always rebuild, so we catch transitive
+			// dependencies that have changed.
+			if s != "" {
+				debug.Println("go build cache exists, will ignore any compiled binary")
+				useCache = true
+			}
 		}
 	}
 

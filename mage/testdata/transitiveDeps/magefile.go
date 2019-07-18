@@ -2,7 +2,7 @@
 
 package main
 
-import "./dep"
+import "github.com/magefile/mage/mage/testdata/transitiveDeps/dep"
 
 func Run() {
 	dep.Speak()
