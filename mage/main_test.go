@@ -61,7 +61,7 @@ func testmain(m *testing.M) int {
 }
 
 func TestTransitiveDepCache(t *testing.T) {
-	cache, err := internal.OutputDebug("go", "env", "gocache")
+	cache, err := internal.OutputDebug("go", "env", "GOCACHE")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -103,6 +103,61 @@ func TestTransitiveDepCache(t *testing.T) {
 		t.Fatalf("got code %v, err: %s", code, stderr)
 	}
 	expected = "meow\n"
+	if actual := stdout.String(); actual != expected {
+		t.Fatalf("expected %q but got %q", expected, actual)
+	}
+}
+
+func TestTransitiveHashFast(t *testing.T) {
+	cache, err := internal.OutputDebug("go", "env", "GOCACHE")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cache == "" {
+		t.Skip("skipping hashfast tests on go version without cache")
+	}
+
+	// Test that if we change a transitive dep, that we don't recompile.
+	// We intentionally run the first time without hashfast to ensure that
+	// we recompile the binary with the current code.
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	inv := Invocation{
+		Stderr: stderr,
+		Stdout: stdout,
+		Dir:    "testdata/transitiveDeps",
+		Args:   []string{"Run"},
+	}
+	code := Invoke(inv)
+	if code != 0 {
+		t.Fatalf("got code %v, err: %s", code, stderr)
+	}
+	expected := "woof\n"
+	if actual := stdout.String(); actual != expected {
+		t.Fatalf("expected %q but got %q", expected, actual)
+	}
+
+	// ok, so baseline, the generated and cached binary should do "woof"
+	// now change out the transitive dependency that does the output
+	// so that it produces different output.
+	if err := os.Rename("testdata/transitiveDeps/dep/dog.go", "testdata/transitiveDeps/dep/dog.notgo"); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Rename("testdata/transitiveDeps/dep/dog.notgo", "testdata/transitiveDeps/dep/dog.go")
+	if err := os.Rename("testdata/transitiveDeps/dep/cat.notgo", "testdata/transitiveDeps/dep/cat.go"); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Rename("testdata/transitiveDeps/dep/cat.go", "testdata/transitiveDeps/dep/cat.notgo")
+	stderr.Reset()
+	stdout.Reset()
+	inv.HashFast = true
+	code = Invoke(inv)
+	if code != 0 {
+		t.Fatalf("got code %v, err: %s", code, stderr)
+	}
+	// we should still get woof, even though the dependency was changed to
+	// return "meow", because we're only hashing the top level magefiles, not
+	// dependencies.
 	if actual := stdout.String(); actual != expected {
 		t.Fatalf("expected %q but got %q", expected, actual)
 	}
