@@ -428,8 +428,8 @@ func Magefiles(magePath, goos, goarch, goCmd string, stderr io.Writer, isDebug b
 	}
 
 	debug.Println("getting all non-mage files in", magePath)
-	// // first, grab all the files with no build tags specified.. this is actually
-	// // our exclude list of things without the mage build tag.
+	// first, grab all the files with no build tags specified.. this is actually
+	// our exclude list of things without the mage build tag.
 	cmd := exec.Command(goCmd, "list", "-e", "-f", `{{join .GoFiles "||"}}`)
 	cmd.Env = env
 	if isDebug {
@@ -437,16 +437,18 @@ func Magefiles(magePath, goos, goarch, goCmd string, stderr io.Writer, isDebug b
 	}
 	cmd.Dir = magePath
 	b, err := cmd.Output()
-	if err != nil {
-		return fail(fmt.Errorf("failed to list non-mage gofiles: %v", err))
-	}
-	list := strings.TrimSpace(string(b))
-	debug.Println("found non-mage files", list)
 	exclude := map[string]bool{}
-	for _, f := range strings.Split(list, "||") {
-		if f != "" {
-			debug.Printf("marked file as non-mage: %q", f)
-			exclude[f] = true
+
+	// ignore error if no go files found
+	// if no error, parse response to build exclude list
+	if err == nil {
+		list := strings.TrimSpace(string(b))
+		debug.Println("found non-mage files", list)
+		for _, f := range strings.Split(list, "||") {
+			if f != "" {
+				debug.Printf("marked file as non-mage: %q", f)
+				exclude[f] = true
+			}
 		}
 	}
 	debug.Println("getting all files plus mage files")
@@ -462,8 +464,8 @@ func Magefiles(magePath, goos, goarch, goCmd string, stderr io.Writer, isDebug b
 		return fail(fmt.Errorf("failed to list mage gofiles: %v", err))
 	}
 
-	list = strings.TrimSpace(string(b))
-	files := []string{}
+	list := strings.TrimSpace(string(b))
+	var files []string
 	for _, f := range strings.Split(list, "||") {
 		if f != "" && !exclude[f] {
 			files = append(files, f)
