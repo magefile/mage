@@ -174,7 +174,7 @@ Options:
 
 	handleError := func(logger *log.Logger, err interface{}) {
 		if err != nil {
-			logger.Printf("Error: %v\n", err)
+			logger.Printf("Error: %+v\n", err)
 			type code interface {
 				ExitStatus() int
 			}
