@@ -1,6 +1,7 @@
 package mage
 
 import (
+	"bytes"
 	"crypto/sha1"
 	"errors"
 	"flag"
@@ -325,13 +326,17 @@ func Invoke(inv Invocation) int {
 	if inv.HashFast {
 		debug.Println("user has set MAGEFILE_HASHFAST, so we'll ignore GOCACHE")
 	} else {
-		if s, err := internal.OutputDebug(inv.GoCmd, "env", "GOCACHE"); err == nil {
-			// if GOCACHE exists, always rebuild, so we catch transitive
-			// dependencies that have changed.
-			if s != "" {
-				debug.Println("go build cache exists, will ignore any compiled binary")
-				useCache = true
-			}
+		s, err := internal.OutputDebug(inv.GoCmd, "env", "GOCACHE")
+		if err != nil {
+			errlog.Printf("failed to run %s env GOCACHE: %s", inv.GoCmd, err)
+			return 1
+		}
+
+		// if GOCACHE exists, always rebuild, so we catch transitive
+		// dependencies that have changed.
+		if s != "" {
+			debug.Println("go build cache exists, will ignore any compiled binary")
+			useCache = true
 		}
 	}
 
@@ -428,17 +433,22 @@ func Magefiles(magePath, goos, goarch, goCmd string, stderr io.Writer, isDebug b
 	}
 
 	debug.Println("getting all non-mage files in", magePath)
+
 	// // first, grab all the files with no build tags specified.. this is actually
 	// // our exclude list of things without the mage build tag.
 	cmd := exec.Command(goCmd, "list", "-e", "-f", `{{join .GoFiles "||"}}`)
 	cmd.Env = env
-	if isDebug {
-		cmd.Stderr = stderr
-	}
+	buf := &bytes.Buffer{}
+	cmd.Stderr = buf
 	cmd.Dir = magePath
 	b, err := cmd.Output()
 	if err != nil {
-		return fail(fmt.Errorf("failed to list non-mage gofiles: %v", err))
+		stderr := buf.String()
+		// if the error is "cannot find module", that can mean that there's no
+		// non-mage files, which is fine, so ignore it.
+		if !strings.Contains(stderr, "cannot find module for path") {
+			return fail(fmt.Errorf("failed to list non-mage gofiles: %v: %s", err, stderr))
+		}
 	}
 	list := strings.TrimSpace(string(b))
 	debug.Println("found non-mage files", list)
@@ -453,13 +463,11 @@ func Magefiles(magePath, goos, goarch, goCmd string, stderr io.Writer, isDebug b
 	cmd = exec.Command(goCmd, "list", "-tags=mage", "-e", "-f", `{{join .GoFiles "||"}}`)
 	cmd.Env = env
 
-	if isDebug {
-		cmd.Stderr = stderr
-	}
+	buf.Reset()
 	cmd.Dir = magePath
 	b, err = cmd.Output()
 	if err != nil {
-		return fail(fmt.Errorf("failed to list mage gofiles: %v", err))
+		return fail(fmt.Errorf("failed to list mage gofiles: %v: %s", err, buf.Bytes()))
 	}
 
 	list = strings.TrimSpace(string(b))
