@@ -69,7 +69,7 @@ func RunWith(env map[string]string, cmd string, args ...string) error {
 	return err
 }
 
-// RunVWith is like RunWith, but always sends the command's stdout to os.Stdout.
+// RunWithV is like RunWith, but always sends the command's stdout to os.Stdout.
 func RunVWith(env map[string]string, cmd string, args ...string) error {
 	_, err := Exec(env, os.Stdout, os.Stderr, cmd, args...)
 	return err
