@@ -27,13 +27,20 @@ const GoCmdEnv = "MAGEFILE_GOCMD"
 // to ignore the default target specified in the magefile.
 const IgnoreDefaultEnv = "MAGEFILE_IGNOREDEFAULT"
 
+// HashFastEnv is the environment variable that indicates the user requested to
+// use a quick hash of magefiles to determine whether or not the magefile binary
+// needs to be rebuilt. This results in faster runtimes, but means that mage
+// will fail to rebuild if a dependency has changed. To force a rebuild, run
+// mage with the -f flag.
+const HashFastEnv = "MAGEFILE_HASHFAST"
+
 // Verbose reports whether a magefile was run with the verbose flag.
 func Verbose() bool {
 	b, _ := strconv.ParseBool(os.Getenv(VerboseEnv))
 	return b
 }
 
-// Debug reports whether a magefile was run with the verbose flag.
+// Debug reports whether a magefile was run with the debug flag.
 func Debug() bool {
 	b, _ := strconv.ParseBool(os.Getenv(DebugEnv))
 	return b
@@ -46,6 +53,13 @@ func GoCmd() string {
 		return cmd
 	}
 	return "go"
+}
+
+// HashFast reports whether the user has requested to use the fast hashing
+// mechanism rather than rely on go's rebuilding mechanism.
+func HashFast() bool {
+	b, _ := strconv.ParseBool(os.Getenv(HashFastEnv))
+	return b
 }
 
 // IgnoreDefault reports whether the user has requested to ignore the default target
