@@ -1,6 +1,7 @@
 package mage
 
 import (
+	"bytes"
 	"crypto/sha1"
 	"errors"
 	"flag"
@@ -110,6 +111,7 @@ type Invocation struct {
 	Args       []string      // args to pass to the compiled binary
 	GoCmd      string        // the go binary command to run
 	CacheDir   string        // the directory where we should store compiled binaries
+	HashFast   bool          // don't rely on GOCACHE, just hash the magefiles
 }
 
 // ParseAndRun parses the command line, and then compiles and runs the mage
@@ -282,7 +284,7 @@ Options:
 	if len(inv.Args) > 0 && cmd != None {
 		return inv, cmd, fmt.Errorf("unexpected arguments to command: %q", inv.Args)
 	}
-
+	inv.HashFast = mg.HashFast()
 	return inv, cmd, err
 }
 
@@ -321,11 +323,19 @@ func Invoke(inv Invocation) int {
 	debug.Println("output exe is ", exePath)
 
 	useCache := false
-	if s, err := internal.OutputDebug(inv.GoCmd, "env", "GOCACHE"); err == nil {
+	if inv.HashFast {
+		debug.Println("user has set MAGEFILE_HASHFAST, so we'll ignore GOCACHE")
+	} else {
+		s, err := internal.OutputDebug(inv.GoCmd, "env", "GOCACHE")
+		if err != nil {
+			errlog.Printf("failed to run %s env GOCACHE: %s", inv.GoCmd, err)
+			return 1
+		}
+
 		// if GOCACHE exists, always rebuild, so we catch transitive
 		// dependencies that have changed.
 		if s != "" {
-			debug.Println("build cache exists, will ignore any compiled binary")
+			debug.Println("go build cache exists, will ignore any compiled binary")
 			useCache = true
 		}
 	}
@@ -423,17 +433,22 @@ func Magefiles(magePath, goos, goarch, goCmd string, stderr io.Writer, isDebug b
 	}
 
 	debug.Println("getting all non-mage files in", magePath)
+
 	// // first, grab all the files with no build tags specified.. this is actually
 	// // our exclude list of things without the mage build tag.
 	cmd := exec.Command(goCmd, "list", "-e", "-f", `{{join .GoFiles "||"}}`)
 	cmd.Env = env
-	if isDebug {
-		cmd.Stderr = stderr
-	}
+	buf := &bytes.Buffer{}
+	cmd.Stderr = buf
 	cmd.Dir = magePath
 	b, err := cmd.Output()
 	if err != nil {
-		return fail(fmt.Errorf("failed to list non-mage gofiles: %v", err))
+		stderr := buf.String()
+		// if the error is "cannot find module", that can mean that there's no
+		// non-mage files, which is fine, so ignore it.
+		if !strings.Contains(stderr, "cannot find module for path") {
+			return fail(fmt.Errorf("failed to list non-mage gofiles: %v: %s", err, stderr))
+		}
 	}
 	list := strings.TrimSpace(string(b))
 	debug.Println("found non-mage files", list)
@@ -448,13 +463,11 @@ func Magefiles(magePath, goos, goarch, goCmd string, stderr io.Writer, isDebug b
 	cmd = exec.Command(goCmd, "list", "-tags=mage", "-e", "-f", `{{join .GoFiles "||"}}`)
 	cmd.Env = env
 
-	if isDebug {
-		cmd.Stderr = stderr
-	}
+	buf.Reset()
 	cmd.Dir = magePath
 	b, err = cmd.Output()
 	if err != nil {
-		return fail(fmt.Errorf("failed to list mage gofiles: %v", err))
+		return fail(fmt.Errorf("failed to list mage gofiles: %v: %s", err, buf.Bytes()))
 	}
 
 	list = strings.TrimSpace(string(b))

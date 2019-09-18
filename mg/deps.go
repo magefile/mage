@@ -307,6 +307,21 @@ func (o *onceFun) run() error {
 	return o.err
 }
 
+// Returns a location of mg.Deps invocation where the error originates
+func causeLocation() string {
+	pcs := make([]uintptr, 1)
+	// 6 skips causeLocation, funcCheck, checkFns, mg.CtxDeps, mg.Deps in stacktrace
+	if runtime.Callers(6, pcs) != 1 {
+		return "<unknown>"
+	}
+	frames := runtime.CallersFrames(pcs)
+	frame, _ := frames.Next()
+	if frame.Function == "" && frame.File == "" && frame.Line == 0 {
+		return "<unknown>"
+	}
+	return fmt.Sprintf("%s %s:%d", frame.Function, frame.File, frame.Line)
+}
+
 // wrapFn tests if a function is one of funcType and wraps in into a corresponding dep type
 func wrapFn(fn interface{}) (dep, error) {
 	if d, ok := fn.(dep); ok {
@@ -324,7 +339,7 @@ func wrapFn(fn interface{}) (dep, error) {
 		return contextErrorFn(typedFn), nil
 	}
 
-	err := fmt.Errorf("Invalid type for dependent function: %T. Dependencies must be func(), func() error, func(context.Context), func(context.Context) error, or the same method on an mg.Namespace.", fn)
+	err := fmt.Errorf("Invalid type for dependent function: %T. Dependencies must be func(), func() error, func(context.Context), func(context.Context) error, or the same method on an mg.Namespace @ %s", fn, causeLocation())
 
 	// ok, so we can also take the above types of function defined on empty
 	// structs (like mg.Namespace). When you pass a method of a type, it gets

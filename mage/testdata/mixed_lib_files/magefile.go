@@ -2,7 +2,7 @@
 
 package main
 
-import "./subdir"
+import "github.com/magefile/mage/mage/testdata/mixed_lib_files/subdir"
 
 func Build() {
 	subdir.Build()
