@@ -11,8 +11,12 @@ import (
 	"sync"
 )
 
-// Filled in during compilation
-var defaultPackage string
+var module string
+
+// SetModule sets the module for build system. The name of the module will be trimmed off package names in output
+func SetModule(mod string) {
+	module = mod
+}
 
 var logger = log.New(os.Stderr, "", 0)
 
@@ -288,7 +292,7 @@ func displayName(name string) string {
 	if len(splitByPackage) == 2 && splitByPackage[0] == "main" {
 		return splitByPackage[len(splitByPackage)-1]
 	}
-	return strings.TrimPrefix(name, defaultPackage+"/")
+	return strings.TrimPrefix(name, module+"/")
 }
 
 type onceFun struct {

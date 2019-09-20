@@ -25,6 +25,8 @@ import (
 )
 
 func main() {
+        mg.SetModule("{{.Module}}")
+
 	// Use local types and functions in order to avoid name conflicts with additional magefiles.
 	type arguments struct {
 		Verbose       bool          // print out log statements

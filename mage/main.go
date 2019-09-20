@@ -382,7 +382,7 @@ func Invoke(inv Invocation) int {
 		binaryName = filepath.Base(inv.CompileOut)
 	}
 
-	err = GenerateMainfile(binaryName, main, info)
+	err = GenerateMainfile(binaryName, main, info, module)
 	if err != nil {
 		errlog.Println("Error:", err)
 		return 1
@@ -391,7 +391,7 @@ func Invoke(inv Invocation) int {
 		defer os.RemoveAll(main)
 	}
 	files = append(files, main)
-	if err := Compile(inv.GOOS, inv.GOARCH, inv.Dir, inv.GoCmd, exePath, module, files, inv.Debug, inv.Stderr, inv.Stdout); err != nil {
+	if err := Compile(inv.GOOS, inv.GOARCH, inv.Dir, inv.GoCmd, exePath, files, inv.Debug, inv.Stderr, inv.Stdout); err != nil {
 		errlog.Println("Error:", err)
 		return 1
 	}
@@ -418,6 +418,7 @@ type mainfileTemplateData struct {
 	Aliases     map[string]*parse.Function
 	Imports     []*parse.Import
 	BinaryName  string
+	Module      string
 }
 
 func nonMageFiles(goCmd, path string, env []string) (map[string]bool, error) {
@@ -550,7 +551,7 @@ func Magefiles(magePath, goos, goarch, goCmd string, stderr io.Writer, isDebug b
 }
 
 // Compile uses the go tool to compile the files into an executable at path.
-func Compile(goos, goarch, magePath, goCmd, compileTo, defaultPackage string, gofiles []string, isDebug bool, stderr, stdout io.Writer) error {
+func Compile(goos, goarch, magePath, goCmd, compileTo string, gofiles []string, isDebug bool, stderr, stdout io.Writer) error {
 	debug.Println("compiling to", compileTo)
 	debug.Println("compiling using gocmd:", goCmd)
 	if isDebug {
@@ -565,8 +566,8 @@ func Compile(goos, goarch, magePath, goCmd, compileTo, defaultPackage string, go
 	for i := range gofiles {
 		gofiles[i] = filepath.Base(gofiles[i])
 	}
-	debug.Printf("running %s build -ldflags='-X github.com/magefile/mage/mg.defaultPackage=%s' -o %s %s", goCmd, defaultPackage, compileTo, strings.Join(gofiles, " "))
-	c := exec.Command(goCmd, append([]string{"build", "-ldflags=-X github.com/magefile/mage/mg.defaultPackage=" + defaultPackage, "-o", compileTo}, gofiles...)...)
+	debug.Printf("running %s build -o %s %s", goCmd, compileTo, strings.Join(gofiles, " "))
+	c := exec.Command(goCmd, append([]string{"build", "-o", compileTo}, gofiles...)...)
 	c.Env = environ
 	c.Stderr = stderr
 	c.Stdout = stdout
@@ -581,7 +582,7 @@ func Compile(goos, goarch, magePath, goCmd, compileTo, defaultPackage string, go
 }
 
 // GenerateMainfile generates the mage mainfile at path.
-func GenerateMainfile(binaryName, path string, info *parse.PkgInfo) error {
+func GenerateMainfile(binaryName, path string, info *parse.PkgInfo, module string) error {
 	debug.Println("Creating mainfile at", path)
 
 	f, err := os.Create(path)
@@ -595,6 +596,7 @@ func GenerateMainfile(binaryName, path string, info *parse.PkgInfo) error {
 		Aliases:     info.Aliases,
 		Imports:     info.Imports,
 		BinaryName:  binaryName,
+		Module:      module,
 	}
 
 	if info.DefaultFunc != nil {
