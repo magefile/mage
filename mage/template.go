@@ -22,6 +22,8 @@ import (
 	"time"
 	{{range .Imports}}{{.UniqueName}} "{{.Path}}"
 	{{end}}
+
+        "github.com/magefile/mage/mg"
 )
 
 func main() {
