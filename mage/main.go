@@ -16,6 +16,7 @@ import (
 	"runtime"
 	"sort"
 	"strings"
+	"sync"
 	"text/template"
 	"time"
 
@@ -301,11 +302,13 @@ func Invoke(inv Invocation) int {
 		inv.CacheDir = mg.CacheDir()
 	}
 
-	files, err := Magefiles(inv.Dir, inv.GOOS, inv.GOARCH, inv.GoCmd, inv.Stderr, inv.Debug)
+	magefiles, err := Magefiles(inv.Dir, inv.GOOS, inv.GOARCH, inv.GoCmd, inv.Stderr, inv.Debug)
 	if err != nil {
 		errlog.Println("Error determining list of magefiles:", err)
 		return 1
 	}
+	files := magefiles.files
+	module := magefiles.module
 
 	if len(files) == 0 {
 		errlog.Println("No .go files marked with the mage build tag in this directory.")
@@ -388,7 +391,7 @@ func Invoke(inv Invocation) int {
 		defer os.RemoveAll(main)
 	}
 	files = append(files, main)
-	if err := Compile(inv.GOOS, inv.GOARCH, inv.Dir, inv.GoCmd, exePath, files, inv.Debug, inv.Stderr, inv.Stdout); err != nil {
+	if err := Compile(inv.GOOS, inv.GOARCH, inv.Dir, inv.GoCmd, exePath, module, files, inv.Debug, inv.Stderr, inv.Stdout); err != nil {
 		errlog.Println("Error:", err)
 		return 1
 	}
@@ -417,74 +420,137 @@ type mainfileTemplateData struct {
 	BinaryName  string
 }
 
-// Magefiles returns the list of magefiles in dir.
-func Magefiles(magePath, goos, goarch, goCmd string, stderr io.Writer, isDebug bool) ([]string, error) {
-	start := time.Now()
-	defer func() {
-		debug.Println("time to scan for Magefiles:", time.Since(start))
-	}()
-	fail := func(err error) ([]string, error) {
-		return nil, err
-	}
+func nonMageFiles(goCmd, path string, env []string) (map[string]bool, error) {
+	// first, grab all the files with no build tags specified.. this is actually
+	// our exclude list of things without the mage build tag.
+	debug.Println("getting all non-mage files in", path)
 
-	env, err := internal.EnvWithGOOS(goos, goarch)
-	if err != nil {
-		return nil, err
-	}
-
-	debug.Println("getting all non-mage files in", magePath)
-
-	// // first, grab all the files with no build tags specified.. this is actually
-	// // our exclude list of things without the mage build tag.
 	cmd := exec.Command(goCmd, "list", "-e", "-f", `{{join .GoFiles "||"}}`)
 	cmd.Env = env
 	buf := &bytes.Buffer{}
 	cmd.Stderr = buf
-	cmd.Dir = magePath
+	cmd.Dir = path
 	b, err := cmd.Output()
 	if err != nil {
 		stderr := buf.String()
 		// if the error is "cannot find module", that can mean that there's no
 		// non-mage files, which is fine, so ignore it.
 		if !strings.Contains(stderr, "cannot find module for path") {
-			return fail(fmt.Errorf("failed to list non-mage gofiles: %v: %s", err, stderr))
+			return nil, fmt.Errorf("failed to list non-mage gofiles: %v: %s", err, stderr)
 		}
 	}
 	list := strings.TrimSpace(string(b))
 	debug.Println("found non-mage files", list)
-	exclude := map[string]bool{}
+	files := map[string]bool{}
 	for _, f := range strings.Split(list, "||") {
 		if f != "" {
 			debug.Printf("marked file as non-mage: %q", f)
-			exclude[f] = true
+			files[f] = true
 		}
-	}
-	debug.Println("getting all files plus mage files")
-	cmd = exec.Command(goCmd, "list", "-tags=mage", "-e", "-f", `{{join .GoFiles "||"}}`)
-	cmd.Env = env
-
-	buf.Reset()
-	cmd.Dir = magePath
-	b, err = cmd.Output()
-	if err != nil {
-		return fail(fmt.Errorf("failed to list mage gofiles: %v: %s", err, buf.Bytes()))
-	}
-
-	list = strings.TrimSpace(string(b))
-	files := []string{}
-	for _, f := range strings.Split(list, "||") {
-		if f != "" && !exclude[f] {
-			files = append(files, f)
-		}
-	}
-	for i := range files {
-		files[i] = filepath.Join(magePath, files[i])
 	}
 	return files, nil
 }
 
+func mageFiles(goCmd, path string, env []string) ([]string, error) {
+	debug.Println("getting all files plus mage files")
+	cmd := exec.Command(goCmd, "list", "-tags=mage", "-e", "-f", `{{join .GoFiles "||"}}`)
+	cmd.Env = env
+
+	buf := &bytes.Buffer{}
+	cmd.Stderr = buf
+	cmd.Dir = path
+	b, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list mage gofiles: %v: %s", err, buf.Bytes())
+	}
+
+	list := strings.TrimSpace(string(b))
+	files := []string{}
+	for _, f := range strings.Split(list, "||") {
+		if f != "" {
+			files = append(files, f)
+		}
+	}
+	return files, nil
+}
+
+func mageModule(goCmd, path string) (string, error) {
+	debug.Println("getting mage module")
+	cmd := exec.Command(goCmd, "list", "-m")
+	cmd.Dir = path
+	buf := &bytes.Buffer{}
+	b, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("failed to list mage module: %v: %s", err, buf.Bytes())
+	}
+	return strings.TrimSpace(string(b)), nil
+}
+
+type magefiles struct {
+	files  []string
+	module string
+}
+
+// Magefiles returns the list of magefiles in dir.
+func Magefiles(magePath, goos, goarch, goCmd string, stderr io.Writer, isDebug bool) (*magefiles, error) {
+	start := time.Now()
+	defer func() {
+		debug.Println("time to scan for Magefiles:", time.Since(start))
+	}()
+
+	env, err := internal.EnvWithGOOS(goos, goarch)
+	if err != nil {
+		return nil, err
+	}
+
+	debug.Println("getting all files plus mage files")
+
+	var exclude map[string]bool
+	var all []string
+	var module string
+	var err2, err3 error
+
+	var wg sync.WaitGroup
+	wg.Add(3)
+
+	go func() {
+		exclude, err = nonMageFiles(goCmd, magePath, env)
+		wg.Done()
+	}()
+
+	go func() {
+		all, err2 = mageFiles(goCmd, magePath, env)
+		wg.Done()
+	}()
+
+	go func() {
+		module, err3 = mageModule(goCmd, magePath)
+		wg.Done()
+	}()
+
+	wg.Wait()
+
+	if err != nil {
+		return nil, err
+	}
+	if err2 != nil {
+		return nil, err2
+	}
+
+	files := []string{}
+	for _, f := range all {
+		if !exclude[f] {
+			files = append(files, f)
+		}
+	}
+	return &magefiles{
+		files:  files,
+		module: module,
+	}, nil
+}
+
 // Compile uses the go tool to compile the files into an executable at path.
-func Compile(goos, goarch, magePath, goCmd, compileTo string, gofiles []string, isDebug bool, stderr, stdout io.Writer) error {
+func Compile(goos, goarch, magePath, goCmd, compileTo, defaultPackage string, gofiles []string, isDebug bool, stderr, stdout io.Writer) error {
 	debug.Println("compiling to", compileTo)
 	debug.Println("compiling using gocmd:", goCmd)
 	if isDebug {
@@ -499,8 +565,8 @@ func Compile(goos, goarch, magePath, goCmd, compileTo string, gofiles []string, 
 	for i := range gofiles {
 		gofiles[i] = filepath.Base(gofiles[i])
 	}
-	debug.Printf("running %s build -o %s %s", goCmd, compileTo, strings.Join(gofiles, " "))
-	c := exec.Command(goCmd, append([]string{"build", "-o", compileTo}, gofiles...)...)
+	debug.Printf("running %s build -ldflags='-X github.com/magefile/mage/mg.defaultPackage=%s' -o %s %s", goCmd, defaultPackage, compileTo, strings.Join(gofiles, " "))
+	c := exec.Command(goCmd, append([]string{"build", "-ldflags=-X github.com/magefile/mage/mg.defaultPackage=" + defaultPackage, "-o", compileTo}, gofiles...)...)
 	c.Env = environ
 	c.Stderr = stderr
 	c.Stdout = stdout

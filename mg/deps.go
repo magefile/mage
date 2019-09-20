@@ -11,6 +11,9 @@ import (
 	"sync"
 )
 
+// Filled in during compilation
+var defaultPackage string
+
 var logger = log.New(os.Stderr, "", 0)
 
 type onceMap struct {
@@ -285,7 +288,7 @@ func displayName(name string) string {
 	if len(splitByPackage) == 2 && splitByPackage[0] == "main" {
 		return splitByPackage[len(splitByPackage)-1]
 	}
-	return name
+	return strings.TrimPrefix(name, defaultPackage+"/")
 }
 
 type onceFun struct {
