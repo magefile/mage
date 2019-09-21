@@ -3,10 +3,12 @@ package mg
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"reflect"
 	"runtime"
+	"sort"
 	"strings"
 	"sync"
 )
@@ -20,26 +22,57 @@ func SetModule(mod string) {
 
 var logger = log.New(os.Stderr, "", 0)
 
-type onceMap struct {
-	mu *sync.Mutex
-	m  map[string]*onceFun
+type taskMap struct {
+	mu     *sync.Mutex
+	nextID int
+	m      map[string]*task
 }
 
-func (o *onceMap) LoadOrStore(s string, one *onceFun) *onceFun {
-	defer o.mu.Unlock()
-	o.mu.Lock()
+func (tm *taskMap) Register(d dep) *task {
+	name := d.Identify()
 
-	existing, ok := o.m[s]
-	if ok {
-		return existing
+	tm.mu.Lock()
+	defer tm.mu.Unlock()
+
+	if _, ok := tm.m[name]; !ok {
+		tm.m[name] = &task{
+			id:          tm.nextID,
+			fn:          d.Run,
+			displayName: displayName(name),
+		}
+		tm.nextID++
 	}
-	o.m[s] = one
-	return one
+	return tm.m[name]
 }
 
-var onces = &onceMap{
+var tasks = &taskMap{
 	mu: &sync.Mutex{},
-	m:  map[string]*onceFun{},
+	m:  map[string]*task{},
+}
+
+type contextKey string
+
+const (
+	stdoutContextKey = contextKey("stdout")
+	stderrContextKey = contextKey("stderr")
+)
+
+// Stdout returns a local stdout stream if assigned to the context, or os.Stdout otherwise
+func Stdout(ctx context.Context) io.Writer {
+	val := ctx.Value(stdoutContextKey)
+	if val == nil {
+		return os.Stdout
+	}
+	return val.(io.Writer)
+}
+
+// Stderr returns a local stderr stream if assigned to the context, or os.Stderr otherwise
+func Stderr(ctx context.Context) io.Writer {
+	val := ctx.Value(stderrContextKey)
+	if val == nil {
+		return os.Stderr
+	}
+	return val.(io.Writer)
 }
 
 // SerialDeps is like Deps except it runs each dependency serially, instead of
@@ -81,41 +114,88 @@ func CtxDeps(ctx context.Context, fns ...interface{}) {
 	runDeps(ctx, deps)
 }
 
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}
+
+func plural(name string, count int) string {
+	if count == 1 {
+		return name
+	}
+
+	return name + "s"
+}
+
+type subtask struct {
+	id   int
+	name string
+}
+
+func (st subtask) String() string {
+	return fmt.Sprintf("#%004d %s", st.id, st.name)
+}
+
 // runDeps assumes you've already called wrapFns.
 func runDeps(ctx context.Context, deps []dep) {
 	mu := &sync.Mutex{}
-	var errs []string
-	var exit int
+
+	failedSubtasks := []subtask{}
+	cumulativeExitStatus := 1
+
 	wg := &sync.WaitGroup{}
 	for _, dep := range deps {
-		fn := addDep(ctx, dep)
+		fn := tasks.Register(dep)
+
 		wg.Add(1)
 		go func() {
+			defer wg.Done()
+
+			toc := taskOutputCollector{taskID: fn.id, taskName: fn.displayName}
+			stdout, stderr := newStreamLineWriters(toc)
+			ctx = context.WithValue(ctx, stdoutContextKey, stdout)
+			ctx = context.WithValue(ctx, stderrContextKey, stderr)
+
+			handleError := func(v interface{}) {
+				var subtaskExitStatus = 1
+				if err, ok := v.(exitStatus); ok {
+					subtaskExitStatus = err.ExitStatus()
+				}
+
+				stderr.Flush()
+				fmt.Fprintf(stderr, "FAILURE | %v\n", v)
+
+				mu.Lock()
+				failedSubtasks = append(failedSubtasks, subtask{fn.id, fn.displayName})
+				cumulativeExitStatus = max(cumulativeExitStatus, subtaskExitStatus)
+				mu.Unlock()
+			}
+
 			defer func() {
 				if v := recover(); v != nil {
-					mu.Lock()
-					if err, ok := v.(error); ok {
-						exit = changeExit(exit, ExitStatus(err))
-					} else {
-						exit = changeExit(exit, 1)
-					}
-					errs = append(errs, fmt.Sprint(v))
-					mu.Unlock()
+					handleError(v)
 				}
-				wg.Done()
 			}()
-			if err := fn.run(); err != nil {
-				mu.Lock()
-				errs = append(errs, fmt.Sprint(err))
-				exit = changeExit(exit, ExitStatus(err))
-				mu.Unlock()
+
+			if err := fn.run(ctx); err != nil {
+				handleError(err)
 			}
 		}()
 	}
-
 	wg.Wait()
-	if len(errs) > 0 {
-		panic(Fatal(exit, strings.Join(errs, "\n")))
+
+	if len(failedSubtasks) > 0 {
+		sort.Slice(failedSubtasks, func(i, j int) bool {
+			return failedSubtasks[i].id < failedSubtasks[j].id
+		})
+		msgs := []string{}
+		for _, subtask := range failedSubtasks {
+			msgs = append(msgs, subtask.String())
+		}
+		panic(fmt.Errorf("Failed %s: %s", plural("subtask", len(failedSubtasks)),
+			strings.Join(msgs, ", ")))
 	}
 }
 
@@ -144,21 +224,6 @@ func wrapFns(fns []interface{}) []dep {
 // Mage target, i.e. optional context argument, optional error return.
 func Deps(fns ...interface{}) {
 	CtxDeps(context.Background(), fns...)
-}
-
-func changeExit(old, new int) int {
-	if new == 0 {
-		return old
-	}
-	if old == 0 {
-		return new
-	}
-	if old == new {
-		return old
-	}
-	// both different and both non-zero, just set
-	// exit to 1. Nothing more we can do.
-	return 1
 }
 
 type dep interface {
@@ -272,17 +337,6 @@ func (ncef namespaceContextErrorFn) Run(ctx context.Context) error {
 	return errorRet(v.Call(append(namespaceArg, reflect.ValueOf(ctx))))
 }
 
-func addDep(ctx context.Context, d dep) *onceFun {
-	name := d.Identify()
-	of := onces.LoadOrStore(name, &onceFun{
-		fn:  d.Run,
-		ctx: ctx,
-
-		displayName: displayName(name),
-	})
-	return of
-}
-
 func name(i interface{}) string {
 	return runtime.FuncForPC(reflect.ValueOf(i).Pointer()).Name()
 }
@@ -295,23 +349,24 @@ func displayName(name string) string {
 	return strings.TrimPrefix(name, module+"/")
 }
 
-type onceFun struct {
+type task struct {
+	id int
+
 	once sync.Once
 	fn   func(context.Context) error
-	ctx  context.Context
 	err  error
 
 	displayName string
 }
 
-func (o *onceFun) run() error {
-	o.once.Do(func() {
+func (t *task) run(ctx context.Context) error {
+	t.once.Do(func() {
 		if Verbose() {
-			logger.Println("Running dependency:", o.displayName)
+			logger.Println("Running dependency:", t.displayName)
 		}
-		o.err = o.fn(o.ctx)
+		t.err = t.fn(ctx)
 	})
-	return o.err
+	return t.err
 }
 
 // Returns a location of mg.Deps invocation where the error originates
