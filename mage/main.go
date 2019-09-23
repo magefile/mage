@@ -537,6 +537,9 @@ func Magefiles(magePath, goos, goarch, goCmd string, stderr io.Writer, isDebug b
 	if err2 != nil {
 		return nil, err2
 	}
+	if err3 != nil {
+		return nil, err3
+	}
 
 	files := []string{}
 	for _, f := range all {

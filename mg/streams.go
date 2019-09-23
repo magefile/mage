@@ -133,5 +133,5 @@ func (toc taskOutputCollector) AddLine(line outputLine) {
 		tags = fmt.Sprintf(" slow-output-line=%dms", dur/time.Millisecond)
 	}
 
-	fmt.Printf("%s %s #%04d %s%s | %s", line.timeStart.Format(timeFormat), streamTag[line.stream], toc.taskID, toc.taskName, tags, line.text)
+	fmt.Printf("%s %s #%04d %s%s | %s", line.timeStart.Format(timeFormat), streamTag[line.stream], toc.task.id, toc.task.displayName, tags, line.text)
 }
