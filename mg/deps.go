@@ -135,7 +135,7 @@ type subtask struct {
 }
 
 func (st subtask) String() string {
-	return fmt.Sprintf("#%004d %s", st.id, st.name)
+	return fmt.Sprintf("#%04d %s", st.id, st.name)
 }
 
 // runDeps assumes you've already called wrapFns.
