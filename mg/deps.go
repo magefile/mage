@@ -129,31 +129,22 @@ func plural(name string, count int) string {
 	return name + "s"
 }
 
-type subtask struct {
-	id   int
-	name string
-}
-
-func (st subtask) String() string {
-	return fmt.Sprintf("#%04d %s", st.id, st.name)
-}
-
 // runDeps assumes you've already called wrapFns.
 func runDeps(ctx context.Context, deps []dep) {
 	mu := &sync.Mutex{}
 
-	failedSubtasks := []subtask{}
+	failedSubtasks := []*task{}
 	cumulativeExitStatus := 1
 
 	wg := &sync.WaitGroup{}
 	for _, dep := range deps {
-		fn := tasks.Register(dep)
+		t := tasks.Register(dep)
 
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 
-			toc := taskOutputCollector{taskID: fn.id, taskName: fn.displayName}
+			toc := taskOutputCollector{task: t}
 			stdout, stderr := newStreamLineWriters(toc)
 			ctx = context.WithValue(ctx, stdoutContextKey, stdout)
 			ctx = context.WithValue(ctx, stderrContextKey, stderr)
@@ -168,7 +159,7 @@ func runDeps(ctx context.Context, deps []dep) {
 				fmt.Fprintf(stderr, "FAILURE | %v\n", v)
 
 				mu.Lock()
-				failedSubtasks = append(failedSubtasks, subtask{fn.id, fn.displayName})
+				failedSubtasks = append(failedSubtasks, t)
 				cumulativeExitStatus = max(cumulativeExitStatus, subtaskExitStatus)
 				mu.Unlock()
 			}
@@ -179,7 +170,7 @@ func runDeps(ctx context.Context, deps []dep) {
 				}
 			}()
 
-			if err := fn.run(ctx); err != nil {
+			if err := t.run(ctx); err != nil {
 				handleError(err)
 			}
 		}()
@@ -357,6 +348,10 @@ type task struct {
 	err  error
 
 	displayName string
+}
+
+func (t *task) String() string {
+	return fmt.Sprintf("#%04d %s", t.id, t.displayName)
 }
 
 func (t *task) run(ctx context.Context) error {

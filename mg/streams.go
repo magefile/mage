@@ -115,8 +115,7 @@ func newStreamLineWriters(collector outputCollector) (flushWriter, flushWriter) 
 }
 
 type taskOutputCollector struct {
-	taskID   int
-	taskName string
+	task *task
 }
 
 var streamTag = map[stream]string{
