@@ -3,7 +3,6 @@ package mg
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"log"
 	"testing"
 	"time"
@@ -86,10 +85,6 @@ func TestDepError(t *testing.T) {
 		if err == nil {
 			t.Fatal("expected panic, but didn't get one")
 		}
-		actual := fmt.Sprint(err)
-		if "ouch!" != actual {
-			t.Fatalf(`expected to get "ouch!" but got "%s"`, actual)
-		}
 	}()
 	Deps(f)
 }
@@ -102,10 +97,6 @@ func TestDepFatal(t *testing.T) {
 		v := recover()
 		if v == nil {
 			t.Fatal("expected panic, but didn't get one")
-		}
-		actual := fmt.Sprint(v)
-		if "ouch!" != actual {
-			t.Fatalf(`expected to get "ouch!" but got "%s"`, actual)
 		}
 		err, ok := v.(error)
 		if !ok {
@@ -131,20 +122,14 @@ func TestDepTwoFatal(t *testing.T) {
 		if v == nil {
 			t.Fatal("expected panic, but didn't get one")
 		}
-		actual := fmt.Sprint(v)
-		// order is non-deterministic, so check for both orders
-		if "ouch!\nbang!" != actual && "bang!\nouch!" != actual {
-			t.Fatalf(`expected to get "ouch!" and "bang!" but got "%s"`, actual)
-		}
 		err, ok := v.(error)
 		if !ok {
 			t.Fatalf("expected recovered val to be error but was %T", v)
 		}
 		code := ExitStatus(err)
-		// two different error codes returns, so we give up and just use error
-		// code 1.
-		if code != 1 {
-			t.Fatalf("Expected exit status 1, but got %v", code)
+		// two different error codes returns, so we use bigger one.
+		if code != 99 {
+			t.Fatalf("Expected exit status 99, but got %v", code)
 		}
 	}()
 	Deps(f, g)

@@ -171,8 +171,8 @@ func TestListMagefilesMain(t *testing.T) {
 		t.Errorf("error from magefile list: %v: %s", err, buf)
 	}
 	expected := []string{"testdata/mixed_main_files/mage_helpers.go", "testdata/mixed_main_files/magefile.go"}
-	if !reflect.DeepEqual(files, expected) {
-		t.Fatalf("expected %q but got %q", expected, files)
+	if !reflect.DeepEqual(files.files, expected) {
+		t.Fatalf("expected %q but got %q", expected, files.files)
 	}
 }
 
@@ -194,8 +194,8 @@ func TestListMagefilesIgnoresGOOS(t *testing.T) {
 	} else {
 		expected = []string{"testdata/goos_magefiles/magefile_nonwindows.go"}
 	}
-	if !reflect.DeepEqual(files, expected) {
-		t.Fatalf("expected %q but got %q", expected, files)
+	if !reflect.DeepEqual(files.files, expected) {
+		t.Fatalf("expected %q but got %q", expected, files.files)
 	}
 }
 
@@ -217,8 +217,8 @@ func TestListMagefilesIgnoresRespectsGOOSArg(t *testing.T) {
 	} else {
 		expected = []string{"testdata/goos_magefiles/magefile_nonwindows.go"}
 	}
-	if !reflect.DeepEqual(files, expected) {
-		t.Fatalf("expected %q but got %q", expected, files)
+	if !reflect.DeepEqual(files.files, expected) {
+		t.Fatalf("expected %q but got %q", expected, files.files)
 	}
 }
 
@@ -286,8 +286,8 @@ func TestListMagefilesLib(t *testing.T) {
 		t.Errorf("error from magefile list: %v: %s", err, buf)
 	}
 	expected := []string{"testdata/mixed_lib_files/mage_helpers.go", "testdata/mixed_lib_files/magefile.go"}
-	if !reflect.DeepEqual(files, expected) {
-		t.Fatalf("expected %q but got %q", expected, files)
+	if !reflect.DeepEqual(files.files, expected) {
+		t.Fatalf("expected %q but got %q", expected, files.files)
 	}
 }
 
@@ -613,7 +613,7 @@ func (t tLogWriter) Write(b []byte) (n int, err error) {
 	return len(b), nil
 }
 
-// Test if generated mainfile references anything other than the stdlib
+// Test if generated mainfile references anything other than the stdlib or mg
 func TestOnlyStdLib(t *testing.T) {
 	buildFile := fmt.Sprintf("./testdata/onlyStdLib/%s", mainfile)
 	os.Remove(buildFile)
@@ -655,8 +655,9 @@ func TestOnlyStdLib(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !filepath.HasPrefix(pkg.Dir, build.Default.GOROOT) {
-			t.Errorf("import of non-stdlib package: %s", s.Path.Value)
+		if !filepath.HasPrefix(pkg.Dir, build.Default.GOROOT) &&
+			pkg.ImportPath != "github.com/magefile/mage/mg" {
+			t.Errorf("import of non-stdlib/non-mg package: %s", s.Path.Value)
 		}
 	}
 }
@@ -1198,6 +1199,11 @@ func TestGoCmd(t *testing.T) {
 
 var runtimeVer = regexp.MustCompile(`go1\.([0-9]+)`)
 
+func findSourcePath() string {
+	_, filename, _, _ := runtime.Caller(1)
+	return filename
+}
+
 func TestGoModules(t *testing.T) {
 	matches := runtimeVer.FindStringSubmatch(runtime.Version())
 	if len(matches) < 2 || minorVer(t, matches[1]) < 11 {
@@ -1221,10 +1227,21 @@ func Test() {
 	if err != nil {
 		t.Fatal(err)
 	}
+	err = ioutil.WriteFile(filepath.Join(dir, "go.mod"), []byte(`module foo.bar/baz
+
+replace github.com/magefile/mage => `+filepath.Join(findSourcePath(), "../..")+`
+
+require (
+	github.com/magefile/mage v1.0.0
+)
+`), 0600)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
-	cmd := exec.Command("go", "mod", "init", "app")
+	cmd := exec.Command("go", "mod", "tidy")
 	cmd.Dir = dir
 	cmd.Env = os.Environ()
 	cmd.Stderr = stderr

@@ -185,8 +185,8 @@ func runDeps(ctx context.Context, deps []dep) {
 		for _, subtask := range failedSubtasks {
 			msgs = append(msgs, subtask.String())
 		}
-		panic(fmt.Errorf("Failed %s: %s", plural("subtask", len(failedSubtasks)),
-			strings.Join(msgs, ", ")))
+		panic(Fatal(cumulativeExitStatus, fmt.Sprintf("Failed %s: %s", plural("subtask", len(failedSubtasks)),
+			strings.Join(msgs, ", "))))
 	}
 }
 

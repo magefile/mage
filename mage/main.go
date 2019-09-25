@@ -544,7 +544,7 @@ func Magefiles(magePath, goos, goarch, goCmd string, stderr io.Writer, isDebug b
 	files := []string{}
 	for _, f := range all {
 		if !exclude[f] {
-			files = append(files, f)
+			files = append(files, filepath.Join(magePath, f))
 		}
 	}
 	return &magefiles{
@@ -654,7 +654,7 @@ func ExeName(goCmd, cacheDir string, files []string) (string, error) {
 func hashFile(fn string) (string, error) {
 	f, err := os.Open(fn)
 	if err != nil {
-		return "", fmt.Errorf("can't open input file for hashing: %#v", err)
+		return "", fmt.Errorf("can't open input file for hashing: %v", fn, err)
 	}
 	defer f.Close()
 
