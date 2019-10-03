@@ -69,6 +69,12 @@ func RunWith(env map[string]string, cmd string, args ...string) error {
 	return err
 }
 
+// RunWithV is like RunWith, but always sends the command's stdout to os.Stdout.
+func RunWithV(env map[string]string, cmd string, args ...string) error {
+	_, err := Exec(env, os.Stdout, os.Stderr, cmd, args...)
+	return err
+}
+
 // Output runs the command and returns the text from stdout.
 func Output(cmd string, args ...string) (string, error) {
 	buf := &bytes.Buffer{}
