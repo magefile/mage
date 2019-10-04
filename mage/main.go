@@ -654,7 +654,7 @@ func ExeName(goCmd, cacheDir string, files []string) (string, error) {
 func hashFile(fn string) (string, error) {
 	f, err := os.Open(fn)
 	if err != nil {
-		return "", fmt.Errorf("can't open input file for hashing: %v", fn, err)
+		return "", fmt.Errorf("can't open input file for hashing: %v", err)
 	}
 	defer f.Close()
 
