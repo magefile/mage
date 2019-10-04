@@ -73,30 +73,6 @@ func main() {
             defer cancel()
         }
 
-	runTarget := func(fn func(context.Context) error) interface{} {
-		var err interface{}
-		d := make(chan interface{})
-		go func() {
-			defer func() {
-				err := recover()
-				d <- err
-			}()
-			err := fn(ctx)
-			d <- err
-		}()
-		select {
-		case <-ctx.Done():
-			e := ctx.Err()
-			fmt.Printf("ctx err: %v\n", e)
-			return e
-		case err = <-d:
-			return err
-		}
-	}
-	// This is necessary in case there aren't any targets, to avoid an unused
-	// variable error.
-	_ = runTarget
-
 	handleError := func(logger *log.Logger, err interface{}) {
 		if err != nil {
 			logger.Printf("Error: %+v\n", err)
