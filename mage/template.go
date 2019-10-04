@@ -66,26 +66,15 @@ func main() {
 		return err
 	}
 
-	var ctx context.Context
-	var ctxCancel func()
-
-	getContext := func() (context.Context, func()) {
-		if ctx != nil {
-			return ctx, ctxCancel
-		}
-
-		if args.Timeout != 0 {
-			ctx, ctxCancel = context.WithTimeout(context.Background(), args.Timeout)
-		} else {
-			ctx = context.Background()
-			ctxCancel = func() {}
-		}
-		return ctx, ctxCancel
-	}
+	ctx := context.Background()
+        if args.Timeout != 0 {
+            var cancel context.CancelFunc
+            ctx, cancel = context.WithTimeout(ctx, args.Timeout)
+            defer cancel()
+        }
 
 	runTarget := func(fn func(context.Context) error) interface{} {
 		var err interface{}
-		ctx, cancel := getContext()
 		d := make(chan interface{})
 		go func() {
 			defer func() {
@@ -97,12 +86,10 @@ func main() {
 		}()
 		select {
 		case <-ctx.Done():
-			cancel()
 			e := ctx.Err()
 			fmt.Printf("ctx err: %v\n", e)
 			return e
 		case err = <-d:
-			cancel()
 			return err
 		}
 	}
