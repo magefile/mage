@@ -656,8 +656,9 @@ func TestOnlyStdLib(t *testing.T) {
 			t.Fatal(err)
 		}
 		if !filepath.HasPrefix(pkg.Dir, build.Default.GOROOT) &&
-			pkg.ImportPath != "github.com/magefile/mage/mg" {
-			t.Errorf("import of non-stdlib/non-mg package: %s", s.Path.Value)
+			pkg.ImportPath != "github.com/magefile/mage/mg" &&
+			pkg.ImportPath != "github.com/magefile/mage/toplevel" {
+			t.Errorf("import of non-stdlib/non-mg/non-toplevel package: %s", s.Path.Value)
 		}
 	}
 }
