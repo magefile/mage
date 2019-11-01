@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/bmatcuk/doublestar"
 )
 
 // expand takes a collection of sources as strings, and for each one, it expands
@@ -51,7 +53,7 @@ func Path(dst string, sources ...string) (bool, error) {
 // the call to Path. It is an error for any glob to return an empty result.
 func Glob(dst string, globs ...string) (bool, error) {
 	for _, g := range globs {
-		files, err := filepath.Glob(g)
+		files, err := doublestar.Glob(g)
 		if err != nil {
 			return false, err
 		}
