@@ -660,6 +660,29 @@ func TestOnlyStdLib(t *testing.T) {
 	}
 }
 
+func TestMaxProcs(t *testing.T) {
+	var stdout bytes.Buffer
+	inv := Invocation{
+		Dir:      "./testdata/maxprocs",
+		Stdout:   &stdout,
+		Args:     []string{"wait"},
+		MaxProcs: 1,
+		Verbose:  true,
+	}
+	code := Invoke(inv)
+	if code != 0 {
+		t.Errorf("expected 0, but got %v", code)
+	}
+	actual := stdout.String()
+	d, err := time.ParseDuration(actual[:len(actual)-1])
+	if err != nil {
+		t.Errorf("unexpected error parsing duration: %v", err)
+	}
+	if d < 600*time.Millisecond {
+		t.Errorf("expected duration longer than 600ms, but got %v", d)
+	}
+}
+
 func TestMultipleTargets(t *testing.T) {
 	var stderr, stdout bytes.Buffer
 	inv := Invocation{
