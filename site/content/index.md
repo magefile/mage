@@ -41,6 +41,10 @@ You may also install a binary release from our
 
 package main
 
+import (
+    "github.com/magefile/mage/sh"
+)
+
 // Runs dep ensure and then installs the binary.
 func Build() error {
     if err := sh.Run("dep", "ensure"); err != nil {
