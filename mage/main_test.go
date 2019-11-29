@@ -783,6 +783,30 @@ func TestSetDir(t *testing.T) {
 	}
 }
 
+func TestSetWorkingDir(t *testing.T) {
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	code := Invoke(Invocation{
+		Dir:     "testdata/setworkdir",
+		WorkDir: "testdata/setworkdir/data",
+		Stdout:  stdout,
+		Stderr:  stderr,
+		Args:    []string{"TestWorkingDir"},
+	})
+
+	if code != 0 {
+		t.Errorf(
+			"expected code 0, but got %d. Stdout:\n%s\nStderr:\n%s",
+			code, stdout, stderr,
+		)
+	}
+
+	expected := "file1.txt, file2.txt\n"
+	if out := stdout.String(); out != expected {
+		t.Fatalf("expected list of files to be %q, but was %q", expected, out)
+	}
+}
+
 // Test the timeout option
 func TestTimeout(t *testing.T) {
 	stderr := &bytes.Buffer{}
