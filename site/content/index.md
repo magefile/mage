@@ -88,7 +88,9 @@ Commands:
 
 Options:
   -d <string> 
-            run magefiles in the given directory (default ".")
+            directory to read magefiles from (default ".")
+  -C <string>
+            working directory where magefiles will run (default -d value)
   -debug    turn on debug messages
   -h        show description of a target
   -f        force recreation of compiled magefile
