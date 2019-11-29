@@ -25,3 +25,11 @@ mage_output_file.go
 # Goland
 .idea
 *.iml
+
+# Vim
+*.sw[op]
+Session.vim
+*~
+
+# GNU Screen
+.screenrc
