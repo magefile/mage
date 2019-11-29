@@ -301,6 +301,9 @@ func Invoke(inv Invocation) int {
 	if inv.Dir == "" {
 		inv.Dir = "."
 	}
+	if inv.WorkDir == "" {
+		inv.WorkDir = inv.Dir
+	}
 	if inv.CacheDir == "" {
 		inv.CacheDir = mg.CacheDir()
 	}
@@ -620,7 +623,8 @@ func RunCompiled(inv Invocation, exePath string, errlog *log.Logger) int {
 	c.Stderr = inv.Stderr
 	c.Stdout = inv.Stdout
 	c.Stdin = inv.Stdin
-	if inv.Dir != inv.WorkDir {
+	c.Dir = inv.Dir
+	if inv.WorkDir != inv.Dir {
 		c.Dir = inv.WorkDir
 	}
 	// intentionally pass through unaltered os.Environ here.. your magefile has
