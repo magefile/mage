@@ -112,6 +112,7 @@ type Invocation struct {
 	GoCmd      string        // the go binary command to run
 	CacheDir   string        // the directory where we should store compiled binaries
 	HashFast   bool          // don't rely on GOCACHE, just hash the magefiles
+	Template   string        // native template to use when running/compiling
 }
 
 // ParseAndRun parses the command line, and then compiles and runs the mage
@@ -177,6 +178,7 @@ func Parse(stderr, stdout io.Writer, args []string) (inv Invocation, cmd Command
 	fs.DurationVar(&inv.Timeout, "t", 0, "timeout in duration parsable format (e.g. 5m30s)")
 	fs.BoolVar(&inv.Keep, "keep", false, "keep intermediate mage files around after running")
 	fs.StringVar(&inv.Dir, "d", ".", "run magefiles in the given directory")
+	fs.StringVar(&inv.Template, "template", "", "compilation template to use, defaults to internal template")
 	fs.StringVar(&inv.GoCmd, "gocmd", mg.GoCmd(), "use the given go binary to compile the output")
 	fs.StringVar(&inv.GOOS, "goos", "", "set GOOS for binary produced with -compile")
 	fs.StringVar(&inv.GOARCH, "goarch", "", "set GOARCH for binary produced with -compile")
@@ -219,6 +221,7 @@ Options:
 		    use the given go binary to compile the output (default: "go")
   -goos     sets the GOOS for the binary created by -compile (default: current OS)
   -goarch   sets the GOARCH for the binary created by -compile (default: current arch)
+  -template specify a path to a template file written in golang to build the artifact
   -t <string>
             timeout in duration parsable format (e.g. 5m30s)
   -v        show verbose output when running mage targets
@@ -299,6 +302,19 @@ func Invoke(inv Invocation) int {
 	}
 	if inv.CacheDir == "" {
 		inv.CacheDir = mg.CacheDir()
+	}
+	if inv.Template != "" {
+		if _, err := os.Stat(inv.Template); err == nil {
+			file, err := os.Open(inv.Template)
+			if err != nil {
+				log.Fatal(err)
+			}
+			defer file.Close()
+			data, err := ioutil.ReadAll(file)
+			mageMainfileTplString = string(data)
+		} else {
+			log.Fatal(err)
+		}
 	}
 
 	files, err := Magefiles(inv.Dir, inv.GOOS, inv.GOARCH, inv.GoCmd, inv.Stderr, inv.Debug)
