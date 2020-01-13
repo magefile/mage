@@ -206,7 +206,8 @@ func TestListMagefilesIgnoresRespectsGOOSArg(t *testing.T) {
 	} else {
 		goos = "windows"
 	}
-	files, err := Magefiles("testdata/goos_magefiles", goos, "", "go", buf, false)
+	// Set GOARCH as amd64 because windows is not on all non-x86 architectures.
+	files, err := Magefiles("testdata/goos_magefiles", goos, "amd64", "go", buf, false)
 	if err != nil {
 		t.Errorf("error from magefile list: %v: %s", err, buf)
 	}
