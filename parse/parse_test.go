@@ -1,9 +1,17 @@
 package parse
 
 import (
+	"log"
+	"os"
 	"reflect"
 	"testing"
+
+	"github.com/magefile/mage/internal"
 )
+
+func init() {
+	internal.SetDebug(log.New(os.Stdout, "", 0))
+}
 
 func TestParse(t *testing.T) {
 	info, err := PrimaryPackage("go", "./testdata", []string{"func.go", "command.go", "alias.go", "repeating_synopsis.go", "subcommands.go"})
@@ -92,5 +100,15 @@ func TestParse(t *testing.T) {
 		if !found {
 			t.Fatalf("expected:\n%#v\n\nto be in:\n%#v", fn, info.Funcs)
 		}
+	}
+}
+
+func TestGetImportSelf(t *testing.T) {
+	imp, err := getImport("go", "github.com/magefile/mage/parse/testdata/importself", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if imp.Info.AstPkg.Name != "importself" {
+		t.Fatalf("expected package importself, got %v", imp.Info.AstPkg.Name)
 	}
 }
