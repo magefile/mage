@@ -96,6 +96,7 @@ func Main() int {
 type Invocation struct {
 	Debug      bool          // turn on debug messages
 	Dir        string        // directory to read magefiles from
+	WorkDir    string        // directory where magefiles will run
 	Force      bool          // forces recreation of the compiled binary
 	Verbose    bool          // tells the magefile to print out log statements
 	List       bool          // tells the magefile to print out a list of targets
@@ -176,7 +177,8 @@ func Parse(stderr, stdout io.Writer, args []string) (inv Invocation, cmd Command
 	fs.BoolVar(&inv.Help, "h", false, "show this help")
 	fs.DurationVar(&inv.Timeout, "t", 0, "timeout in duration parsable format (e.g. 5m30s)")
 	fs.BoolVar(&inv.Keep, "keep", false, "keep intermediate mage files around after running")
-	fs.StringVar(&inv.Dir, "d", ".", "run magefiles in the given directory")
+	fs.StringVar(&inv.Dir, "d", ".", "directory to read magefiles from")
+	fs.StringVar(&inv.WorkDir, "w", inv.Dir, "working directory where magefiles will run")
 	fs.StringVar(&inv.GoCmd, "gocmd", mg.GoCmd(), "use the given go binary to compile the output")
 	fs.StringVar(&inv.GOOS, "goos", "", "set GOOS for binary produced with -compile")
 	fs.StringVar(&inv.GOARCH, "goarch", "", "set GOARCH for binary produced with -compile")
@@ -203,25 +205,27 @@ Commands:
   -clean    clean out old generated binaries from CACHE_DIR
   -compile <string>
             output a static binary to the given path
+  -h        show this help
   -init     create a starting template if no mage files exist
   -l        list mage targets in this directory
-  -h        show this help
   -version  show version info for the mage binary
 
 Options:
   -d <string> 
-            run magefiles in the given directory (default ".")
+            directory to read magefiles from (default ".")
   -debug    turn on debug messages
-  -h        show description of a target
   -f        force recreation of compiled magefile
-  -keep     keep intermediate mage files around after running
+  -goarch   sets the GOARCH for the binary created by -compile (default: current arch)
   -gocmd <string>
 		    use the given go binary to compile the output (default: "go")
   -goos     sets the GOOS for the binary created by -compile (default: current OS)
-  -goarch   sets the GOARCH for the binary created by -compile (default: current arch)
+  -h        show description of a target
+  -keep     keep intermediate mage files around after running
   -t <string>
             timeout in duration parsable format (e.g. 5m30s)
   -v        show verbose output when running mage targets
+  -w <string>
+            working directory where magefiles will run (default -d value)
 `[1:])
 	}
 	err = fs.Parse(args)
@@ -296,6 +300,9 @@ func Invoke(inv Invocation) int {
 	}
 	if inv.Dir == "" {
 		inv.Dir = "."
+	}
+	if inv.WorkDir == "" {
+		inv.WorkDir = inv.Dir
 	}
 	if inv.CacheDir == "" {
 		inv.CacheDir = mg.CacheDir()
@@ -617,6 +624,9 @@ func RunCompiled(inv Invocation, exePath string, errlog *log.Logger) int {
 	c.Stdout = inv.Stdout
 	c.Stdin = inv.Stdin
 	c.Dir = inv.Dir
+	if inv.WorkDir != inv.Dir {
+		c.Dir = inv.WorkDir
+	}
 	// intentionally pass through unaltered os.Environ here.. your magefile has
 	// to deal with it.
 	c.Env = os.Environ()
