@@ -230,6 +230,7 @@ func getNamedImports(gocmd string, pkgs map[string]string) ([]*Import, error) {
 	return imports, nil
 }
 
+// getImport returns the metadata about a package that has been mage:import'ed.
 func getImport(gocmd, importpath, alias string) (*Import, error) {
 	out, err := internal.OutputDebug(gocmd, "list", "-f", "{{.Dir}}||{{.Name}}", importpath)
 	if err != nil {
@@ -241,7 +242,17 @@ func getImport(gocmd, importpath, alias string) (*Import, error) {
 	}
 	dir, name := parts[0], parts[1]
 	debug.Printf("parsing imported package %q from dir %q", importpath, dir)
-	info, err := Package(dir, nil)
+
+	// we use go list to get the list of files, since go/parser doesn't differentiate between
+	// go files with build tags etc, and go list does. This prevents weird problems if you
+	// have more than one package in a folder because of build tags.
+	out, err = internal.OutputDebug(gocmd, "list", "-f", `{{join .GoFiles "||"}}`, importpath)
+	if err != nil {
+		return nil, err
+	}
+	files := strings.Split(out, "||")
+
+	info, err := Package(dir, files)
 	if err != nil {
 		return nil, err
 	}
@@ -253,6 +264,7 @@ func getImport(gocmd, importpath, alias string) (*Import, error) {
 	return &Import{Alias: alias, Name: name, Path: importpath, Info: *info}, nil
 }
 
+// Import represents the data about a mage:import package
 type Import struct {
 	Alias      string
 	Name       string
@@ -653,7 +665,7 @@ func getFunction(exp ast.Expr, pi *PkgInfo) (*Function, error) {
 	return nil, fmt.Errorf("unknown package for function %q", exp)
 }
 
-// getPackage returns the non-test package at the given path.
+// getPackage returns the importable package at the given path.
 func getPackage(path string, files []string, fset *token.FileSet) (*ast.Package, error) {
 	var filter func(f os.FileInfo) bool
 	if len(files) > 0 {
@@ -672,12 +684,21 @@ func getPackage(path string, files []string, fset *token.FileSet) (*ast.Package,
 		return nil, fmt.Errorf("failed to parse directory: %v", err)
 	}
 
-	for name, pkg := range pkgs {
-		if !strings.HasSuffix(name, "_test") {
-			return pkg, nil
+	switch len(pkgs) {
+	case 1:
+		var pkg *ast.Package
+		for _, pkg = range pkgs {
 		}
+		return pkg, nil
+	case 0:
+		return nil, fmt.Errorf("no importable packages found in %s", path)
+	default:
+		var names []string
+		for name := range pkgs {
+			names = append(names, name)
+		}
+		return nil, fmt.Errorf("multiple packages found in %s: %v", path, strings.Join(names, ", "))
 	}
-	return nil, fmt.Errorf("no non-test packages found in %s", path)
 }
 
 func hasContextParam(ft *ast.FuncType) bool {
