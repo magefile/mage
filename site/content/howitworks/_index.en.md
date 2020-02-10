@@ -12,6 +12,9 @@ unchanged, the same compiled binary will be reused next time, to avoid the
 generation overhead.  As of Mage 1.3.0, the version of Go used to compile the
 binary is also used in the hash.
 
+When no magefiles are found in the current directory, Mage traverses upwards
+through the path attempting to find any magefiles.
+
 ## Binary Cache
 
 Compiled magefile binaries are stored in $HOME/.magefile.  This location can be
