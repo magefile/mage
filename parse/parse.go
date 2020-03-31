@@ -232,7 +232,7 @@ func getNamedImports(gocmd string, pkgs map[string]string) ([]*Import, error) {
 
 // getImport returns the metadata about a package that has been mage:import'ed.
 func getImport(gocmd, importpath, alias string) (*Import, error) {
-	out, err := internal.OutputDebug(gocmd, "list", "-f", "{{.Dir}}||{{.Name}}", importpath)
+	out, err := internal.OutputDebug(gocmd, "list", "-tags", "mage", "-f", "{{.Dir}}||{{.Name}}", importpath)
 	if err != nil {
 		return nil, err
 	}
@@ -246,7 +246,7 @@ func getImport(gocmd, importpath, alias string) (*Import, error) {
 	// we use go list to get the list of files, since go/parser doesn't differentiate between
 	// go files with build tags etc, and go list does. This prevents weird problems if you
 	// have more than one package in a folder because of build tags.
-	out, err = internal.OutputDebug(gocmd, "list", "-f", `{{join .GoFiles "||"}}`, importpath)
+	out, err = internal.OutputDebug(gocmd, "list", "-tags", "mage", "-f", `{{join .GoFiles "||"}}`, importpath)
 	if err != nil {
 		return nil, err
 	}
