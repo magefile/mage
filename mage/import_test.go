@@ -187,3 +187,31 @@ func TestMageImportsOneLine(t *testing.T) {
 		t.Fatalf("expected: %q got: %q", expected, actual)
 	}
 }
+
+func TestMageImportsTaggedPackage(t *testing.T) {
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:    "./testdata/mageimport/tagged",
+		Stdout: stdout,
+		Stderr: stderr,
+		List:   true,
+	}
+
+	code := Invoke(inv)
+	if code != 1 {
+		t.Fatalf("expected to exit with code 1, but got %v, stdout:\n%s\nstderr:\n%s", code, stdout, stderr)
+	}
+
+	actual := stderr.String()
+	expected := `
+Error parsing magefiles: error running "go list -f {{.Dir}}||{{.Name}} github.com/magefile/mage/mage/testdata/mageimport/tagged/pkg": exit status 1
+can't load package: package github.com/magefile/mage/mage/testdata/mageimport/tagged/pkg: build constraints exclude all Go files in /home/arve/Projects/mage/mage/testdata/mageimport/tagged/pkg
+
+`[1:]
+	if actual != expected {
+		t.Logf("expected: %q", expected)
+		t.Logf("  actual: %q", actual)
+		t.Fatalf("expected:\n%v\n\ngot:\n%v", expected, actual)
+	}
+}
