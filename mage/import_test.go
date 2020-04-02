@@ -206,12 +206,11 @@ func TestMageImportsTaggedPackage(t *testing.T) {
 	actual := stderr.String()
 	expected := `
 Error parsing magefiles: error running "go list -f {{.Dir}}||{{.Name}} github.com/magefile/mage/mage/testdata/mageimport/tagged/pkg": exit status 1
-can't load package: package github.com/magefile/mage/mage/testdata/mageimport/tagged/pkg: build constraints exclude all Go files in /home/arve/Projects/mage/mage/testdata/mageimport/tagged/pkg
-
-`[1:]
-	if actual != expected {
+can't load package: package github.com/magefile/mage/mage/testdata/mageimport/tagged/pkg: build constraints exclude all Go files`[1:]
+	actualShortened := actual[:len(expected)]
+	if actualShortened != expected {
 		t.Logf("expected: %q", expected)
-		t.Logf("  actual: %q", actual)
-		t.Fatalf("expected:\n%v\n\ngot:\n%v", expected, actual)
+		t.Logf("  actual: %q", actualShortened)
+		t.Fatalf("expected:\n%v\n\ngot:\n%v", expected, actualShortened)
 	}
 }
