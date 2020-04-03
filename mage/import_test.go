@@ -204,9 +204,9 @@ func TestMageImportsTaggedPackage(t *testing.T) {
 	}
 
 	actual := stderr.String()
+	// Match a shorter version of the error message, since the output from go list differs between versions
 	expected := `
-Error parsing magefiles: error running "go list -f {{.Dir}}||{{.Name}} github.com/magefile/mage/mage/testdata/mageimport/tagged/pkg": exit status 1
-can't load package: package github.com/magefile/mage/mage/testdata/mageimport/tagged/pkg:`[1:]
+Error parsing magefiles: error running "go list -f {{.Dir}}||{{.Name}} github.com/magefile/mage/mage/testdata/mageimport/tagged/pkg": exit status 1`[1:]
 	actualShortened := actual[:len(expected)]
 	if actualShortened != expected {
 		t.Logf("expected: %q", expected)
