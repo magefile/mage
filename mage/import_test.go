@@ -210,7 +210,7 @@ can't load package: package github.com/magefile/mage/mage/testdata/mageimport/ta
 	actualShortened := actual[:len(expected)]
 	if actualShortened != expected {
 		t.Logf("expected: %q", expected)
-		t.Logf("  actual: %q", actualShortened)
-		t.Fatalf("expected:\n%v\n\ngot:\n%v", expected, actualShortened)
+		t.Logf("actual: %q", actualShortened)
+		t.Fatalf("expected:\n%s\n\ngot:\n%s", expected, actualShortened)
 	}
 }
