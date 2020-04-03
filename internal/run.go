@@ -50,8 +50,9 @@ func OutputDebug(cmd string, args ...string) (string, error) {
 	c.Stderr = errbuf
 	c.Stdout = buf
 	if err := c.Run(); err != nil {
-		debug.Print("error running '", cmd, strings.Join(args, " "), "': ", err, ": ", errbuf)
-		return "", err
+		errMsg := strings.TrimSpace(errbuf.String())
+		debug.Print("error running '", cmd, strings.Join(args, " "), "': ", err, ": ", errMsg)
+		return "", fmt.Errorf("error running \"%s %s\": %s\n%s", cmd, strings.Join(args, " "), err, errMsg)
 	}
 	return strings.TrimSpace(buf.String()), nil
 }

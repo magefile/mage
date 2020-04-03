@@ -187,3 +187,30 @@ func TestMageImportsOneLine(t *testing.T) {
 		t.Fatalf("expected: %q got: %q", expected, actual)
 	}
 }
+
+func TestMageImportsTaggedPackage(t *testing.T) {
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:    "./testdata/mageimport/tagged",
+		Stdout: stdout,
+		Stderr: stderr,
+		List:   true,
+	}
+
+	code := Invoke(inv)
+	if code != 1 {
+		t.Fatalf("expected to exit with code 1, but got %v, stdout:\n%s\nstderr:\n%s", code, stdout, stderr)
+	}
+
+	actual := stderr.String()
+	// Match a shorter version of the error message, since the output from go list differs between versions
+	expected := `
+Error parsing magefiles: error running "go list -f {{.Dir}}||{{.Name}} github.com/magefile/mage/mage/testdata/mageimport/tagged/pkg": exit status 1`[1:]
+	actualShortened := actual[:len(expected)]
+	if actualShortened != expected {
+		t.Logf("expected: %q", expected)
+		t.Logf("actual: %q", actualShortened)
+		t.Fatalf("expected:\n%s\n\ngot:\n%s", expected, actualShortened)
+	}
+}
