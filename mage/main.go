@@ -506,8 +506,9 @@ func Compile(goos, goarch, magePath, goCmd, compileTo string, gofiles []string, 
 	for i := range gofiles {
 		gofiles[i] = filepath.Base(gofiles[i])
 	}
-	debug.Printf("running %s build -o %s %s", goCmd, compileTo, strings.Join(gofiles, " "))
-	c := exec.Command(goCmd, append([]string{"build", "-o", compileTo}, gofiles...)...)
+	args := append([]string{"build", "-o", compileTo}, gofiles...)
+	debug.Printf("running %s %s", goCmd, strings.Join(args, " "))
+	c := exec.Command(goCmd, args...)
 	c.Env = environ
 	c.Stderr = stderr
 	c.Stdout = stdout

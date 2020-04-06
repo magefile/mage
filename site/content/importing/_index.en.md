@@ -14,14 +14,13 @@ package.  i.e. it cannot be `package main`.  This is in contrast to a normal
 mage package that must be `package main`.  The reason is that the go tool won't
 let you import a main package.
 
-In addition, all files will be imported, not just those tagged with the
-`//+build mage` build tag.  Again, this is a restriction of the go tool.  Mage
-can build only the `.go` files in the current directory that have the `mage`
-build tag, but when importing code from other directories, it's simply not
-possible.  This means that any exported function (in any file) that matches
-Mage's allowed formats will be picked up as a target. 
+In addition, all package files will be imported, so long as they don't have a 
+build tag.  If you try to import a package consisting only of files with build 
+tags (e.g. `//+build mage`), it will cause an error since mage doesn't set any 
+build tags when importing packages.  Any exported function, in imported 
+packages, that matches Mage's allowed formats will be picked up as a target.
 
-Aliases and defaults in the imported package will be ignored. 
+Aliases and defaults in imported packages will be ignored. 
 
 Other than these differences, you can write targets in those packages just
 like a normal magefile.
