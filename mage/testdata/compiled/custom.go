@@ -14,7 +14,9 @@ var Default = Deploy
 
 // This is very verbose.
 func TestVerbose() {
-	log.Println("hi!")
+	if mg.Verbose() {
+		log.Println("hi!")
+	}
 }
 
 // This is the synopsis for Deploy. This part shouldn't show up.
