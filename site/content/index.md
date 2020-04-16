@@ -13,19 +13,19 @@ and Mage automatically uses them as Makefile-like runnable targets.
 Mage has no dependencies outside the Go standard library, and builds with Go 1.7
 and above (possibly even lower versions, but they're not regularly tested). 
 
+**Using Go Modules (Recommended)**
+
+```plain
+git clone https://github.com/magefile/mage
+cd mage
+go run bootstrap.go
+```
+
 **Using GOPATH**
 
 ```plain
 go get -u -d github.com/magefile/mage
 cd $GOPATH/src/github.com/magefile/mage
-go run bootstrap.go
-```
-
-**Using Go Modules**
-
-```plain
-git clone https://github.com/magefile/mage
-cd mage
 go run bootstrap.go
 ```
 
@@ -53,9 +53,9 @@ import (
     "github.com/magefile/mage/sh"
 )
 
-// Runs dep ensure and then installs the binary.
+// Runs go mod download and then installs the binary.
 func Build() error {
-    if err := sh.Run("dep", "ensure"); err != nil {
+    if err := sh.Run("go", "mod", "download"); err != nil {
         return err
     }
     return sh.Run("go", "install", "./...")
