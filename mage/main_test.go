@@ -1143,6 +1143,69 @@ func TestCompiledEnvironmentVars(t *testing.T) {
 	}
 }
 
+func TestCompiledVerboseFlag(t *testing.T) {
+	stderr := &bytes.Buffer{}
+	stdout := &bytes.Buffer{}
+	dir := "./testdata/compiled"
+	compileDir, err := ioutil.TempDir(dir, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	filename := filepath.Join(compileDir, "mage_out")
+	// The CompileOut directory is relative to the
+	// invocation directory, so chop off the invocation dir.
+	outName := "./" + filename[len(dir)-1:]
+	defer os.RemoveAll(compileDir)
+	inv := Invocation{
+		Dir:        dir,
+		Stdout:     stdout,
+		Stderr:     stderr,
+		CompileOut: outName,
+	}
+	code := Invoke(inv)
+	if code != 0 {
+		t.Errorf("expected to exit with code 0, but got %v, stderr: %s", code, stderr)
+	}
+
+	run := func(verboseEnv string, args ...string) string {
+		var stdout, stderr bytes.Buffer
+		args = append(args, "printverboseflag")
+		cmd := exec.Command(filename, args...)
+		cmd.Env = []string{verboseEnv}
+		cmd.Stderr = &stderr
+		cmd.Stdout = &stdout
+		if err := cmd.Run(); err != nil {
+			t.Fatalf("running '%s %s' with env %s failed with: %v\nstdout: %s\nstderr: %s",
+				filename, strings.Join(args, " "), verboseEnv, err, stdout.String(), stderr.String())
+		}
+		return strings.TrimSpace(stdout.String())
+	}
+
+	got := run("MAGEFILE_VERBOSE=false")
+	want := "mg.Verbose()==false"
+	if got != want {
+		t.Errorf("got %q, expected %q", got, want)
+	}
+
+	got = run("MAGEFILE_VERBOSE=false", "-v")
+	want = "mg.Verbose()==true"
+	if got != want {
+		t.Errorf("got %q, expected %q", got, want)
+	}
+
+	got = run("MAGEFILE_VERBOSE=true")
+	want = "mg.Verbose()==true"
+	if got != want {
+		t.Errorf("got %q, expected %q", got, want)
+	}
+
+	got = run("MAGEFILE_VERBOSE=true", "-v=false")
+	want = "mg.Verbose()==false"
+	if got != want {
+		t.Errorf("got %q, expected %q", got, want)
+	}
+}
+
 func TestClean(t *testing.T) {
 	if err := os.RemoveAll(mg.CacheDir()); err != nil {
 		t.Error("error removing cache dir:", err)
