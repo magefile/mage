@@ -4,6 +4,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"time"
 
@@ -14,9 +15,12 @@ var Default = Deploy
 
 // This is very verbose.
 func TestVerbose() {
-	if mg.Verbose() {
-		log.Println("hi!")
-	}
+	log.Println("hi!")
+}
+
+// PrintVerboseFlag prints the value of mg.Verbose() to stdout.
+func PrintVerboseFlag() {
+	fmt.Printf("mg.Verbose()==%v", mg.Verbose())
 }
 
 // This is the synopsis for Deploy. This part shouldn't show up.
