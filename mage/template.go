@@ -186,6 +186,13 @@ Options:
 	}
 	_ = handleError
 
+	// Set MAGEFILE_VERBOSE so mg.Verbose() reflects the flag value.
+	if args.Verbose {
+		os.Setenv("MAGEFILE_VERBOSE", "1")
+	} else {
+		os.Setenv("MAGEFILE_VERBOSE", "0")
+	}
+
 	log.SetFlags(0)
 	if !args.Verbose {
 		log.SetOutput(ioutil.Discard)
