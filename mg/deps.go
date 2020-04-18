@@ -99,6 +99,7 @@ func runDeps(ctx context.Context, types []funcType, fns []interface{}) {
 	for i, f := range fns {
 		fn := addDep(ctx, types[i], f)
 		wg.Add(1)
+		acquire()
 		go func() {
 			defer func() {
 				if v := recover(); v != nil {
@@ -111,6 +112,7 @@ func runDeps(ctx context.Context, types []funcType, fns []interface{}) {
 					errs = append(errs, fmt.Sprint(v))
 					mu.Unlock()
 				}
+				release()
 				wg.Done()
 			}()
 			if err := fn.run(); err != nil {
@@ -126,6 +128,29 @@ func runDeps(ctx context.Context, types []funcType, fns []interface{}) {
 	if len(errs) > 0 {
 		panic(Fatal(exit, strings.Join(errs, "\n")))
 	}
+}
+
+var procLimit chan struct{}
+
+func init() {
+	n := MaxProcs()
+	if n > 0 {
+		procLimit = make(chan struct{}, n)
+	}
+}
+
+func acquire() {
+	if procLimit == nil {
+		return
+	}
+	procLimit <- struct{}{}
+}
+
+func release() {
+	if procLimit == nil {
+		return
+	}
+	<-procLimit
 }
 
 func checkFns(fns []interface{}) []funcType {

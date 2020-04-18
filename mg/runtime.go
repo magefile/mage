@@ -34,6 +34,10 @@ const IgnoreDefaultEnv = "MAGEFILE_IGNOREDEFAULT"
 // mage with the -f flag.
 const HashFastEnv = "MAGEFILE_HASHFAST"
 
+// MaxProcsEnv is the environment variable that indicates the maximum number of
+// of concurrent dependencies to run.
+const MaxProcsEnv = "MAGEFILE_MAXPROCS"
+
 // Verbose reports whether a magefile was run with the verbose flag.
 func Verbose() bool {
 	b, _ := strconv.ParseBool(os.Getenv(VerboseEnv))
@@ -60,6 +64,13 @@ func GoCmd() string {
 func HashFast() bool {
 	b, _ := strconv.ParseBool(os.Getenv(HashFastEnv))
 	return b
+}
+
+// MaxProcs reports the limit on the number of concurrent dependencies.
+// A return of zero indicates no limit.
+func MaxProcs() int {
+	l, _ := strconv.Atoi(os.Getenv(MaxProcsEnv))
+	return l
 }
 
 // IgnoreDefault reports whether the user has requested to ignore the default target
