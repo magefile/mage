@@ -93,6 +93,60 @@ Options:
 		return
 	}
 	  
+	// Terminals with color support:
+	// 	"TERM=xterm"
+	// 	"TERM=xterm-vt220"
+	// 	"TERM=xterm-256color"
+	// 	"TERM=screen-256color"
+	// 	"TERM=tmux-256color"
+	// 	"TERM=rxvt-unicode-256color"
+	// Don't support color:
+	// 	"TERM=cygwin"
+	var specialColorTerms = map[string]bool{
+		"screen-256color":       true,
+		"tmux-256color":         true,
+		"rxvt-unicode-256color": true,
+	}
+
+	// terminalSupportsColor checks if the current console supports color output
+	//
+	// Supported:
+	// 	linux, mac, or windows's ConEmu, Cmder, putty, git-bash.exe
+	// Not supported:
+	// 	windows cmd.exe, powerShell.exe
+	terminalSupportsColor := func() bool {
+		envTerm := os.Getenv("TERM")
+		if strings.Contains(envTerm, "xterm") {
+			return true
+		}
+
+		// it's special color term
+		if _, ok := specialColorTerms[envTerm]; ok {
+			return true
+		}
+
+		// like on ConEmu software, e.g "ConEmuANSI=ON"
+		if os.Getenv("ConEmuANSI") == "ON" {
+			return true
+		}
+
+		// like on ConEmu software, e.g "ANSICON=189x2000 (189x43)"
+		if os.Getenv("ANSICON") != "" {
+			return true
+		}
+
+		return false
+	}
+
+	colorizeOutputOnColorTerminal := func(str string) string {
+		if terminalSupportsColor() {
+			// chosing CYAN (code 36) as an arbitrary color, because it has a neutral meaning
+			return fmt.Sprintf("\033[36m%s\033[0m", str)
+		} else {
+			return str
+		}
+	}
+
 	list := func() error {
 		{{with .Description}}fmt.Println(` + "`{{.}}\n`" + `)
 		{{- end}}
@@ -117,7 +171,7 @@ Options:
 		fmt.Println("Targets:")
 		w := tabwriter.NewWriter(os.Stdout, 0, 4, 4, ' ', 0)
 		for _, name := range keys {
-			fmt.Fprintf(w, "  %v\t%v\n", name, targets[name])
+			fmt.Fprintf(w, "  %v\t%v\n", colorizeOutputOnColorTerminal(name), targets[name])
 		}
 		err := w.Flush()
 		{{- if .DefaultFunc.Name}}

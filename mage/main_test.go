@@ -57,7 +57,19 @@ func testmain(m *testing.M) int {
 	if err := os.Unsetenv(mg.IgnoreDefaultEnv); err != nil {
 		log.Fatal(err)
 	}
+	if err := os.Setenv(mg.CacheEnv, dir); err != nil {
+		log.Fatal(err)
+	}
+	resetTerm()
 	return m.Run()
+}
+
+func resetTerm() {
+	// unset TERM env var in order to disable color output to make the tests simpler
+	// there is a specific test for colorized output, so all the other tests can use non-colorized one
+	if err := os.Unsetenv("TERM"); err != nil {
+		log.Fatal(err)
+	}
 }
 
 func TestTransitiveDepCache(t *testing.T) {
@@ -292,6 +304,7 @@ func TestListMagefilesLib(t *testing.T) {
 }
 
 func TestMixedMageImports(t *testing.T) {
+	resetTerm()
 	stderr := &bytes.Buffer{}
 	stdout := &bytes.Buffer{}
 	inv := Invocation{
@@ -420,7 +433,81 @@ Targets:
 	}
 }
 
+var terminals = []struct {
+	code          string
+	supportsColor bool
+}{
+	{"", false},
+	{"vt100", false},
+	{"cygwin", false},
+	{"xterm", true},
+	{"xterm-vt220", true},
+	{"xterm-16color", true},
+	{"xterm-256color", true},
+	{"screen-256color", true},
+	{"tmux-256color", true},
+	{"rxvt-unicode-256color", true},
+}
+
+func TestListWithColor(t *testing.T) {
+
+	expectedPlainText := `
+This is a comment on the package which should get turned into output with the list of targets.
+
+Targets:
+  somePig*       This is the synopsis for SomePig.
+  testVerbose    
+
+* default target
+`[1:]
+
+	// NOTE: using the literal string would be complicated because I would need to break it
+	// in the middle and join with a normal string for the target names,
+	// otherwise the single backslash would be taken literally and encoded as \\
+	expectedColorizedText := "" +
+		"This is a comment on the package which should get turned into output with the list of targets.\n" +
+		"\n" +
+		"Targets:\n" +
+		"  \x1b[36msomePig*\x1b[0m       This is the synopsis for SomePig.\n" +
+		"  \x1b[36mtestVerbose\x1b[0m    \n" +
+		"\n" +
+		"* default target\n"
+
+	for _, terminal := range terminals {
+		t.Run(terminal.code, func(t *testing.T) {
+			os.Setenv("TERM", terminal.code)
+
+			stdout := &bytes.Buffer{}
+			inv := Invocation{
+				Dir:    "./testdata/list",
+				Stdout: stdout,
+				Stderr: ioutil.Discard,
+				List:   true,
+			}
+
+			code := Invoke(inv)
+			if code != 0 {
+				t.Errorf("expected to exit with code 0, but got %v", code)
+			}
+			actual := stdout.String()
+			var expected string
+			if terminal.supportsColor {
+				expected = expectedColorizedText
+			} else {
+				expected = expectedPlainText
+			}
+
+			if actual != expected {
+				t.Logf("expected: %q", expected)
+				t.Logf("  actual: %q", actual)
+				t.Fatalf("expected:\n%v\n\ngot:\n%v", expected, actual)
+			}
+		})
+	}
+}
+
 func TestNoArgNoDefaultList(t *testing.T) {
+	resetTerm()
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
 	inv := Invocation{
@@ -458,6 +545,7 @@ func TestIgnoreDefault(t *testing.T) {
 	if err := os.Setenv(mg.IgnoreDefaultEnv, "1"); err != nil {
 		t.Fatal(err)
 	}
+	resetTerm()
 
 	code := Invoke(inv)
 	if code != 0 {
@@ -1286,6 +1374,7 @@ func TestGoCmd(t *testing.T) {
 var runtimeVer = regexp.MustCompile(`go1\.([0-9]+)`)
 
 func TestGoModules(t *testing.T) {
+	resetTerm()
 	matches := runtimeVer.FindStringSubmatch(runtime.Version())
 	if len(matches) < 2 || minorVer(t, matches[1]) < 11 {
 		t.Skipf("Skipping Go modules test because go version %q is less than go1.11", runtime.Version())
