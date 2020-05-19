@@ -129,14 +129,14 @@ Options:
 		magenta:       "\u001b[35m",
 		cyan:          "\u001b[36m",
 		white:         "\u001b[37m",
-		brightBlack:   "\u001b[30;1m",
-		brightRed:     "\u001b[31;1m",
-		brightGreen:   "\u001b[32;1m",
-		brightYellow:  "\u001b[33;1m",
-		brightBlue:    "\u001b[34;1m",
-		brightMagenta: "\u001b[35;1m",
-		brightCyan:    "\u001b[36;1m",
-		brightWhite:   "\u001b[37;1m",
+		brightblack:   "\u001b[30;1m",
+		brightred:     "\u001b[31;1m",
+		brightgreen:   "\u001b[32;1m",
+		brightyellow:  "\u001b[33;1m",
+		brightblue:    "\u001b[34;1m",
+		brightmagenta: "\u001b[35;1m",
+		brightcyan:    "\u001b[36;1m",
+		brightwhite:   "\u001b[37;1m",
 	}
 	
 	const _color_name = "blackredgreenyellowbluemagentacyanwhitebrightblackbrightredbrightgreenbrightyellowbrightbluebrightmagentabrightcyanbrightwhite"
@@ -157,24 +157,8 @@ Options:
 	// It is set to Cyan as an arbitrary color, because it has a neutral meaning
 	var defaultTargetAnsiColor = ansiColor[cyan]
 
-	toLowerCase := func(s string) string {
-		// this is a naive implementation
-		// borrowed from https://golang.org/src/strings/strings.go
-		// and only considers alphabetical characters [a-zA-Z]
-		// so that we don't depend on the "strings" package
-		buf := make([]byte, len(s))
-		for i := 0; i < len(s); i++ {
-			c := s[i]
-			if 'A' <= c && c <= 'Z' {
-				c += 'a' - 'A'
-			}
-			buf[i] = c
-		}
-		return string(buf)
-	}
-
 	getAnsiColor := func(color string) (string, bool) {
-		colorLower := toLowerCase(color)
+		colorLower := strings.ToLower(color)
 		for k, v := range ansiColor {
 			colorConstLower := colorToLowerString(k)
 			if colorConstLower == colorLower {
@@ -207,6 +191,10 @@ Options:
 	// 	windows cmd.exe, powerShell.exe
 	terminalSupportsColor := func() bool {
 		envTerm := os.Getenv("TERM")
+		if envTerm == "xterm-mono") {
+			return false
+		}
+
 		if strings.Contains(envTerm, "xterm") {
 			return true
 		}
