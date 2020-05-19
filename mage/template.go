@@ -92,7 +92,98 @@ Options:
 		fs.Usage()
 		return
 	}
-	  
+
+		
+	// color is ANSI color type
+	type color int
+
+	// If you add/change/remove any items in this constant,
+	// you will need to run "stringer -type=color" in this directory again.
+	// NOTE: Please keep the list in an alphabetical order.
+	const (
+		black color = iota
+		red
+		green
+		yellow
+		blue
+		magenta
+		cyan
+		white
+		brightBlack
+		brightRed
+		brightGreen
+		brightYellow
+		brightBlue
+		brightMagenta
+		brightCyan
+		brightWhite
+	)
+
+	// AnsiColor are ANSI color codes for supported terminal colors.
+	var ansiColor = map[color]string{
+		black:         "\u001b[30m",
+		red:           "\u001b[31m",
+		green:         "\u001b[32m",
+		yellow:        "\u001b[33m",
+		blue:          "\u001b[34m",
+		magenta:       "\u001b[35m",
+		cyan:          "\u001b[36m",
+		white:         "\u001b[37m",
+		brightBlack:   "\u001b[30;1m",
+		brightRed:     "\u001b[31;1m",
+		brightGreen:   "\u001b[32;1m",
+		brightYellow:  "\u001b[33;1m",
+		brightBlue:    "\u001b[34;1m",
+		brightMagenta: "\u001b[35;1m",
+		brightCyan:    "\u001b[36;1m",
+		brightWhite:   "\u001b[37;1m",
+	}
+	
+	const _color_name = "blackredgreenyellowbluemagentacyanwhitebrightblackbrightredbrightgreenbrightyellowbrightbluebrightmagentabrightcyanbrightwhite"
+
+	var _color_index = [...]uint8{0, 5, 8, 13, 19, 23, 30, 34, 39, 50, 59, 70, 82, 92, 105, 115, 126}
+
+	colorToLowerString := func (i color) string {
+		if i < 0 || i >= color(len(_color_index)-1) {
+			return "color(" + strconv.FormatInt(int64(i), 10) + ")"
+		}
+		return _color_name[_color_index[i]:_color_index[i+1]]
+	}
+
+	// ansiColorReset is an ANSI color code to reset the terminal color.
+	const ansiColorReset = "\033[0m"
+
+	// defaultTargetAnsiColor is a default ANSI color for colorizing targets.
+	// It is set to Cyan as an arbitrary color, because it has a neutral meaning
+	var defaultTargetAnsiColor = ansiColor[cyan]
+
+	toLowerCase := func(s string) string {
+		// this is a naive implementation
+		// borrowed from https://golang.org/src/strings/strings.go
+		// and only considers alphabetical characters [a-zA-Z]
+		// so that we don't depend on the "strings" package
+		buf := make([]byte, len(s))
+		for i := 0; i < len(s); i++ {
+			c := s[i]
+			if 'A' <= c && c <= 'Z' {
+				c += 'a' - 'A'
+			}
+			buf[i] = c
+		}
+		return string(buf)
+	}
+
+	getAnsiColor := func(color string) (string, bool) {
+		colorLower := toLowerCase(color)
+		for k, v := range ansiColor {
+			colorConstLower := colorToLowerString(k)
+			if colorConstLower == colorLower {
+				return v, true
+			}
+		}
+		return "", false
+	}
+
 	// Terminals with color support:
 	// 	"TERM=xterm"
 	// 	"TERM=xterm-vt220"
@@ -111,7 +202,7 @@ Options:
 	// terminalSupportsColor checks if the current console supports color output
 	//
 	// Supported:
-	// 	linux, mac, or windows's ConEmu, Cmder, putty, git-bash.exe
+	// 	linux, mac, or windows's ConEmu, Cmder, putty, git-bash.exe, pwsh.exe
 	// Not supported:
 	// 	windows cmd.exe, powerShell.exe
 	terminalSupportsColor := func() bool {
@@ -122,6 +213,11 @@ Options:
 
 		// it's special color term
 		if _, ok := specialColorTerms[envTerm]; ok {
+			return true
+		}
+
+		// it's color PowerShell 7+ (pwsh.exe)
+		if os.Getenv("COLORTERM") == "truecolor" {
 			return true
 		}
 
@@ -138,10 +234,30 @@ Options:
 		return false
 	}
 
-	colorizeOutputOnColorTerminal := func(str string) string {
-		if terminalSupportsColor() {
-			// chosing CYAN (code 36) as an arbitrary color, because it has a neutral meaning
-			return fmt.Sprintf("\033[36m%s\033[0m", str)
+	// enableColor reports whether the user has requested to enable a color output.
+	enableColor := func() bool {
+		b, _ := strconv.ParseBool(os.Getenv("MAGEFILE_ENABLE_COLOR"))
+		return b
+	}
+
+	// targetColor returns the ANSI color which should be used to colorize targets.
+	targetColor := func() string {
+		s, exists := os.LookupEnv("MAGEFILE_TARGET_COLOR")
+		if exists == true {
+			if c, ok := getAnsiColor(s); ok == true {
+				return c
+			}
+		}
+		return defaultTargetAnsiColor
+	}
+
+	// store the color terminal variables, so that the detection isn't repeated for each target
+	var enableColorValue = enableColor() && terminalSupportsColor()
+	var targetColorValue = targetColor()
+
+	printName := func(str string) string {
+		if enableColorValue {
+			return fmt.Sprintf("%s%s%s", targetColorValue, str, ansiColorReset)
 		} else {
 			return str
 		}
@@ -171,7 +287,7 @@ Options:
 		fmt.Println("Targets:")
 		w := tabwriter.NewWriter(os.Stdout, 0, 4, 4, ' ', 0)
 		for _, name := range keys {
-			fmt.Fprintf(w, "  %v\t%v\n", colorizeOutputOnColorTerminal(name), targets[name])
+			fmt.Fprintf(w, "  %v\t%v\n", printName(name), targets[name])
 		}
 		err := w.Flush()
 		{{- if .DefaultFunc.Name}}
