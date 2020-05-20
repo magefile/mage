@@ -450,6 +450,8 @@ var terminals = []struct {
 }
 
 func TestListWithColor(t *testing.T) {
+	os.Setenv(mg.EnableColorEnv, "true")
+	os.Setenv(mg.TargetColorEnv, mg.Cyan.String())
 
 	expectedPlainText := `
 This is a comment on the package which should get turned into output with the list of targets.
