@@ -102,6 +102,11 @@ func OutputWith(env map[string]string, cmd string, args ...string) (string, erro
 // Code reports the exit code the command returned if it ran. If err == nil, ran
 // is always true and code is always 0.
 func Exec(env map[string]string, stdout, stderr io.Writer, cmd string, args ...string) (ran bool, err error) {
+	return ExecFrom("", env, stdout, stderr, cmd, args...)
+}
+
+// ExecFrom is like Exec, but allows specifying working directory of the command.
+func ExecFrom(dir string, env map[string]string, stdout, stderr io.Writer, cmd string, args ...string) (ran bool, err error) {
 	expand := func(s string) string {
 		s2, ok := env[s]
 		if ok {
@@ -113,7 +118,7 @@ func Exec(env map[string]string, stdout, stderr io.Writer, cmd string, args ...s
 	for i := range args {
 		args[i] = os.Expand(args[i], expand)
 	}
-	ran, code, err := run(env, stdout, stderr, cmd, args...)
+	ran, code, err := run(dir, env, stdout, stderr, cmd, args...)
 	if err == nil {
 		return true, nil
 	}
@@ -123,12 +128,13 @@ func Exec(env map[string]string, stdout, stderr io.Writer, cmd string, args ...s
 	return ran, fmt.Errorf(`failed to run "%s %s: %v"`, cmd, strings.Join(args, " "), err)
 }
 
-func run(env map[string]string, stdout, stderr io.Writer, cmd string, args ...string) (ran bool, code int, err error) {
+func run(dir string, env map[string]string, stdout, stderr io.Writer, cmd string, args ...string) (ran bool, code int, err error) {
 	c := exec.Command(cmd, args...)
 	c.Env = os.Environ()
 	for k, v := range env {
 		c.Env = append(c.Env, k+"="+v)
 	}
+	c.Dir = dir
 	c.Stderr = stderr
 	c.Stdout = stdout
 	c.Stdin = os.Stdin
