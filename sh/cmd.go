@@ -133,7 +133,8 @@ func run(env map[string]string, stdout, stderr io.Writer, cmd string, args ...st
 	c.Stdout = stdout
 	c.Stdin = os.Stdin
 
-	var quoted []string; for i:=0; i<len(args); i++ { 
+	var quoted []string 
+	for i := range args {
 		quoted=append(quoted,fmt.Sprintf("\"%s\"",args[i]));
 	}
 	log.Println("[magefile-exec]:", cmd,  strings.Join(quoted, " "))
