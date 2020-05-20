@@ -191,7 +191,7 @@ Options:
 	// 	windows cmd.exe, powerShell.exe
 	terminalSupportsColor := func() bool {
 		envTerm := os.Getenv("TERM")
-		if envTerm == "xterm-mono") {
+		if envTerm == "xterm-mono" {
 			return false
 		}
 
