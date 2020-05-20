@@ -109,14 +109,14 @@ Options:
 		magenta
 		cyan
 		white
-		brightBlack
-		brightRed
-		brightGreen
-		brightYellow
-		brightBlue
-		brightMagenta
-		brightCyan
-		brightWhite
+		brightblack
+		brightred
+		brightgreen
+		brightyellow
+		brightblue
+		brightmagenta
+		brightcyan
+		brightwhite
 	)
 
 	// AnsiColor are ANSI color codes for supported terminal colors.
