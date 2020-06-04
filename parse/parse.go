@@ -34,8 +34,10 @@ type PkgInfo struct {
 	Description string
 	Funcs       Functions
 	DefaultFunc *Function
+	// DeinitFunc runs any clean up tasks on shutdown
+	DeinitFunc *Function
 	Aliases     map[string]*Function
-	Imports     Imports
+	Imports     []*Import
 }
 
 // Function represented a job function from a mage file
@@ -561,6 +563,28 @@ func setDefault(pi *PkgInfo) {
 				return
 			}
 			pi.DefaultFunc = f
+			return
+		}
+	}
+}
+
+func setDeinit(pi *PkgInfo) {
+	for _, v := range pi.DocPkg.Vars {
+		for x, name := range v.Names {
+			if name != "Deinit" {
+				continue
+			}
+			spec := v.Decl.Specs[x].(*ast.ValueSpec)
+			if len(spec.Values) != 1 {
+				log.Println("warning: deinit declaration has multiple values")
+			}
+
+			f, err := getFunction(spec.Values[0], pi)
+			if err != nil {
+				log.Println("warning, deinit declaration malformed:", err)
+				return
+			}
+			pi.DeinitFunc = f
 			return
 		}
 	}

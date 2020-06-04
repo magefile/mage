@@ -427,6 +427,7 @@ type mainfileTemplateData struct {
 	Description string
 	Funcs       []*parse.Function
 	DefaultFunc parse.Function
+	DeinitFunc  *parse.Function
 	Aliases     map[string]*parse.Function
 	Imports     []*parse.Import
 	BinaryName  string
