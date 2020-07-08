@@ -60,7 +60,7 @@ func testmain(m *testing.M) int {
 	if err := os.Setenv(mg.CacheEnv, dir); err != nil {
 		log.Fatal(err)
 	}
-	if err := os.Setenv(mg.EnableColorEnv, "false"); err != nil {
+	if err := os.Unsetenv(mg.EnableColorEnv); err != nil {
 		log.Fatal(err)
 	}
 	if err := os.Unsetenv(mg.TargetColorEnv); err != nil {
@@ -71,11 +71,15 @@ func testmain(m *testing.M) int {
 }
 
 func resetTerm() {
-	// unset TERM env var in order to disable color output to make the tests simpler
-	// there is a specific test for colorized output, so all the other tests can use non-colorized one
-	if err := os.Unsetenv("TERM"); err != nil {
-		log.Fatal(err)
+	if term, exists := os.LookupEnv("TERM"); exists == true {
+		log.Printf("Current terminal: %s", term)
+		// unset TERM env var in order to disable color output to make the tests simpler
+		// there is a specific test for colorized output, so all the other tests can use non-colorized one
+		if err := os.Unsetenv("TERM"); err != nil {
+			log.Fatal(err)
+		}
 	}
+	os.Setenv(mg.EnableColorEnv, "false")
 }
 
 func TestTransitiveDepCache(t *testing.T) {
