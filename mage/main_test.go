@@ -71,7 +71,7 @@ func testmain(m *testing.M) int {
 }
 
 func resetTerm() {
-	if term, exists := os.LookupEnv("TERM"); exists == true {
+	if term, exists := os.LookupEnv("TERM"); exists {
 		log.Printf("Current terminal: %s", term)
 		// unset TERM env var in order to disable color output to make the tests simpler
 		// there is a specific test for colorized output, so all the other tests can use non-colorized one
