@@ -60,6 +60,12 @@ func testmain(m *testing.M) int {
 	if err := os.Setenv(mg.CacheEnv, dir); err != nil {
 		log.Fatal(err)
 	}
+	if err := os.Unsetenv(mg.EnableColorEnv); err != nil {
+		log.Fatal(err)
+	}
+	if err := os.Unsetenv(mg.TargetColorEnv); err != nil {
+		log.Fatal(err)
+	}
 	resetTerm()
 	return m.Run()
 }
@@ -437,16 +443,15 @@ var terminals = []struct {
 	code          string
 	supportsColor bool
 }{
-	{"", false},
+	{"", true},
 	{"vt100", false},
 	{"cygwin", false},
+	{"xterm-mono", false},
 	{"xterm", true},
 	{"xterm-vt220", true},
 	{"xterm-16color", true},
 	{"xterm-256color", true},
 	{"screen-256color", true},
-	{"tmux-256color", true},
-	{"rxvt-unicode-256color", true},
 }
 
 func TestListWithColor(t *testing.T) {

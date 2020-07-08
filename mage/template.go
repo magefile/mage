@@ -168,19 +168,14 @@ Options:
 		return "", false
 	}
 
-	// Terminals with color support:
-	// 	"TERM=xterm"
-	// 	"TERM=xterm-vt220"
-	// 	"TERM=xterm-256color"
-	// 	"TERM=screen-256color"
-	// 	"TERM=tmux-256color"
-	// 	"TERM=rxvt-unicode-256color"
-	// Don't support color:
-	// 	"TERM=cygwin"
-	var specialColorTerms = map[string]bool{
-		"screen-256color":       true,
-		"tmux-256color":         true,
-		"rxvt-unicode-256color": true,
+	// Terminals which  don't support color:
+	// 	TERM=vt100
+	// 	TERM=cygwin
+	// 	TERM=xterm-mono
+    var noColorTerms = map[string]bool{
+		"vt100":      false,
+		"cygwin":     false,
+		"xterm-mono": false,
 	}
 
 	// terminalSupportsColor checks if the current console supports color output
@@ -191,35 +186,10 @@ Options:
 	// 	windows cmd.exe, powerShell.exe
 	terminalSupportsColor := func() bool {
 		envTerm := os.Getenv("TERM")
-		if envTerm == "xterm-mono" {
+		if _, ok := noColorTerms[envTerm]; ok {
 			return false
 		}
-
-		if strings.Contains(envTerm, "xterm") {
-			return true
-		}
-
-		// it's special color term
-		if _, ok := specialColorTerms[envTerm]; ok {
-			return true
-		}
-
-		// it's color PowerShell 7+ (pwsh.exe)
-		if os.Getenv("COLORTERM") == "truecolor" {
-			return true
-		}
-
-		// like on ConEmu software, e.g "ConEmuANSI=ON"
-		if os.Getenv("ConEmuANSI") == "ON" {
-			return true
-		}
-
-		// like on ConEmu software, e.g "ANSICON=189x2000 (189x43)"
-		if os.Getenv("ANSICON") != "" {
-			return true
-		}
-
-		return false
+		return true
 	}
 
 	// enableColor reports whether the user has requested to enable a color output.
