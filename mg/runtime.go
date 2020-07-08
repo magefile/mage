@@ -124,7 +124,7 @@ func EnableColor() bool {
 // TargetColor returns the configured ANSI color name a color output.
 func TargetColor() string {
 	s, exists := os.LookupEnv(TargetColorEnv)
-	if exists == true {
+	if exists {
 		if c, ok := getAnsiColor(s); ok == true {
 			return c
 		}
