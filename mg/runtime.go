@@ -125,7 +125,7 @@ func EnableColor() bool {
 func TargetColor() string {
 	s, exists := os.LookupEnv(TargetColorEnv)
 	if exists {
-		if c, ok := getAnsiColor(s); ok == true {
+		if c, ok := getAnsiColor(s); ok {
 			return c
 		}
 	}
