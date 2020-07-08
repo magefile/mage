@@ -60,7 +60,7 @@ func testmain(m *testing.M) int {
 	if err := os.Setenv(mg.CacheEnv, dir); err != nil {
 		log.Fatal(err)
 	}
-	if err := os.Unsetenv(mg.EnableColorEnv); err != nil {
+	if err := os.Setenv(mg.EnableColorEnv, "false"); err != nil {
 		log.Fatal(err)
 	}
 	if err := os.Unsetenv(mg.TargetColorEnv); err != nil {
