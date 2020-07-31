@@ -14,10 +14,12 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
+	"syscall"
 	"text/tabwriter"
 	"time"
 	{{range .Imports}}{{.UniqueName}} "{{.Path}}"
@@ -260,17 +262,19 @@ Options:
 	var ctxCancel func()
 
 	getContext := func() (context.Context, func()) {
-		if ctx != nil {
-			return ctx, ctxCancel
+		if ctx == nil {
+			ctx, ctxCancel = context.WithCancel(context.Background())
 		}
 
-		if args.Timeout != 0 {
-			ctx, ctxCancel = context.WithTimeout(context.Background(), args.Timeout)
-		} else {
-			ctx = context.Background()
-			ctxCancel = func() {}
-		}
 		return ctx, ctxCancel
+	}
+
+	getTimeout := func() <-chan time.Time {
+		if args.Timeout != 0 {
+			return time.After(args.Timeout)
+		}
+
+		return make(chan time.Time)
 	}
 
 	runTarget := func(fn func(context.Context) error) interface{} {
@@ -285,15 +289,25 @@ Options:
 			err := fn(ctx)
 			d <- err
 		}()
-		select {
-		case <-ctx.Done():
-			cancel()
-			e := ctx.Err()
-			fmt.Printf("ctx err: %v\n", e)
-			return e
-		case err = <-d:
-			cancel()
-			return err
+		timeoutCh := getTimeout()
+		sigCh := make(chan os.Signal, 1)
+		signal.Notify(sigCh, syscall.SIGINT)
+		for {
+			select {
+			case <-sigCh:
+				select {
+				case <-ctx.Done():
+					return fmt.Errorf("target killed")
+				default:
+					cancel()
+				}
+			case <-timeoutCh:
+				cancel()
+				return fmt.Errorf("context deadline exceeded")
+			case err = <-d:
+				cancel()
+				return err
+			}
 		}
 	}
 	// This is necessary in case there aren't any targets, to avoid an unused
