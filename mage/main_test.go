@@ -191,7 +191,10 @@ func TestListMagefilesMain(t *testing.T) {
 	if err != nil {
 		t.Errorf("error from magefile list: %v: %s", err, buf)
 	}
-	expected := []string{"testdata/mixed_main_files/mage_helpers.go", "testdata/mixed_main_files/magefile.go"}
+	expected := []string{
+		filepath.FromSlash("testdata/mixed_main_files/mage_helpers.go"),
+		filepath.FromSlash("testdata/mixed_main_files/magefile.go"),
+	}
 	if !reflect.DeepEqual(files, expected) {
 		t.Fatalf("expected %q but got %q", expected, files)
 	}
@@ -211,9 +214,9 @@ func TestListMagefilesIgnoresGOOS(t *testing.T) {
 	}
 	var expected []string
 	if runtime.GOOS == "windows" {
-		expected = []string{"testdata/goos_magefiles/magefile_windows.go"}
+		expected = []string{filepath.FromSlash("testdata/goos_magefiles/magefile_windows.go")}
 	} else {
-		expected = []string{"testdata/goos_magefiles/magefile_nonwindows.go"}
+		expected = []string{filepath.FromSlash("testdata/goos_magefiles/magefile_nonwindows.go")}
 	}
 	if !reflect.DeepEqual(files, expected) {
 		t.Fatalf("expected %q but got %q", expected, files)
@@ -235,9 +238,9 @@ func TestListMagefilesIgnoresRespectsGOOSArg(t *testing.T) {
 	}
 	var expected []string
 	if goos == "windows" {
-		expected = []string{"testdata/goos_magefiles/magefile_windows.go"}
+		expected = []string{filepath.FromSlash("testdata/goos_magefiles/magefile_windows.go")}
 	} else {
-		expected = []string{"testdata/goos_magefiles/magefile_nonwindows.go"}
+		expected = []string{filepath.FromSlash("testdata/goos_magefiles/magefile_nonwindows.go")}
 	}
 	if !reflect.DeepEqual(files, expected) {
 		t.Fatalf("expected %q but got %q", expected, files)
@@ -307,7 +310,10 @@ func TestListMagefilesLib(t *testing.T) {
 	if err != nil {
 		t.Errorf("error from magefile list: %v: %s", err, buf)
 	}
-	expected := []string{"testdata/mixed_lib_files/mage_helpers.go", "testdata/mixed_lib_files/magefile.go"}
+	expected := []string{
+		filepath.FromSlash("testdata/mixed_lib_files/mage_helpers.go"),
+		filepath.FromSlash("testdata/mixed_lib_files/magefile.go"),
+	}
 	if !reflect.DeepEqual(files, expected) {
 		t.Fatalf("expected %q but got %q", expected, files)
 	}
@@ -1078,6 +1084,9 @@ func TestCompiledFlags(t *testing.T) {
 		t.Fatal(err)
 	}
 	name := filepath.Join(compileDir, "mage_out")
+	if runtime.GOOS == "windows" {
+		name += ".exe"
+	}
 	// The CompileOut directory is relative to the
 	// invocation directory, so chop off the invocation dir.
 	outName := "./" + name[len(dir)-1:]
@@ -1162,6 +1171,9 @@ func TestCompiledEnvironmentVars(t *testing.T) {
 		t.Fatal(err)
 	}
 	name := filepath.Join(compileDir, "mage_out")
+	if runtime.GOOS == "windows" {
+		name += ".exe"
+	}
 	// The CompileOut directory is relative to the
 	// invocation directory, so chop off the invocation dir.
 	outName := "./" + name[len(dir)-1:]
@@ -1251,6 +1263,9 @@ func TestCompiledVerboseFlag(t *testing.T) {
 		t.Fatal(err)
 	}
 	filename := filepath.Join(compileDir, "mage_out")
+	if runtime.GOOS == "windows" {
+		filename += ".exe"
+	}
 	// The CompileOut directory is relative to the
 	// invocation directory, so chop off the invocation dir.
 	outName := "./" + filename[len(dir)-1:]
