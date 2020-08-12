@@ -135,7 +135,7 @@ func run(env map[string]string, stdout, stderr io.Writer, cmd string, args ...st
 
 	var quoted []string 
 	for i := range args {
-		quoted=append(quoted,fmt.Sprintf("%q",args[i]));
+		quoted = append(quoted, fmt.Sprintf("%q", args[i]));
 	}
 	log.Println("exec:", cmd,  strings.Join(quoted, " "))
 	err = c.Run()
