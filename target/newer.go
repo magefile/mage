@@ -113,7 +113,7 @@ func NewestModTime(targets ...string) (time.Time, error) {
 				return err
 			}
 			mTime := info.ModTime()
-			if mTime.Before(t) {
+			if mTime.After(t) {
 				t = mTime
 			}
 			return nil
