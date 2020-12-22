@@ -94,7 +94,6 @@ Options:
 		fs.Usage()
 		return
 	}
-
 		
 	// color is ANSI color type
 	type color int
