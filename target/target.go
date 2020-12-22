@@ -38,11 +38,12 @@ func Glob(dst string, globs ...string) (bool, error) {
 	return GlobNewer(stat.ModTime(), globs...)
 }
 
-// Dir reports whether any of the sources have been modified more recently than
-// the destination.  If a source or destination is a directory, modtimes of
-// files under those directories are compared instead.  If the destination file
-// doesn't exist, it always returns true and nil.  It's an error if any of the
-// sources don't exist.
+// Dir reports whether any of the sources have been modified more recently
+// than the destination. If a source or destination is a directory, this
+// function returns true if a source has any file that has been modified more
+// recently than the most recently modified file in dst. If the destination
+// file doesn't exist, it always returns true and nil.  It's an error if any
+// of the sources don't exist.
 func Dir(dst string, sources ...string) (bool, error) {
 	dst = os.ExpandEnv(dst)
 	stat, err := os.Stat(dst)
