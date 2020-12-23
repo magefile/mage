@@ -822,7 +822,6 @@ func TestBadSecondTargets(t *testing.T) {
 		Dir:    "./testdata",
 		Stdout: &stdout,
 		Stderr: &stderr,
-		Keep:   true,
 		Args:   []string{"TestVerbose", "NotGonnaWork"},
 	}
 	code := Invoke(inv)
