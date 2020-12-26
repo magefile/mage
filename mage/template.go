@@ -276,7 +276,7 @@ Options:
 		return make(chan time.Time)
 	}
 
-	runTarget := func(fn func(context.Context) error) interface{} {
+	runTarget := func(logger *log.Logger, fn func(context.Context) error) interface{} {
 		var err interface{}
 		ctx, cancel := getContext()
 		d := make(chan interface{})
@@ -294,11 +294,21 @@ Options:
 		for {
 			select {
 			case <-sigCh:
+				logger.Println("cancelling mage targets, waiting up to 5 seconds for cleanup...")
+				cancel()
+				cleanupCh := time.After(5 * time.Second)
+
 				select {
-				case <-ctx.Done():
-					return fmt.Errorf("target killed")
-				default:
-					cancel()
+				// target exited by itself
+				case err = <-d:
+					return err
+				// cleanup timeout exceeded
+				case <-cleanupCh:
+					return fmt.Errorf("cleanup timeout exceeded")
+				// second SIGINT received
+				case <-sigCh:
+					logger.Println("exiting mage")
+					return fmt.Errorf("exit forced")
 				}
 			case <-timeoutCh:
 				cancel()

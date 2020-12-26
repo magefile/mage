@@ -1387,12 +1387,22 @@ func TestSignals(t *testing.T) {
 	if strings.Contains(got, want) == false {
 		t.Errorf("got %q, does not contain %q", got, want)
 	}
+	got = stderr.String()
+	want = "cancelling mage targets, waiting up to 5 seconds for cleanup...\n"
+	if strings.Contains(got, want) == false {
+		t.Errorf("got %q, does not contain %q", got, want)
+	}
 
 	if err := run(stdout, stderr, name, "exitsAfterCancel", syscall.SIGINT); err != nil {
 		t.Fatal(err)
 	}
 	got = stdout.String()
-	want = "exiting...done\n"
+	want = "exiting...done\ndeferred cleanup\n"
+	if strings.Contains(got, want) == false {
+		t.Errorf("got %q, does not contain %q", got, want)
+	}
+	got = stderr.String()
+	want = "cancelling mage targets, waiting up to 5 seconds for cleanup...\n"
 	if strings.Contains(got, want) == false {
 		t.Errorf("got %q, does not contain %q", got, want)
 	}
@@ -1401,7 +1411,16 @@ func TestSignals(t *testing.T) {
 		t.Fatalf("expected an error because of force kill")
 	}
 	got = stderr.String()
-	want = "Error: target killed\n"
+	want = "cancelling mage targets, waiting up to 5 seconds for cleanup...\nexiting mage\nError: exit forced\n"
+	if strings.Contains(got, want) == false {
+		t.Errorf("got %q, does not contain %q", got, want)
+	}
+
+	if err := run(stdout, stderr, name, "ignoresSignals", syscall.SIGINT); err == nil {
+		t.Fatalf("expected an error because of force kill")
+	}
+	got = stderr.String()
+	want = "cancelling mage targets, waiting up to 5 seconds for cleanup...\nError: cleanup timeout exceeded\n"
 	if strings.Contains(got, want) == false {
 		t.Errorf("got %q, does not contain %q", got, want)
 	}

@@ -31,13 +31,16 @@ func ExitsAfterSigint(ctx context.Context) {
 
 // Exits after ctx cancel and wait
 func ExitsAfterCancel(ctx context.Context) {
+	defer func() {
+		fmt.Println("deferred cleanup")
+	}()
 	<-ctx.Done()
 	fmt.Printf("exiting...")
 	time.Sleep(200 * time.Millisecond)
 	fmt.Println("done")
 }
 
-// Ignores all signals, requires killing
+// Ignores all signals, requires killing via timeout or second SIGINT
 func IgnoresSignals(ctx context.Context) {
 	sigC := make(chan os.Signal, 1)
 	signal.Notify(sigC, syscall.SIGINT)

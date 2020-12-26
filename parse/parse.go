@@ -93,7 +93,7 @@ func (f Function) ExecCode() (string, error) {
 			wrapFn := func(ctx context.Context) error {
 				return %s(ctx)
 			}
-			err := runTarget(wrapFn)`[1:]
+			err := runTarget(logger, wrapFn)`[1:]
 		return fmt.Sprintf(out, name), nil
 	}
 	if f.IsContext && !f.IsError {
@@ -102,7 +102,7 @@ func (f Function) ExecCode() (string, error) {
 				%s(ctx)
 				return nil
 			}
-			err := runTarget(wrapFn)`[1:]
+			err := runTarget(logger, wrapFn)`[1:]
 		return fmt.Sprintf(out, name), nil
 	}
 	if !f.IsContext && f.IsError {
@@ -110,7 +110,7 @@ func (f Function) ExecCode() (string, error) {
 			wrapFn := func(ctx context.Context) error {
 				return %s()
 			}
-			err := runTarget(wrapFn)`[1:]
+			err := runTarget(logger, wrapFn)`[1:]
 		return fmt.Sprintf(out, name), nil
 	}
 	if !f.IsContext && !f.IsError {
@@ -119,7 +119,7 @@ func (f Function) ExecCode() (string, error) {
 				%s()
 				return nil
 			}
-			err := runTarget(wrapFn)`[1:]
+			err := runTarget(logger, wrapFn)`[1:]
 		return fmt.Sprintf(out, name), nil
 	}
 	return "", fmt.Errorf("Error formatting ExecCode code for %#v", f)
