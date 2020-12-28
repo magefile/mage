@@ -1519,8 +1519,6 @@ func TestAliasToImport(t *testing.T) {
 
 }
 
-var wrongDepRx = regexp.MustCompile("^Error: Invalid type for dependent function.*@ main.FooBar .*magefile.go")
-
 func TestWrongDependency(t *testing.T) {
 	stderr := &bytes.Buffer{}
 	inv := Invocation{
@@ -1532,9 +1530,10 @@ func TestWrongDependency(t *testing.T) {
 	if code != 1 {
 		t.Fatalf("expected 1, but got %v", code)
 	}
+	expected := "Error: argument 0 (complex128), is not a supported argument type\n"
 	actual := stderr.String()
-	if !wrongDepRx.MatchString(actual) {
-		t.Fatalf("expected matching %q, but got %q", wrongDepRx, actual)
+	if actual != expected {
+		t.Fatalf("expected %q, but got %q", expected, actual)
 	}
 }
 
