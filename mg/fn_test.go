@@ -3,6 +3,7 @@ package mg
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -157,9 +158,9 @@ func TestF(t *testing.T) {
 }
 
 func TestFTwice(t *testing.T) {
-	called := 0
+	var called int64
 	f := func(int) {
-		called++
+		atomic.AddInt64(&called, 1)
 	}
 
 	Deps(F(f, 5), F(f, 5), F(f, 1))
@@ -173,6 +174,7 @@ func ExampleF() {
 		fmt.Println(i)
 	}
 
+	// we use SerialDeps here to ensure consistent output, but this works with all Deps functions.
 	SerialDeps(F(f, 5), F(f, 1))
 	// output:
 	// 5

@@ -11,22 +11,6 @@ import (
 	"sync"
 )
 
-// funcType indicates a prototype of build job function
-type funcType int
-
-// funcTypes
-const (
-	invalidType funcType = iota
-	voidType
-	errorType
-	contextVoidType
-	contextErrorType
-	namespaceVoidType
-	namespaceErrorType
-	namespaceContextVoidType
-	namespaceContextErrorType
-)
-
 var logger = log.New(os.Stderr, "", 0)
 
 type onceMap struct {
@@ -39,7 +23,7 @@ type onceKey struct {
 	ID   string
 }
 
-func (o *onceMap) LoadOrStore(f Fn, one *onceFun) *onceFun {
+func (o *onceMap) LoadOrStore(f Fn) *onceFun {
 	defer o.mu.Unlock()
 	o.mu.Lock()
 
@@ -50,6 +34,11 @@ func (o *onceMap) LoadOrStore(f Fn, one *onceFun) *onceFun {
 	existing, ok := o.m[key]
 	if ok {
 		return existing
+	}
+	one := &onceFun{
+		once:        &sync.Once{},
+		fn:          f,
+		displayName: displayName(f.Name()),
 	}
 	o.m[key] = one
 	return one
@@ -107,7 +96,7 @@ func runDeps(ctx context.Context, fns []Fn) {
 	var exit int
 	wg := &sync.WaitGroup{}
 	for _, f := range fns {
-		fn := addDep(ctx, f)
+		fn := onces.LoadOrStore(f)
 		wg.Add(1)
 		go func() {
 			defer func() {
@@ -123,7 +112,7 @@ func runDeps(ctx context.Context, fns []Fn) {
 				}
 				wg.Done()
 			}()
-			if err := fn.run(); err != nil {
+			if err := fn.run(ctx); err != nil {
 				mu.Lock()
 				errs = append(errs, fmt.Sprint(err))
 				exit = changeExit(exit, ExitStatus(err))
@@ -181,14 +170,6 @@ func changeExit(old, new int) int {
 	return 1
 }
 
-func addDep(ctx context.Context, f Fn) *onceFun {
-	of := onces.LoadOrStore(f, &onceFun{
-		fn:  f,
-		ctx: ctx,
-	})
-	return of
-}
-
 // funcName returns the unique name for the function
 func funcName(i interface{}) string {
 	return runtime.FuncForPC(reflect.ValueOf(i).Pointer()).Name()
@@ -203,20 +184,21 @@ func displayName(name string) string {
 }
 
 type onceFun struct {
-	once sync.Once
+	once *sync.Once
 	fn   Fn
-	ctx  context.Context
 	err  error
 
 	displayName string
 }
 
-func (o *onceFun) run() error {
+// run will run the function exactly once and capture the error output. Further runs simply return
+// the same error output.
+func (o *onceFun) run(ctx context.Context) error {
 	o.once.Do(func() {
 		if Verbose() {
 			logger.Println("Running dependency:", displayName(o.fn.Name()))
 		}
-		o.err = o.fn.Run(o.ctx)
+		o.err = o.fn.Run(ctx)
 	})
 	return o.err
 }
