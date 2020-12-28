@@ -17,8 +17,8 @@ type Fn interface {
 	Name() string
 
 	// ID should be an additional uniqueness qualifier in case the name is insufficiently unique.
-	// This can be the case for functions that take arguments (in which case mg.F uses the
-	// json-encoded value of the args).
+	// This can be the case for functions that take arguments (mg.F json-encodes an array of the
+	// args).
 	ID() string
 
 	// Run should run the function.
@@ -93,7 +93,7 @@ func (f fn) ID() string {
 	return f.id
 }
 
-// Run should run the function.
+// Run runs the function.
 func (f fn) Run(ctx context.Context) error {
 	return f.f(ctx)
 }

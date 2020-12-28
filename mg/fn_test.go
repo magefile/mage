@@ -2,6 +2,7 @@ package mg
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 )
@@ -153,6 +154,29 @@ func TestF(t *testing.T) {
 	if sOut != s {
 		t.Error(sOut)
 	}
+}
+
+func TestFTwice(t *testing.T) {
+	called := 0
+	f := func(int) {
+		called++
+	}
+
+	Deps(F(f, 5), F(f, 5), F(f, 1))
+	if called != 2 {
+		t.Fatalf("Expected to be called 2 times, but was called %d", called)
+	}
+}
+
+func ExampleF() {
+	f := func(i int) {
+		fmt.Println(i)
+	}
+
+	SerialDeps(F(f, 5), F(f, 1))
+	// output:
+	// 5
+	// 1
 }
 
 func TestFNamespace(t *testing.T) {
