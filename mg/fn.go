@@ -37,7 +37,7 @@ func F(target interface{}, args ...interface{}) Fn {
 	}
 	id, err := json.Marshal(args)
 	if err != nil {
-		panic(fmt.Errorf("can't convert args into a mage-compatible id for mg.Deps: %w", err))
+		panic(fmt.Errorf("can't convert args into a mage-compatible id for mg.Deps: %s", err))
 	}
 	return fn{
 		name: funcName(target),
