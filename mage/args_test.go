@@ -28,7 +28,76 @@ waiting 5ms
 not coughing
 `
 	if actual != expected {
-		t.Fatal("output is not expected:\n", actual)
+		t.Fatalf("output is not expected:\n%q", actual)
+	}
+}
+
+func TestBadIntArg(t *testing.T) {
+	stderr := &bytes.Buffer{}
+	stdout := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:    "./testdata/args",
+		Stderr: stderr,
+		Stdout: stdout,
+		Args:   []string{"count", "abc123"},
+	}
+	code := Invoke(inv)
+	if code != 2 {
+		t.Log("stderr:", stderr)
+		t.Log("stdout:", stdout)
+		t.Fatalf("expected code 2, but got %v", code)
+	}
+	actual := stderr.String()
+	expected := "can't convert argument \"abc123\" to int\n"
+
+	if actual != expected {
+		t.Fatalf("output is not expected:\n%q", actual)
+	}
+}
+
+func TestBadBoolArg(t *testing.T) {
+	stderr := &bytes.Buffer{}
+	stdout := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:    "./testdata/args",
+		Stderr: stderr,
+		Stdout: stdout,
+		Args:   []string{"cough", "abc123"},
+	}
+	code := Invoke(inv)
+	if code != 2 {
+		t.Log("stderr:", stderr)
+		t.Log("stdout:", stdout)
+		t.Fatalf("expected code 2, but got %v", code)
+	}
+	actual := stderr.String()
+	expected := "can't convert argument \"abc123\" to bool\n"
+
+	if actual != expected {
+		t.Fatalf("output is not expected:\n%q", actual)
+	}
+}
+
+func TestBadDurationArg(t *testing.T) {
+	stderr := &bytes.Buffer{}
+	stdout := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:    "./testdata/args",
+		Stderr: stderr,
+		Stdout: stdout,
+		Args:   []string{"wait", "abc123"},
+	}
+	code := Invoke(inv)
+	if code != 2 {
+		t.Log("stderr:", stderr)
+		t.Log("stdout:", stdout)
+		t.Fatalf("expected code 2, but got %v", code)
+	}
+	actual := stderr.String()
+	expected := "can't convert argument \"abc123\" to time.Duration\n"
+
+	if actual != expected {
+		t.Fatalf("output is not expected:\n%q", actual)
 	}
 }
 
@@ -51,7 +120,7 @@ func TestMissingArgs(t *testing.T) {
 	expected := "not enough arguments for target \"Say\", expected 2, got 1\n"
 
 	if actual != expected {
-		t.Fatal("output is not expected:\n", actual)
+		t.Fatalf("output is not expected:\n%q", actual)
 	}
 }
 
@@ -82,7 +151,7 @@ Aliases: speak
 
 `
 	if actual != expected {
-		t.Fatal("output is not expected:\n", actual)
+		t.Fatalf("output is not expected:\n%q", actual)
 	}
 }
 

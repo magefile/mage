@@ -105,8 +105,8 @@ func (f Function) ExecCode() string {
 			parseargs += fmt.Sprintf(`
 				arg%d, err := strconv.Atoi(args.Args[x])
 				if err != nil {
-					logger.Printf("can't convert argument %%q to integer\n", args.Args[x])
-					os.Exit(1)
+					logger.Printf("can't convert argument %%q to int\n", args.Args[x])
+					os.Exit(2)
 				}
 				x++`, x)
 		case "bool":
@@ -114,7 +114,7 @@ func (f Function) ExecCode() string {
 				arg%d, err := strconv.ParseBool(args.Args[x])
 				if err != nil {
 					logger.Printf("can't convert argument %%q to bool\n", args.Args[x])
-					os.Exit(1)
+					os.Exit(2)
 				}
 				x++`, x)
 		case "time.Duration":
@@ -122,7 +122,7 @@ func (f Function) ExecCode() string {
 				arg%d, err := time.ParseDuration(args.Args[x])
 				if err != nil {
 					logger.Printf("can't convert argument %%q to time.Duration\n", args.Args[x])
-					os.Exit(1)
+					os.Exit(2)
 				}
 				x++`, x)
 		}
