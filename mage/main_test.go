@@ -826,10 +826,10 @@ func TestBadSecondTargets(t *testing.T) {
 	}
 	code := Invoke(inv)
 	if code != 2 {
-		t.Errorf("expected 0, but got %v", code)
+		t.Errorf("expected 2, but got %v", code)
 	}
 	actual := stderr.String()
-	expected := "Unknown target specified: NotGonnaWork\n"
+	expected := "Unknown target specified: \"NotGonnaWork\"\n"
 	if actual != expected {
 		t.Errorf("expected %q, but got %q", expected, actual)
 	}
@@ -967,7 +967,7 @@ func TestHelpTarget(t *testing.T) {
 		t.Errorf("expected to exit with code 0, but got %v", code)
 	}
 	actual := stdout.String()
-	expected := "mage panics:\n\nFunction that panics.\n\n"
+	expected := "Function that panics.\n\nUsage:\n\n\tmage panics\n\n"
 	if actual != expected {
 		t.Fatalf("expected %q, but got %q", expected, actual)
 	}
@@ -987,7 +987,7 @@ func TestHelpAlias(t *testing.T) {
 		t.Errorf("expected to exit with code 0, but got %v", code)
 	}
 	actual := stdout.String()
-	expected := "mage status:\n\nPrints status.\n\nAliases: st, stat\n\n"
+	expected := "Prints status.\n\nUsage:\n\n\tmage status\n\nAliases: st, stat\n\n"
 	if actual != expected {
 		t.Fatalf("expected %q, but got %q", expected, actual)
 	}
@@ -1004,7 +1004,7 @@ func TestHelpAlias(t *testing.T) {
 		t.Errorf("expected to exit with code 0, but got %v", code)
 	}
 	actual = stdout.String()
-	expected = "mage checkout:\n\nAliases: co\n\n"
+	expected = "Usage:\n\n\tmage checkout\n\nAliases: co\n\n"
 	if actual != expected {
 		t.Fatalf("expected %q, but got %q", expected, actual)
 	}
@@ -1053,10 +1053,10 @@ func TestInvalidAlias(t *testing.T) {
 	}
 	code := Invoke(inv)
 	if code != 2 {
-		t.Errorf("expected to exit with code 1, but got %v", code)
+		t.Errorf("expected to exit with code 2, but got %v", code)
 	}
 	actual := stderr.String()
-	expected := "Unknown target specified: co\n"
+	expected := "Unknown target specified: \"co\"\n"
 	if actual != expected {
 		t.Fatalf("expected %q, but got %q", expected, actual)
 	}
@@ -1121,7 +1121,7 @@ func TestCompiledFlags(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := strings.TrimSpace(stdout.String())
-	want := filepath.Base(name) + " deploy:\n\nThis is the synopsis for Deploy. This part shouldn't show up."
+	want := "This is the synopsis for Deploy. This part shouldn't show up.\n\nUsage:\n\n\t" + filepath.Base(name) + " deploy"
 	if got != want {
 		t.Errorf("got %q, want %q", got, want)
 	}
@@ -1206,8 +1206,8 @@ func TestCompiledEnvironmentVars(t *testing.T) {
 	if err := run(stdout, stderr, name, "MAGEFILE_HELP=1", "deploy"); err != nil {
 		t.Fatal(err)
 	}
-	got := strings.TrimSpace(stdout.String())
-	want := filepath.Base(name) + " deploy:\n\nThis is the synopsis for Deploy. This part shouldn't show up."
+	got := stdout.String()
+	want := "This is the synopsis for Deploy. This part shouldn't show up.\n\nUsage:\n\n\t" + filepath.Base(name) + " deploy\n\n"
 	if got != want {
 		t.Errorf("got %q, want %q", got, want)
 	}
@@ -1519,8 +1519,6 @@ func TestAliasToImport(t *testing.T) {
 
 }
 
-var wrongDepRx = regexp.MustCompile("^Error: Invalid type for dependent function.*@ main.FooBar .*magefile.go")
-
 func TestWrongDependency(t *testing.T) {
 	stderr := &bytes.Buffer{}
 	inv := Invocation{
@@ -1532,9 +1530,10 @@ func TestWrongDependency(t *testing.T) {
 	if code != 1 {
 		t.Fatalf("expected 1, but got %v", code)
 	}
+	expected := "Error: argument 0 (complex128), is not a supported argument type\n"
 	actual := stderr.String()
-	if !wrongDepRx.MatchString(actual) {
-		t.Fatalf("expected matching %q, but got %q", wrongDepRx, actual)
+	if actual != expected {
+		t.Fatalf("expected %q, but got %q", expected, actual)
 	}
 }
 

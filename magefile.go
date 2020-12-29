@@ -19,6 +19,16 @@ import (
 	"github.com/magefile/mage/sh"
 )
 
+var Aliases = map[string]interface{}{
+	"Speak": Say,
+}
+
+// Say says something.
+func Say(msg string, i int, b bool, d time.Duration) error {
+	_, err := fmt.Printf("%v(%T) %v(%T) %v(%T) %v(%T)\n", msg, msg, i, i, b, b, d, d)
+	return err
+}
+
 // Runs "go install" for mage.  This generates the version info the binary.
 func Install() error {
 	name := "mage"
