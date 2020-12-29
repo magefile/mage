@@ -67,10 +67,8 @@ func Install() error {
 
 var releaseTag = regexp.MustCompile(`^v1\.[0-9]+\.[0-9]+$`)
 
-// Generates a new release.  Expects the TAG environment variable to be set,
-// which will create a new tag with that name.
-func Release() (err error) {
-	tag := os.Getenv("TAG")
+// Generates a new release. Expects a version tag in v1.x.x format.
+func Release(tag string) (err error) {
 	if !releaseTag.MatchString(tag) {
 		return errors.New("TAG environment variable must be in semver v1.x.x format, but was " + tag)
 	}
