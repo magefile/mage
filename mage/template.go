@@ -23,15 +23,86 @@ import (
 	{{range .Imports}}{{.UniqueName}} "{{.Path}}"
 	{{end}}
 )
+func stripFlags(fs flag.FlagSet, args []string) []string {
+	if len(args) == 0 {
+		return args
+	}
+
+	commands := []string{}
+
+Loop:
+	for len(args) > 0 {
+		s := args[0]
+		args = args[1:]
+		switch {
+		case fs.Lookup(strings.Trim(s, "-")) != nil:
+			commands = append(commands, s)
+		case s == "--":
+			// "--" terminates the flags
+			break Loop
+		case strings.HasPrefix(s, "--") && !strings.Contains(s, "="):
+			// If '--flag arg' then
+			// delete arg from args.
+			fallthrough // (do the same as below)
+		case strings.HasPrefix(s, "-") && !strings.Contains(s, "=") && len(s) == 2:
+			// If '-f arg' then
+			// delete 'arg' from args or break the loop if len(args) <= 1.
+			if len(args) <= 1 {
+				break Loop
+			} else {
+				args = args[0:]
+				continue
+			}
+		case strings.HasPrefix(s, "-") && strings.Contains(s, "="):
+			parts := strings.SplitN(s, "=",2)
+			if fs.Lookup(strings.Trim(parts[0], "-")) != nil {
+			  commands = append(commands, s)
+			  continue
+			}
+		case s != "" && !strings.HasPrefix(s, "-"):
+			commands = append(commands, s)
+		}
+	}
+
+	return commands
+}
+
+func getFlags(args []string) map[string][]string {
+	flags := make(map[string][]string)
+	if len(args) == 0 {
+		return flags
+	}
+
+	for _, s := range args {
+		if s == "==" {
+			break
+		}
+
+		if !strings.HasPrefix(s, "-") {
+		  continue
+		}
+
+		parts := strings.SplitN(s, "=", 2)
+		key := strings.Trim(parts[0], "-")
+		if len(parts) == 2 {
+			flags[key] = append(flags[key], parts[1])
+		} else {
+			flags[key] = append(flags[key], "true")
+		}
+	}
+
+	return flags
+}
 
 func main() {
 	// Use local types and functions in order to avoid name conflicts with additional magefiles.
 	type arguments struct {
-		Verbose       bool          // print out log statements
-		List          bool          // print out a list of targets
-		Help          bool          // print out help for a specific target
-		Timeout       time.Duration // set a timeout to running the targets
-		Args          []string      // args contain the non-flag command-line arguments
+		Verbose       bool                // print out log statements
+		List          bool                // print out a list of targets
+		Help          bool                // print out help for a specific target
+		Timeout       time.Duration       // set a timeout to running the targets
+		Args          []string            // args contain the non-flag command-line arguments
+		Flags         map[string][]string // flags contains the flag command-line arguments
 	}
 
 	parseBool := func(env string) bool {
@@ -83,7 +154,8 @@ Options:
   -v    show verbose output when running targets
  ` + "`" + `[1:], filepath.Base(os.Args[0]))
 	}
-	if err := fs.Parse(os.Args[1:]); err != nil {
+	
+	if err := fs.Parse(stripFlags(fs, os.Args[1:])); err != nil {
 		// flag will have printed out an error already.
 		return
 	}
@@ -385,6 +457,8 @@ Options:
 	for x := 0; x < len(args.Args); {
 		target := args.Args[x]
 		x++
+		flags := getFlags(os.Args[1:])
+		args.Flags = flags
 
 		// resolve aliases
 		switch strings.ToLower(target) {
@@ -397,7 +471,40 @@ Options:
 		switch strings.ToLower(target) {
 		{{range .Funcs }}
 			case "{{lower .TargetName}}":
-				expected := x + {{len .Args}}
+
+				if len(flags["help"]) > 0 || len(flags["h"]) > 0  {
+				fmt.Fprintf(os.Stdout,  ` + "`" + `
+{{- with .Comment}}
+
+{{.}}
+
+{{ end -}}
+
+Usage:
+  {{$.BinaryName}} {{lower .TargetName}} [options] {{range .Positional}} <{{.Name}}>{{end}}
+
+Options:
+  -h, --help	show this help
+{{- range .Flags}}
+  --{{.Name}}	provide the {{.Name}} argument ({{.FlagType}})
+{{- end}}
+` + "`" + `)
+				  return
+				}
+
+				validFlags := map[string][]string{}
+				{{range .Args}}
+			      {{ if .IsFlag }}
+				  if a, ok := flags["{{.Name}}"]; ok {
+					validFlags["{{.Name}}"] = append(validFlags["{{.Name}}"], a...)
+				  } else {
+					validFlags["{{.Name}}"] = append(validFlags["{{.Name}}"], "")
+				  }
+				  {{- end}}
+				{{- end}}
+				args.Flags = validFlags
+
+				expected := x + {{len .Positional}}
 				if expected > len(args.Args) {
 					// note that expected and args at this point include the arg for the target itself
 					// so we subtract 1 here to show the number of args without the target.
