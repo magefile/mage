@@ -66,6 +66,24 @@ func (a Arg) FlagType() string {
 	return strings.TrimSuffix(strings.TrimPrefix(a.Type, "mg."), "Flag")
 }
 
+// ZeroValue returns code needed to set the default value for a flag when it is
+// undefined. It needs to be a value that can be converted to the correct tyoe
+// in ExecCode
+func (a Arg) ZeroValue() string {
+	var z string
+	switch a.Type {
+	case "string", "mg.StringFlag", "mg.StringSliceFlag":
+		z = `""`
+	case "int", "mg.IntFlag":
+		z = `"0"`
+	case "bool", "mg.BoolFlag":
+		z = `"false"`
+	case "time.Duration", "mg.DurationFlag":
+		z = `"0s"`
+	}
+	return z
+}
+
 // ID returns user-readable information about where this function is defined.
 func (f Function) ID() string {
 	path := "<current>"

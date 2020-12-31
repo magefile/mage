@@ -498,7 +498,7 @@ Options:
 				  if a, ok := flags["{{.Name}}"]; ok {
 					validFlags["{{.Name}}"] = append(validFlags["{{.Name}}"], a...)
 				  } else {
-					validFlags["{{.Name}}"] = append(validFlags["{{.Name}}"], "")
+					validFlags["{{.Name}}"] = append(validFlags["{{.Name}}"], {{.ZeroValue}})
 				  }
 				  {{- end}}
 				{{- end}}
