@@ -1436,6 +1436,18 @@ func Test() {
 	}
 	stderr.Reset()
 	stdout.Reset()
+
+	// we need to run go mod tidy, since go build will no longer auto-add dependencies.
+	cmd = exec.Command("go", "mod", "tidy")
+	cmd.Dir = dir
+	cmd.Env = os.Environ()
+	cmd.Stderr = stderr
+	cmd.Stdout = stdout
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("Error running go mod tidy: %v\nStdout: %s\nStderr: %s", err, stdout, stderr)
+	}
+	stderr.Reset()
+	stdout.Reset()
 	code := Invoke(Invocation{
 		Dir:    dir,
 		Stderr: stderr,
