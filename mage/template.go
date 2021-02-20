@@ -339,7 +339,8 @@ Options:
 			os.Exit(2)
 		}
 		switch strings.ToLower(args.Args[0]) {
-			{{range .Funcs}}case "{{lower .TargetName}}":
+			{{range .Funcs -}}
+			case "{{lower .TargetName}}":
 				{{if ne .Comment "" -}}
 				fmt.Println({{printf "%q" .Comment}})
 				fmt.Println()
@@ -355,7 +356,27 @@ Options:
 					fmt.Printf("Aliases: %s\n\n", strings.Join(aliases, ", "))
 				}
 				return
-			{{end}}
+			{{end -}}
+			{{range .Imports -}}
+				{{range .Info.Funcs -}}
+			case "{{lower .TargetName}}":
+				{{if ne .Comment "" -}}
+				fmt.Println({{printf "%q" .Comment}})
+				fmt.Println()
+				{{end}}
+				fmt.Print("Usage:\n\n\t{{$.BinaryName}} {{lower .TargetName}}{{range .Args}} <{{.Name}}>{{end}}\n\n")
+				var aliases []string
+				{{- $name := .Name -}}
+				{{- $recv := .Receiver -}}
+				{{range $alias, $func := $.Aliases}}
+				{{if and (eq $name $func.Name) (eq $recv $func.Receiver)}}aliases = append(aliases, "{{$alias}}"){{end -}}
+				{{- end}}
+				if len(aliases) > 0 {
+					fmt.Printf("Aliases: %s\n\n", strings.Join(aliases, ", "))
+				}
+				return
+				{{end -}}
+			{{end -}}
 			default:
 				logger.Printf("Unknown target: %q\n", args.Args[0])
 				os.Exit(2)
