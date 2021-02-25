@@ -25,7 +25,6 @@ go run bootstrap.go
 
 ```
 git clone https://github.com/magefile/mage
-cd mage
 go run bootstrap.go
 ```
 
