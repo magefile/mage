@@ -53,9 +53,10 @@ for discussion of usage, development, etc.
 
 # Documentation
 
-see [magefile.org](https://magefile.org) for full docs
+See [magefile.org](https://magefile.org) for full documentation.
 
-see [godoc.org/github.com/magefile/mage/mage](https://godoc.org/github.com/magefile/mage/mage) for how to use mage as a library.
+See [pkg.go.dev/github.com/magefile/mage/mage](https://pkg.go.dev/github.com/magefile/mage/mage)
+for instructions on how to use Mage as a library.
 
 # Why?
 

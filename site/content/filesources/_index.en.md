@@ -4,7 +4,7 @@ weight = 35
 +++
 
 Mage supports make-like comparisons of file sources and file targets.  Using the
-[target](https://godoc.org/github.com/magefile/mage/target) library, you can
+[target](https://pkg.go.dev/github.com/magefile/mage/target) library, you can
 easily compare the last modified times of a target file or directory with the
 last modified time of the file or directories required to build that target.
 
