@@ -48,6 +48,12 @@ type Function struct {
 	IsContext  bool
 	Synopsis   string
 	Comment    string
+	Args       []Arg
+}
+
+// Arg is an argument to a Function.
+type Arg struct {
+	Name, Type string
 }
 
 // ID returns user-readable information about where this function is defined.
@@ -79,7 +85,7 @@ func (f Function) TargetName() string {
 // ExecCode returns code for the template switch to run the target.
 // It wraps each target call to match the func(context.Context) error that
 // runTarget requires.
-func (f Function) ExecCode() (string, error) {
+func (f Function) ExecCode() string {
 	name := f.Name
 	if f.Receiver != "" {
 		name = f.Receiver + "{}." + name
@@ -88,41 +94,64 @@ func (f Function) ExecCode() (string, error) {
 		name = f.Package + "." + name
 	}
 
-	if f.IsContext && f.IsError {
-		out := `
-			wrapFn := func(ctx context.Context) error {
-				return %s(ctx)
-			}
-			err := runTarget(wrapFn)`[1:]
-		return fmt.Sprintf(out, name), nil
+	var parseargs string
+	for x, arg := range f.Args {
+		switch arg.Type {
+		case "string":
+			parseargs += fmt.Sprintf(`
+			arg%d := args.Args[x]
+			x++`, x)
+		case "int":
+			parseargs += fmt.Sprintf(`
+				arg%d, err := strconv.Atoi(args.Args[x])
+				if err != nil {
+					logger.Printf("can't convert argument %%q to int\n", args.Args[x])
+					os.Exit(2)
+				}
+				x++`, x)
+		case "bool":
+			parseargs += fmt.Sprintf(`
+				arg%d, err := strconv.ParseBool(args.Args[x])
+				if err != nil {
+					logger.Printf("can't convert argument %%q to bool\n", args.Args[x])
+					os.Exit(2)
+				}
+				x++`, x)
+		case "time.Duration":
+			parseargs += fmt.Sprintf(`
+				arg%d, err := time.ParseDuration(args.Args[x])
+				if err != nil {
+					logger.Printf("can't convert argument %%q to time.Duration\n", args.Args[x])
+					os.Exit(2)
+				}
+				x++`, x)
+		}
 	}
-	if f.IsContext && !f.IsError {
-		out := `
-			wrapFn := func(ctx context.Context) error {
-				%s(ctx)
-				return nil
-			}
-			err := runTarget(wrapFn)`[1:]
-		return fmt.Sprintf(out, name), nil
+
+	out := parseargs + `
+				wrapFn := func(ctx context.Context) error {
+					`
+	if f.IsError {
+		out += "return "
 	}
-	if !f.IsContext && f.IsError {
-		out := `
-			wrapFn := func(ctx context.Context) error {
-				return %s()
-			}
-			err := runTarget(wrapFn)`[1:]
-		return fmt.Sprintf(out, name), nil
+	out += name + "("
+	var args []string
+	if f.IsContext {
+		args = append(args, "ctx")
 	}
-	if !f.IsContext && !f.IsError {
-		out := `
-			wrapFn := func(ctx context.Context) error {
-				%s()
-				return nil
-			}
-			err := runTarget(wrapFn)`[1:]
-		return fmt.Sprintf(out, name), nil
+	for x := 0; x < len(f.Args); x++ {
+		args = append(args, fmt.Sprintf("arg%d", x))
 	}
-	return "", fmt.Errorf("Error formatting ExecCode code for %#v", f)
+	out += strings.Join(args, ", ")
+	out += ")"
+	if !f.IsError {
+		out += `
+					return nil`
+	}
+	out += `
+				}
+				ret := runTarget(wrapFn)`
+	return out
 }
 
 // PrimaryPackage parses a package.  If files is non-empty, it will only parse the files given.
@@ -285,18 +314,16 @@ func setFuncs(pi *PkgInfo) {
 			// skip non-exported functions
 			continue
 		}
-		if typ := funcType(f.Decl.Type); typ != invalidType {
-			debug.Printf("found target %v", f.Name)
-			pi.Funcs = append(pi.Funcs, &Function{
-				Name:      f.Name,
-				Comment:   toOneLine(f.Doc),
-				Synopsis:  sanitizeSynopsis(f),
-				IsError:   typ == errorType || typ == contextErrorType,
-				IsContext: typ == contextVoidType || typ == contextErrorType,
-			})
-		} else {
-			debug.Printf("skipping function with invalid signature func %s(%v)(%v)", f.Name, fieldNames(f.Decl.Type.Params), fieldNames(f.Decl.Type.Results))
+		fn, err := funcType(f.Decl.Type)
+		if err != nil {
+			debug.Printf("skipping function with invalid signature func %s: %v", f.Name, err)
+			continue
 		}
+		debug.Printf("found target %v", f.Name)
+		fn.Name = f.Name
+		fn.Comment = toOneLine(f.Doc)
+		fn.Synopsis = sanitizeSynopsis(f)
+		pi.Funcs = append(pi.Funcs, fn)
 	}
 }
 
@@ -310,19 +337,18 @@ func setNamespaces(pi *PkgInfo) {
 			if !ast.IsExported(f.Name) {
 				continue
 			}
-			typ := funcType(f.Decl.Type)
-			if typ == invalidType {
+			fn, err := funcType(f.Decl.Type)
+			if err != nil {
+				debug.Printf("skipping invalid namespace method %s %s.%s: %v", pi.DocPkg.ImportPath, t.Name, f.Name, err)
 				continue
 			}
 			debug.Printf("found namespace method %s %s.%s", pi.DocPkg.ImportPath, t.Name, f.Name)
-			pi.Funcs = append(pi.Funcs, &Function{
-				Name:      f.Name,
-				Receiver:  t.Name,
-				Comment:   toOneLine(f.Doc),
-				Synopsis:  sanitizeSynopsis(f),
-				IsError:   typ == errorType || typ == contextErrorType,
-				IsContext: typ == contextVoidType || typ == contextErrorType,
-			})
+			fn.Name = f.Name
+			fn.Comment = toOneLine(f.Doc)
+			fn.Synopsis = sanitizeSynopsis(f)
+			fn.Receiver = t.Name
+
+			pi.Funcs = append(pi.Funcs, fn)
 		}
 	}
 }
@@ -444,31 +470,6 @@ func isNamespace(t *doc.Type) bool {
 		return false
 	}
 	return ident.Name == "mg" && sel.Sel.Name == "Namespace"
-}
-
-func fieldNames(flist *ast.FieldList) string {
-	if flist == nil {
-		return ""
-	}
-	list := flist.List
-	if len(list) == 0 {
-		return ""
-	}
-	args := make([]string, 0, len(list))
-	for _, f := range list {
-		names := make([]string, 0, len(f.Names))
-		for _, n := range f.Names {
-			if n.Name != "" {
-				names = append(names, n.Name)
-			}
-		}
-		nms := strings.Join(names, ", ")
-		if nms != "" {
-			nms += " "
-		}
-		args = append(args, nms+fmt.Sprint(f.Type))
-	}
-	return strings.Join(args, ", ")
 }
 
 // checkDupeTargets checks a package for duplicate target names.
@@ -701,23 +702,33 @@ func getPackage(path string, files []string, fset *token.FileSet) (*ast.Package,
 	}
 }
 
-func hasContextParam(ft *ast.FuncType) bool {
-	if ft.Params.NumFields() != 1 {
-		return false
+// hasContextParams returns whether or not the first parameter is a context.Context. If it
+// determines that hte first parameter makes this function invalid for mage, it'll return a non-nil
+// error.
+func hasContextParam(ft *ast.FuncType) (bool, error) {
+	if ft.Params.NumFields() < 1 {
+		return false, nil
 	}
-	ret := ft.Params.List[0]
-	sel, ok := ret.Type.(*ast.SelectorExpr)
+	param := ft.Params.List[0]
+	sel, ok := param.Type.(*ast.SelectorExpr)
 	if !ok {
-		return false
+		return false, nil
 	}
 	pkg, ok := sel.X.(*ast.Ident)
 	if !ok {
-		return false
+		return false, nil
 	}
 	if pkg.Name != "context" {
-		return false
+		return false, nil
 	}
-	return sel.Sel.Name == "Context"
+	if sel.Sel.Name != "Context" {
+		return false, nil
+	}
+	if len(param.Names) > 1 {
+		// something like foo, bar context.Context
+		return false, errors.New("ETOOMANYCONTEXTS")
+	}
+	return true, nil
 }
 
 func hasVoidReturn(ft *ast.FuncType) bool {
@@ -725,48 +736,62 @@ func hasVoidReturn(ft *ast.FuncType) bool {
 	return res.NumFields() == 0
 }
 
-func hasErrorReturn(ft *ast.FuncType) bool {
+func hasErrorReturn(ft *ast.FuncType) (bool, error) {
 	res := ft.Results
-	if res.NumFields() != 1 {
-		return false
+	if res.NumFields() == 0 {
+		// void return is ok
+		return false, nil
+	}
+	if res.NumFields() > 1 {
+		return false, errors.New("ETOOMANYRETURNS")
 	}
 	ret := res.List[0]
 	if len(ret.Names) > 1 {
-		return false
+		return false, errors.New("ETOOMANYERRORS")
 	}
-	return fmt.Sprint(ret.Type) == "error"
+	if fmt.Sprint(ret.Type) == "error" {
+		return true, nil
+	}
+	return false, errors.New("EBADRETURNTYPE")
 }
 
-type functype int
-
-const (
-	invalidType functype = iota
-	voidType
-	errorType
-	contextVoidType
-	contextErrorType
-)
-
-func funcType(ft *ast.FuncType) functype {
-	if hasContextParam(ft) {
-		if hasVoidReturn(ft) {
-			return contextVoidType
+func funcType(ft *ast.FuncType) (*Function, error) {
+	var err error
+	f := &Function{}
+	f.IsContext, err = hasContextParam(ft)
+	if err != nil {
+		return nil, err
+	}
+	f.IsError, err = hasErrorReturn(ft)
+	if err != nil {
+		return nil, err
+	}
+	x := 0
+	if f.IsContext {
+		x++
+	}
+	for ; x < len(ft.Params.List); x++ {
+		param := ft.Params.List[x]
+		t := fmt.Sprint(param.Type)
+		typ, ok := argTypes[t]
+		if !ok {
+			return nil, fmt.Errorf("unsupported argument type: %s", t)
 		}
-		if hasErrorReturn(ft) {
-			return contextErrorType
+		// support for foo, bar string
+		for _, name := range param.Names {
+			f.Args = append(f.Args, Arg{Name: name.Name, Type: typ})
 		}
 	}
-	if ft.Params.NumFields() == 0 {
-		if hasVoidReturn(ft) {
-			return voidType
-		}
-		if hasErrorReturn(ft) {
-			return errorType
-		}
-	}
-	return invalidType
+	return f, nil
 }
 
 func toOneLine(s string) string {
 	return strings.TrimSpace(strings.Replace(s, "\n", " ", -1))
+}
+
+var argTypes = map[string]string{
+	"string":           "string",
+	"int":              "int",
+	"&{time Duration}": "time.Duration",
+	"bool":             "bool",
 }

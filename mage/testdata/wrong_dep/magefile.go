@@ -8,9 +8,9 @@ import (
 
 var Default = FooBar
 
-func WrongSignature(i int) {
+func WrongSignature(c complex128) {
 }
 
 func FooBar() {
-	mg.Deps(WrongSignature)
+	mg.Deps(mg.F(WrongSignature, 0))
 }

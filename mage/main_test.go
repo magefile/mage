@@ -57,7 +57,29 @@ func testmain(m *testing.M) int {
 	if err := os.Unsetenv(mg.IgnoreDefaultEnv); err != nil {
 		log.Fatal(err)
 	}
+	if err := os.Setenv(mg.CacheEnv, dir); err != nil {
+		log.Fatal(err)
+	}
+	if err := os.Unsetenv(mg.EnableColorEnv); err != nil {
+		log.Fatal(err)
+	}
+	if err := os.Unsetenv(mg.TargetColorEnv); err != nil {
+		log.Fatal(err)
+	}
+	resetTerm()
 	return m.Run()
+}
+
+func resetTerm() {
+	if term, exists := os.LookupEnv("TERM"); exists {
+		log.Printf("Current terminal: %s", term)
+		// unset TERM env var in order to disable color output to make the tests simpler
+		// there is a specific test for colorized output, so all the other tests can use non-colorized one
+		if err := os.Unsetenv("TERM"); err != nil {
+			log.Fatal(err)
+		}
+	}
+	os.Setenv(mg.EnableColorEnv, "false")
 }
 
 func TestTransitiveDepCache(t *testing.T) {
@@ -169,7 +191,10 @@ func TestListMagefilesMain(t *testing.T) {
 	if err != nil {
 		t.Errorf("error from magefile list: %v: %s", err, buf)
 	}
-	expected := []string{"testdata/mixed_main_files/mage_helpers.go", "testdata/mixed_main_files/magefile.go"}
+	expected := []string{
+		filepath.FromSlash("testdata/mixed_main_files/mage_helpers.go"),
+		filepath.FromSlash("testdata/mixed_main_files/magefile.go"),
+	}
 	if !reflect.DeepEqual(files, expected) {
 		t.Fatalf("expected %q but got %q", expected, files)
 	}
@@ -189,9 +214,9 @@ func TestListMagefilesIgnoresGOOS(t *testing.T) {
 	}
 	var expected []string
 	if runtime.GOOS == "windows" {
-		expected = []string{"testdata/goos_magefiles/magefile_windows.go"}
+		expected = []string{filepath.FromSlash("testdata/goos_magefiles/magefile_windows.go")}
 	} else {
-		expected = []string{"testdata/goos_magefiles/magefile_nonwindows.go"}
+		expected = []string{filepath.FromSlash("testdata/goos_magefiles/magefile_nonwindows.go")}
 	}
 	if !reflect.DeepEqual(files, expected) {
 		t.Fatalf("expected %q but got %q", expected, files)
@@ -213,9 +238,9 @@ func TestListMagefilesIgnoresRespectsGOOSArg(t *testing.T) {
 	}
 	var expected []string
 	if goos == "windows" {
-		expected = []string{"testdata/goos_magefiles/magefile_windows.go"}
+		expected = []string{filepath.FromSlash("testdata/goos_magefiles/magefile_windows.go")}
 	} else {
-		expected = []string{"testdata/goos_magefiles/magefile_nonwindows.go"}
+		expected = []string{filepath.FromSlash("testdata/goos_magefiles/magefile_nonwindows.go")}
 	}
 	if !reflect.DeepEqual(files, expected) {
 		t.Fatalf("expected %q but got %q", expected, files)
@@ -285,13 +310,17 @@ func TestListMagefilesLib(t *testing.T) {
 	if err != nil {
 		t.Errorf("error from magefile list: %v: %s", err, buf)
 	}
-	expected := []string{"testdata/mixed_lib_files/mage_helpers.go", "testdata/mixed_lib_files/magefile.go"}
+	expected := []string{
+		filepath.FromSlash("testdata/mixed_lib_files/mage_helpers.go"),
+		filepath.FromSlash("testdata/mixed_lib_files/magefile.go"),
+	}
 	if !reflect.DeepEqual(files, expected) {
 		t.Fatalf("expected %q but got %q", expected, files)
 	}
 }
 
 func TestMixedMageImports(t *testing.T) {
+	resetTerm()
 	stderr := &bytes.Buffer{}
 	stdout := &bytes.Buffer{}
 	inv := Invocation{
@@ -420,7 +449,82 @@ Targets:
 	}
 }
 
+var terminals = []struct {
+	code          string
+	supportsColor bool
+}{
+	{"", true},
+	{"vt100", false},
+	{"cygwin", false},
+	{"xterm-mono", false},
+	{"xterm", true},
+	{"xterm-vt220", true},
+	{"xterm-16color", true},
+	{"xterm-256color", true},
+	{"screen-256color", true},
+}
+
+func TestListWithColor(t *testing.T) {
+	os.Setenv(mg.EnableColorEnv, "true")
+	os.Setenv(mg.TargetColorEnv, mg.Cyan.String())
+
+	expectedPlainText := `
+This is a comment on the package which should get turned into output with the list of targets.
+
+Targets:
+  somePig*       This is the synopsis for SomePig.
+  testVerbose    
+
+* default target
+`[1:]
+
+	// NOTE: using the literal string would be complicated because I would need to break it
+	// in the middle and join with a normal string for the target names,
+	// otherwise the single backslash would be taken literally and encoded as \\
+	expectedColorizedText := "" +
+		"This is a comment on the package which should get turned into output with the list of targets.\n" +
+		"\n" +
+		"Targets:\n" +
+		"  \x1b[36msomePig*\x1b[0m       This is the synopsis for SomePig.\n" +
+		"  \x1b[36mtestVerbose\x1b[0m    \n" +
+		"\n" +
+		"* default target\n"
+
+	for _, terminal := range terminals {
+		t.Run(terminal.code, func(t *testing.T) {
+			os.Setenv("TERM", terminal.code)
+
+			stdout := &bytes.Buffer{}
+			inv := Invocation{
+				Dir:    "./testdata/list",
+				Stdout: stdout,
+				Stderr: ioutil.Discard,
+				List:   true,
+			}
+
+			code := Invoke(inv)
+			if code != 0 {
+				t.Errorf("expected to exit with code 0, but got %v", code)
+			}
+			actual := stdout.String()
+			var expected string
+			if terminal.supportsColor {
+				expected = expectedColorizedText
+			} else {
+				expected = expectedPlainText
+			}
+
+			if actual != expected {
+				t.Logf("expected: %q", expected)
+				t.Logf("  actual: %q", actual)
+				t.Fatalf("expected:\n%v\n\ngot:\n%v", expected, actual)
+			}
+		})
+	}
+}
+
 func TestNoArgNoDefaultList(t *testing.T) {
+	resetTerm()
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
 	inv := Invocation{
@@ -458,6 +562,7 @@ func TestIgnoreDefault(t *testing.T) {
 	if err := os.Setenv(mg.IgnoreDefaultEnv, "1"); err != nil {
 		t.Fatal(err)
 	}
+	resetTerm()
 
 	code := Invoke(inv)
 	if code != 0 {
@@ -721,10 +826,10 @@ func TestBadSecondTargets(t *testing.T) {
 	}
 	code := Invoke(inv)
 	if code != 2 {
-		t.Errorf("expected 0, but got %v", code)
+		t.Errorf("expected 2, but got %v", code)
 	}
 	actual := stderr.String()
-	expected := "Unknown target specified: NotGonnaWork\n"
+	expected := "Unknown target specified: \"NotGonnaWork\"\n"
 	if actual != expected {
 		t.Errorf("expected %q, but got %q", expected, actual)
 	}
@@ -862,7 +967,7 @@ func TestHelpTarget(t *testing.T) {
 		t.Errorf("expected to exit with code 0, but got %v", code)
 	}
 	actual := stdout.String()
-	expected := "mage panics:\n\nFunction that panics.\n\n"
+	expected := "Function that panics.\n\nUsage:\n\n\tmage panics\n\n"
 	if actual != expected {
 		t.Fatalf("expected %q, but got %q", expected, actual)
 	}
@@ -882,7 +987,7 @@ func TestHelpAlias(t *testing.T) {
 		t.Errorf("expected to exit with code 0, but got %v", code)
 	}
 	actual := stdout.String()
-	expected := "mage status:\n\nPrints status.\n\nAliases: st, stat\n\n"
+	expected := "Prints status.\n\nUsage:\n\n\tmage status\n\nAliases: st, stat\n\n"
 	if actual != expected {
 		t.Fatalf("expected %q, but got %q", expected, actual)
 	}
@@ -899,7 +1004,7 @@ func TestHelpAlias(t *testing.T) {
 		t.Errorf("expected to exit with code 0, but got %v", code)
 	}
 	actual = stdout.String()
-	expected = "mage checkout:\n\nAliases: co\n\n"
+	expected = "Usage:\n\n\tmage checkout\n\nAliases: co\n\n"
 	if actual != expected {
 		t.Fatalf("expected %q, but got %q", expected, actual)
 	}
@@ -948,10 +1053,10 @@ func TestInvalidAlias(t *testing.T) {
 	}
 	code := Invoke(inv)
 	if code != 2 {
-		t.Errorf("expected to exit with code 1, but got %v", code)
+		t.Errorf("expected to exit with code 2, but got %v", code)
 	}
 	actual := stderr.String()
-	expected := "Unknown target specified: co\n"
+	expected := "Unknown target specified: \"co\"\n"
 	if actual != expected {
 		t.Fatalf("expected %q, but got %q", expected, actual)
 	}
@@ -979,6 +1084,9 @@ func TestCompiledFlags(t *testing.T) {
 		t.Fatal(err)
 	}
 	name := filepath.Join(compileDir, "mage_out")
+	if runtime.GOOS == "windows" {
+		name += ".exe"
+	}
 	// The CompileOut directory is relative to the
 	// invocation directory, so chop off the invocation dir.
 	outName := "./" + name[len(dir)-1:]
@@ -1013,7 +1121,7 @@ func TestCompiledFlags(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := strings.TrimSpace(stdout.String())
-	want := filepath.Base(name) + " deploy:\n\nThis is the synopsis for Deploy. This part shouldn't show up."
+	want := "This is the synopsis for Deploy. This part shouldn't show up.\n\nUsage:\n\n\t" + filepath.Base(name) + " deploy"
 	if got != want {
 		t.Errorf("got %q, want %q", got, want)
 	}
@@ -1063,6 +1171,9 @@ func TestCompiledEnvironmentVars(t *testing.T) {
 		t.Fatal(err)
 	}
 	name := filepath.Join(compileDir, "mage_out")
+	if runtime.GOOS == "windows" {
+		name += ".exe"
+	}
 	// The CompileOut directory is relative to the
 	// invocation directory, so chop off the invocation dir.
 	outName := "./" + name[len(dir)-1:]
@@ -1095,8 +1206,8 @@ func TestCompiledEnvironmentVars(t *testing.T) {
 	if err := run(stdout, stderr, name, "MAGEFILE_HELP=1", "deploy"); err != nil {
 		t.Fatal(err)
 	}
-	got := strings.TrimSpace(stdout.String())
-	want := filepath.Base(name) + " deploy:\n\nThis is the synopsis for Deploy. This part shouldn't show up."
+	got := stdout.String()
+	want := "This is the synopsis for Deploy. This part shouldn't show up.\n\nUsage:\n\n\t" + filepath.Base(name) + " deploy\n\n"
 	if got != want {
 		t.Errorf("got %q, want %q", got, want)
 	}
@@ -1152,6 +1263,9 @@ func TestCompiledVerboseFlag(t *testing.T) {
 		t.Fatal(err)
 	}
 	filename := filepath.Join(compileDir, "mage_out")
+	if runtime.GOOS == "windows" {
+		filename += ".exe"
+	}
 	// The CompileOut directory is relative to the
 	// invocation directory, so chop off the invocation dir.
 	outName := "./" + filename[len(dir)-1:]
@@ -1274,7 +1388,7 @@ func TestGoCmd(t *testing.T) {
 
 	buf := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
-	if err := Compile("", "", dir, os.Args[0], name, []string{}, false, stderr, buf); err != nil {
+	if err := Compile("", "", "", dir, os.Args[0], name, []string{}, false, stderr, buf); err != nil {
 		t.Log("stderr: ", stderr.String())
 		t.Fatal(err)
 	}
@@ -1286,6 +1400,7 @@ func TestGoCmd(t *testing.T) {
 var runtimeVer = regexp.MustCompile(`go1\.([0-9]+)`)
 
 func TestGoModules(t *testing.T) {
+	resetTerm()
 	matches := runtimeVer.FindStringSubmatch(runtime.Version())
 	if len(matches) < 2 || minorVer(t, matches[1]) < 11 {
 		t.Skipf("Skipping Go modules test because go version %q is less than go1.11", runtime.Version())
@@ -1318,6 +1433,18 @@ func Test() {
 	cmd.Stdout = stdout
 	if err := cmd.Run(); err != nil {
 		t.Fatalf("Error running go mod init: %v\nStdout: %s\nStderr: %s", err, stdout, stderr)
+	}
+	stderr.Reset()
+	stdout.Reset()
+
+	// we need to run go mod tidy, since go build will no longer auto-add dependencies.
+	cmd = exec.Command("go", "mod", "tidy")
+	cmd.Dir = dir
+	cmd.Env = os.Environ()
+	cmd.Stderr = stderr
+	cmd.Stdout = stdout
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("Error running go mod tidy: %v\nStdout: %s\nStderr: %s", err, stdout, stderr)
 	}
 	stderr.Reset()
 	stdout.Reset()
@@ -1404,8 +1531,6 @@ func TestAliasToImport(t *testing.T) {
 
 }
 
-var wrongDepRx = regexp.MustCompile("^Error: Invalid type for dependent function.*@ main.FooBar .*magefile.go")
-
 func TestWrongDependency(t *testing.T) {
 	stderr := &bytes.Buffer{}
 	inv := Invocation{
@@ -1417,9 +1542,10 @@ func TestWrongDependency(t *testing.T) {
 	if code != 1 {
 		t.Fatalf("expected 1, but got %v", code)
 	}
+	expected := "Error: argument 0 (complex128), is not a supported argument type\n"
 	actual := stderr.String()
-	if !wrongDepRx.MatchString(actual) {
-		t.Fatalf("expected matching %q, but got %q", wrongDepRx, actual)
+	if actual != expected {
+		t.Fatalf("expected %q, but got %q", expected, actual)
 	}
 }
 

@@ -422,6 +422,18 @@ func TestDir(t *testing.T) {
 			sources: []string{"$MYDIR"},
 			expect:  true,
 		},
+		{
+			desc:    "Source file is newer than dst dir",
+			target:  "dir/dir2",
+			sources: []string{"file_five"},
+			expect:  true,
+		},
+		{
+			desc:    "Source file is not newer than dst dir",
+			target:  "dir/dir2",
+			sources: []string{"file_one"},
+			expect:  false,
+		},
 	}
 
 	for _, c := range table {

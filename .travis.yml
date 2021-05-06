@@ -9,13 +9,14 @@ branches:
 # library, I'm not going to worry about older versions for now.
 go:
   - tip
+  - 1.16beta1
+  - 1.15.x
+  - 1.14.x
   - 1.13.x
   - 1.12.x
   - 1.11.x
   - 1.10.x
   - 1.9.x
-  - 1.8.x
-  - 1.7.x
 
 # don't call go get ./... because this hides when deps are
 # not packaged into the vendor directory.
