@@ -2,6 +2,7 @@ package mg
 
 import (
 	"bytes"
+	"fmt"
 	"log"
 	"os"
 	"strings"
@@ -33,3 +34,23 @@ func bar() {
 }
 
 func baz() {}
+
+func TestDepWasNotInvoked(t *testing.T) {
+	fn1 := func() error {
+		return nil
+	}
+	defer func() {
+		err := recover()
+		if err == nil {
+			t.Fatal("expected panic, but didn't get one")
+		}
+		gotErr := fmt.Sprint(err)
+		wantErr := "A dependency of the current target was defined improperly, with parenthesis"
+		if !strings.Contains(gotErr, wantErr) {
+			t.Fatalf(`expected to get "%s" but got "%s"`, wantErr, gotErr)
+		}
+	}()
+	func(fns ...interface{}) {
+		checkFns(fns)
+	}(fn1())
+}

@@ -130,6 +130,9 @@ func runDeps(ctx context.Context, fns []Fn) {
 func checkFns(fns []interface{}) []Fn {
 	funcs := make([]Fn, len(fns))
 	for i, f := range fns {
+		if f == nil {
+			panic("A dependency of the current target was defined improperly, with parenthesis. Dependencies should be defined as mg.Deps(MyDep), not mg.Deps(MyDep())")
+		}
 		if fn, ok := f.(Fn); ok {
 			funcs[i] = fn
 			continue
