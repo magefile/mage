@@ -395,7 +395,10 @@ Options:
 	}
 
 	{{- if .DeinitFunc}}
+	defer func() {
 	{{.DeinitFunc.ExecCode}}
+		_ = handleError(logger, ret)
+	}()
 	{{- end}}
 	if len(args.Args) < 1 {
 	{{- if .DefaultFunc.Name}}
