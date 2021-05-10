@@ -71,6 +71,20 @@ func TestParse(t *testing.T) {
 		t.Fatalf("expected DefaultName to be ReturnsNilError")
 	}
 
+	if info.DeinitFunc == nil {
+		t.Fatal("expected deinit func to exist, but was nil")
+	}
+
+	// DeinitIsError
+	if info.DeinitFunc.IsError != true {
+		t.Fatalf("expected DeinitIsError to be true")
+	}
+
+	// DeinitName
+	if info.DeinitFunc.Name != "Shutdown" {
+		t.Fatalf("expected DeinitName to be Shutdown")
+	}
+
 	if info.Aliases["void"].Name != "ReturnsVoid" {
 		t.Fatalf("expected alias of void to be ReturnsVoid")
 	}

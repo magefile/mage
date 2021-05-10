@@ -551,6 +551,7 @@ func GenerateMainfile(binaryName, path string, info *parse.PkgInfo) error {
 		Aliases:     info.Aliases,
 		Imports:     info.Imports,
 		BinaryName:  binaryName,
+		DeinitFunc:  info.DeinitFunc,
 	}
 
 	if info.DefaultFunc != nil {
