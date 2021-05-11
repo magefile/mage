@@ -648,6 +648,25 @@ func TestTargetPanics(t *testing.T) {
 	}
 }
 
+func TestDeinit(t *testing.T) {
+	stdout := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:    "./testdata/deinit",
+		Stderr: ioutil.Discard,
+		Stdout: stdout,
+		Args:   []string{"targetwithcustomshutdown"},
+	}
+	code := Invoke(inv)
+	if code != 0 {
+		t.Fatalf("expected 0, but got %v", code)
+	}
+	actual := stdout.String()
+	expected := "Shutting down\n"
+	if actual != expected {
+		t.Fatalf("expected %q, but got %q", expected, actual)
+	}
+}
+
 func TestPanicsErr(t *testing.T) {
 	stderr := &bytes.Buffer{}
 	inv := Invocation{

@@ -126,3 +126,14 @@ func TestGetImportSelf(t *testing.T) {
 		t.Fatalf("expected package importself, got %v", imp.Info.AstPkg.Name)
 	}
 }
+
+func TestNoDeinitByDefault(t *testing.T) {
+	info, err := PrimaryPackage("go", "./testdata", []string{"func.go", "repeating_synopsis.go", "subcommands.go"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if info.DeinitFunc != nil {
+		t.Fatal("expected deinit func to not exist, but was not nil")
+	}
+}
