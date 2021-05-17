@@ -64,6 +64,11 @@ const EnableColorEnv = "MAGEFILE_ENABLE_COLOR"
 // - BrightWhite
 const TargetColorEnv = "MAGEFILE_TARGET_COLOR"
 
+// ParallelEnv is the environment variable that indicates the maximum count of
+// deps to run in parallel. Unless overridden by user, this will be the CPU
+// count, minus one.
+const ParallelEnv = "MAGEFILE_MAX_PARALLEL"
+
 // Verbose reports whether a magefile was run with the verbose flag.
 func Verbose() bool {
 	b, _ := strconv.ParseBool(os.Getenv(VerboseEnv))
@@ -130,6 +135,29 @@ func TargetColor() string {
 		}
 	}
 	return DefaultTargetAnsiColor
+}
+
+// MaxParallel returns the configured maximum parallel deps, or NumCPU - 1
+func MaxParallel() int {
+	var parallel int
+
+	val, exists := os.LookupEnv(ParallelEnv)
+	if exists {
+		parallel, _ = strconv.Atoi(val)
+	}
+
+	if parallel > 0 {
+		return parallel
+	}
+
+	cpus := runtime.NumCPU()
+	if cpus < 2 {
+		parallel = 1
+	} else {
+		parallel = cpus - 1
+	}
+
+	return parallel
 }
 
 // Namespace allows for the grouping of similar commands

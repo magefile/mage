@@ -59,8 +59,10 @@ var mainfileTemplate = template.Must(template.New("").Funcs(map[string]interface
 }).Parse(mageMainfileTplString))
 var initOutput = template.Must(template.New("").Parse(mageTpl))
 
-const mainfile = "mage_output_file.go"
-const initFile = "magefile.go"
+const (
+	mainfile = "mage_output_file.go"
+	initFile = "magefile.go"
+)
 
 var debug = log.New(ioutil.Discard, "DEBUG: ", log.Ltime|log.Lmicroseconds)
 
@@ -114,6 +116,7 @@ type Invocation struct {
 	GoCmd      string        // the go binary command to run
 	CacheDir   string        // the directory where we should store compiled binaries
 	HashFast   bool          // don't rely on GOCACHE, just hash the magefiles
+	Parallel   int           // maximum parallel deps
 }
 
 // ParseAndRun parses the command line, and then compiles and runs the mage
@@ -184,6 +187,7 @@ func Parse(stderr, stdout io.Writer, args []string) (inv Invocation, cmd Command
 	fs.StringVar(&inv.GOOS, "goos", "", "set GOOS for binary produced with -compile")
 	fs.StringVar(&inv.GOARCH, "goarch", "", "set GOARCH for binary produced with -compile")
 	fs.StringVar(&inv.Ldflags, "ldflags", "", "set ldflags for binary produced with -compile")
+	fs.IntVar(&inv.Parallel, "p", 0, "set max dependencies to run in parallel")
 
 	// commands below
 
@@ -224,6 +228,7 @@ Options:
   -ldflags  sets the ldflags for the binary created by -compile (default: "")
   -h        show description of a target
   -keep     keep intermediate mage files around after running
+  -p        sets maximum parallel deps to run (default: 0, num CPU - 1)
   -t <string>
             timeout in duration parsable format (e.g. 5m30s)
   -v        show verbose output when running mage targets
@@ -261,7 +266,6 @@ Options:
 		if fs.NArg() > 0 {
 			// Temporary dupe of below check until we refactor the other commands to use this check
 			return inv, cmd, errors.New("-h, -init, -clean, -compile and -version cannot be used simultaneously")
-
 		}
 	}
 	if inv.Help {
@@ -657,6 +661,10 @@ func RunCompiled(inv Invocation, exePath string, errlog *log.Logger) int {
 	if inv.Timeout > 0 {
 		c.Env = append(c.Env, fmt.Sprintf("MAGEFILE_TIMEOUT=%s", inv.Timeout.String()))
 	}
+	if inv.Parallel > 0 {
+		c.Env = append(c.Env, fmt.Sprintf("MAGEFILE_MAX_PARALLEL=%d", inv.Parallel))
+	}
+
 	debug.Print("running magefile with mage vars:\n", strings.Join(filter(c.Env, "MAGEFILE"), "\n"))
 	err := c.Run()
 	if !sh.CmdRan(err) {
@@ -696,5 +704,4 @@ func removeContents(dir string) error {
 		}
 	}
 	return nil
-
 }

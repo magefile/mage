@@ -95,6 +95,7 @@ func runDeps(ctx context.Context, fns []Fn) {
 	var errs []string
 	var exit int
 	wg := &sync.WaitGroup{}
+	semaphore := make(chan int, MaxParallel())
 	for _, f := range fns {
 		fn := onces.LoadOrStore(f)
 		wg.Add(1)
@@ -112,12 +113,16 @@ func runDeps(ctx context.Context, fns []Fn) {
 				}
 				wg.Done()
 			}()
+			semaphore <- 1
+
 			if err := fn.run(ctx); err != nil {
 				mu.Lock()
 				errs = append(errs, fmt.Sprint(err))
 				exit = changeExit(exit, ExitStatus(err))
 				mu.Unlock()
 			}
+
+			<-semaphore
 		}()
 	}
 
