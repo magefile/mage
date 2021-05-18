@@ -1323,7 +1323,7 @@ func TestCompiledVerboseFlag(t *testing.T) {
 	}
 }
 
-func TestCompiledDetermanistic(t *testing.T) {
+func TestCompiledDeterministic(t *testing.T) {
 	dir := "./testdata/compiled"
 	compileDir, err := ioutil.TempDir(dir, "")
 	if err != nil {
