@@ -100,6 +100,7 @@ Options:
   -debug    turn on debug messages
   -f        force recreation of compiled magefile
   -goarch   sets the GOARCH for the binary created by -compile (default: current arch)
+	-goarm    sets the GOARM for the binary created by -compile (default: empty or current ARM version depending on arch)
   -gocmd <string>
 		    use the given go binary to compile the output (default: "go")
   -goos     sets the GOOS for the binary created by -compile (default: current OS)
