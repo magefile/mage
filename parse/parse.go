@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"reflect"
 	"sort"
 	"strings"
 	"time"
@@ -36,8 +37,8 @@ type PkgInfo struct {
 	DefaultFunc *Function
 	// DeinitFunc runs any clean up tasks on shutdown
 	DeinitFunc *Function
-	Aliases     map[string]*Function
-	Imports     []*Import
+	Aliases    map[string]*Function
+	Imports    Imports
 }
 
 // Function represented a job function from a mage file
@@ -586,8 +587,19 @@ func setDeinit(pi *PkgInfo) {
 				return
 			}
 			pi.DeinitFunc = f
+			removeDeinitFuncFromTargets(pi)
 			return
 		}
+	}
+}
+
+func removeDeinitFuncFromTargets(pi *PkgInfo) {
+	for i, f := range pi.Funcs {
+		if !reflect.DeepEqual(f, pi.DeinitFunc) {
+			continue
+		}
+		pi.Funcs = append(pi.Funcs[:i], pi.Funcs[i+1:]...)
+		return
 	}
 }
 

@@ -115,6 +115,13 @@ func TestParse(t *testing.T) {
 			t.Fatalf("expected:\n%#v\n\nto be in:\n%#v", fn, info.Funcs)
 		}
 	}
+
+	// Make sure Deinit target has been removed from the target list
+	for _, infoFn := range info.Funcs {
+		if reflect.DeepEqual(infoFn, info.DeinitFunc) {
+			t.Fatalf("Did not expect to find Deinit target in the list of targets")
+		}
+	}
 }
 
 func TestGetImportSelf(t *testing.T) {
