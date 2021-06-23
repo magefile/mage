@@ -98,7 +98,7 @@ func BothOutput(cmd string, args ...string) (string, string, error) {
 func BothOutputWith(env map[string]string, cmd string, args ...string) (string, string, error) {
 	outBuf := &bytes.Buffer{}
 	errBuf := &bytes.Buffer{}
-	_, err := sh.Exec(env, outBuf, errBuf, cmd, args...)
+	_, err := Exec(env, outBuf, errBuf, cmd, args...)
 	return strings.TrimSuffix(outBuf.String(), "\n"), strings.TrimSuffix(errBuf.String(), "\n"), err
 }
 
