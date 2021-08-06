@@ -13,6 +13,13 @@ and Mage automatically uses them as Makefile-like runnable targets.
 Mage has no dependencies outside the Go standard library, and builds with Go 1.7
 and above (possibly even lower versions, but they're not regularly tested).
 
+
+**Using Go 1.16+**
+
+```
+go install github.com/magefile/mage@latest
+```
+
 **Using GOPATH**
 
 ```
@@ -77,4 +84,3 @@ use the language your contributors are already comfortable with?
 If you use mage and like it, or any of my other software, and you'd like to show your appreciation, you can do so on my patreon:
 
 [<img src=https://user-images.githubusercontent.com/3185864/49846051-64eddf80-fd97-11e8-9f59-d09f5652d214.png>](https://www.patreon.com/join/natefinch?)
-
