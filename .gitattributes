@@ -1,2 +1,14 @@
+# Auto detect text files and perform LF normalization
+* text=auto eol=lf
+
 site/* linguist-documentation
 vendor/* linguist-vendored
+
+
+#
+# Exclude files from exporting
+#
+
+.gitattributes export-ignore
+.gitignore     export-ignore
+.gitkeep       export-ignore
