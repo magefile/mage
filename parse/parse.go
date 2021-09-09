@@ -324,7 +324,7 @@ type Import struct {
 var _ sort.Interface = (Imports)(nil)
 
 // Imports implements sort interface to optimize compiled output with
-// determanistic generated mainfile.
+// deterministic generated mainfile.
 type Imports []*Import
 
 func (s Imports) Len() int {
