@@ -384,7 +384,7 @@ func Invoke(inv Invocation) int {
 		return 1
 	}
 
-	// reproducible output for determanistic builds
+	// reproducible output for deterministic builds
 	sort.Sort(info.Funcs)
 	sort.Sort(info.Imports)
 
