@@ -2,7 +2,6 @@ package mg
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"os"
 	"reflect"
@@ -36,7 +35,6 @@ func (o *onceMap) LoadOrStore(f Fn) *onceFun {
 		return existing
 	}
 	one := &onceFun{
-		once:        &sync.Once{},
 		fn:          f,
 		displayName: displayName(f.Name()),
 	}
@@ -91,37 +89,44 @@ func CtxDeps(ctx context.Context, fns ...interface{}) {
 
 // runDeps assumes you've already called checkFns.
 func runDeps(ctx context.Context, fns []Fn) {
-	mu := &sync.Mutex{}
-	var errs []string
-	var exit int
-	wg := &sync.WaitGroup{}
+	resultCh := make(chan error, len(fns))
+	var wg sync.WaitGroup
+	wg.Add(len(fns))
 	for _, f := range fns {
 		fn := onces.LoadOrStore(f)
-		wg.Add(1)
 		go func() {
 			defer func() {
 				if v := recover(); v != nil {
-					mu.Lock()
-					if err, ok := v.(error); ok {
-						exit = changeExit(exit, ExitStatus(err))
-					} else {
-						exit = changeExit(exit, 1)
+					var err error
+					var ok bool
+					if err, ok = v.(error); !ok {
+						err = Fatal(1)
 					}
-					errs = append(errs, fmt.Sprint(v))
-					mu.Unlock()
+					select {
+					case <-ctx.Done():
+					case resultCh <- err:
+					}
 				}
 				wg.Done()
 			}()
-			if err := fn.run(ctx); err != nil {
-				mu.Lock()
-				errs = append(errs, fmt.Sprint(err))
-				exit = changeExit(exit, ExitStatus(err))
-				mu.Unlock()
+			err := fn.run(ctx)
+			select {
+			case <-ctx.Done():
+			case resultCh <- err:
 			}
 		}()
 	}
 
 	wg.Wait()
+	close(resultCh)
+	var errs []string
+	var exit int
+	for err := range resultCh {
+		if err != nil {
+			errs = append(errs, err.Error())
+			exit = changeExit(exit, ExitStatus(err))
+		}
+	}
 	if len(errs) > 0 {
 		panic(Fatal(exit, strings.Join(errs, "\n")))
 	}
@@ -191,9 +196,12 @@ func displayName(name string) string {
 }
 
 type onceFun struct {
-	once *sync.Once
+	once sync.Once
 	fn   Fn
 	err  error
+	// depPanicked references the panic a dependency had previously
+	// failed with if set
+	depPanicked interface{}
 
 	displayName string
 }
@@ -202,10 +210,19 @@ type onceFun struct {
 // the same error output.
 func (o *onceFun) run(ctx context.Context) error {
 	o.once.Do(func() {
+		defer func() {
+			if v := recover(); v != nil {
+				o.depPanicked = v
+				panic(v)
+			}
+		}()
 		if Verbose() {
 			logger.Println("Running dependency:", displayName(o.fn.Name()))
 		}
 		o.err = o.fn.Run(ctx)
 	})
+	if o.depPanicked != nil {
+		panic(o.depPanicked)
+	}
 	return o.err
 }
