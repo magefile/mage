@@ -55,7 +55,7 @@ type Function struct {
 var _ sort.Interface = (Functions)(nil)
 
 // Functions implements sort interface to optimize compiled output with
-// determanistic generated mainfile.
+// deterministic generated mainfile.
 type Functions []*Function
 
 func (s Functions) Len() int {
