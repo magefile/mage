@@ -59,8 +59,10 @@ var mainfileTemplate = template.Must(template.New("").Funcs(map[string]interface
 }).Parse(mageMainfileTplString))
 var initOutput = template.Must(template.New("").Parse(mageTpl))
 
-const mainfile = "mage_output_file.go"
-const initFile = "magefile.go"
+const (
+	mainfile = "mage_output_file.go"
+	initFile = "magefile.go"
+)
 
 var debug = log.New(ioutil.Discard, "DEBUG: ", log.Ltime|log.Lmicroseconds)
 
@@ -261,7 +263,6 @@ Options:
 		if fs.NArg() > 0 {
 			// Temporary dupe of below check until we refactor the other commands to use this check
 			return inv, cmd, errors.New("-h, -init, -clean, -compile and -version cannot be used simultaneously")
-
 		}
 	}
 	if inv.Help {
@@ -382,6 +383,10 @@ func Invoke(inv Invocation) int {
 		errlog.Println("Error parsing magefiles:", err)
 		return 1
 	}
+
+	// reproducible output for deterministic builds
+	sort.Sort(info.Funcs)
+	sort.Sort(info.Imports)
 
 	main := filepath.Join(inv.Dir, mainfile)
 	binaryName := "mage"
@@ -696,5 +701,4 @@ func removeContents(dir string) error {
 		}
 	}
 	return nil
-
 }
