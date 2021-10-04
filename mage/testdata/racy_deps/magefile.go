@@ -1,3 +1,4 @@
+//go:build mage
 // +build mage
 
 package main
@@ -26,6 +27,7 @@ func Test3() error {
 	fmt.Println("execute test3")
 	return nil
 }
+
 func Test4() error {
 	mg.Deps(Test1, Test2, Test3)
 	fmt.Println("execute test4")
