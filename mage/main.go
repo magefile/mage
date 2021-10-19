@@ -50,11 +50,11 @@ func lowerFirstWord(s string) string {
 var mainfileTemplate = template.Must(template.New("").Funcs(map[string]interface{}{
 	"lower": strings.ToLower,
 	"lowerFirst": func(s string) string {
-		parts := strings.Split(s, ":")
+		parts := strings.Split(s, mg.TargetNameSeparator())
 		for i, t := range parts {
 			parts[i] = lowerFirstWord(t)
 		}
-		return strings.Join(parts, ":")
+		return strings.Join(parts, mg.TargetNameSeparator())
 	},
 }).Parse(mageMainfileTplString))
 var initOutput = template.Must(template.New("").Parse(mageTpl))

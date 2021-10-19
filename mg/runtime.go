@@ -64,6 +64,10 @@ const EnableColorEnv = "MAGEFILE_ENABLE_COLOR"
 // - BrightWhite
 const TargetColorEnv = "MAGEFILE_TARGET_COLOR"
 
+// TargetNameSeparatorEnv is the environment variable that the user requested
+// to set a different namespace separator then the default one.
+const TargetNameSeparatorEnv = "MAGEFILE_TARGETNAME_SEPARATOR"
+
 // Verbose reports whether a magefile was run with the verbose flag.
 func Verbose() bool {
 	b, _ := strconv.ParseBool(os.Getenv(VerboseEnv))
@@ -130,6 +134,14 @@ func TargetColor() string {
 		}
 	}
 	return DefaultTargetAnsiColor
+}
+
+// TargetNameSeparator returns the configured namespace separator.
+func TargetNameSeparator() string {
+	if separator := os.Getenv(TargetNameSeparatorEnv); separator != "" {
+		return separator
+	}
+	return ":"
 }
 
 // Namespace allows for the grouping of similar commands

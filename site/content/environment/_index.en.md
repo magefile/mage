@@ -73,3 +73,7 @@ The supported ANSI color names are any of these:
 - BrightWhite
 
 The names are case-insensitive.
+
+## MAGEFILE_TARGETNAME_SEPARATOR
+
+Sets the separator for namespaced targets (default is ":")

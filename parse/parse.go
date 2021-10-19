@@ -3,6 +3,7 @@ package parse
 import (
 	"errors"
 	"fmt"
+	"github.com/magefile/mage/mg"
 	"go/ast"
 	"go/doc"
 	"go/parser"
@@ -98,7 +99,7 @@ func (f Function) TargetName() string {
 			names = append(names, s)
 		}
 	}
-	return strings.Join(names, ":")
+	return strings.Join(names, mg.TargetNameSeparator())
 }
 
 // ExecCode returns code for the template switch to run the target.
@@ -516,7 +517,7 @@ func checkDupeTargets(info *PkgInfo) (hasDupes bool, names map[string][]string) 
 	for _, f := range info.Funcs {
 		low := strings.ToLower(f.Name)
 		if f.Receiver != "" {
-			low = strings.ToLower(f.Receiver) + ":" + low
+			low = strings.ToLower(f.Receiver) + mg.TargetNameSeparator() + low
 		}
 		if lowers[low] {
 			hasDupes = true
