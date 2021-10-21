@@ -31,3 +31,8 @@ func TakesContextReturnsVoid(ctx context.Context) {
 func TakesContextReturnsError(ctx context.Context) error {
 	return nil
 }
+
+// mage:skip
+func SkipTarget() {
+	mg.Deps(f)
+}

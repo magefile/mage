@@ -18,6 +18,7 @@ import (
 )
 
 const importTag = "mage:import"
+const skipTarget = "mage:skip"
 
 var debug = log.New(ioutil.Discard, "DEBUG: ", log.Ltime|log.Lmicroseconds)
 
@@ -359,6 +360,10 @@ func setFuncs(pi *PkgInfo) {
 		debug.Printf("found target %v", f.Name)
 		fn.Name = f.Name
 		fn.Comment = toOneLine(f.Doc)
+		if fn.Comment == skipTarget {
+			debug.Printf("skipping function %s with skip comment", f.Name)
+			continue
+		}
 		fn.Synopsis = sanitizeSynopsis(f)
 		pi.Funcs = append(pi.Funcs, fn)
 	}

@@ -87,6 +87,12 @@ func TestParse(t *testing.T) {
 		t.Fatalf("expected to only have two aliases, but have %#v", info.Aliases)
 	}
 
+	for _, fn := range info.Funcs {
+		if fn.Name == "SkipTarget" {
+			t.Fatalf("expected %s to be skipped", fn.Name)
+		}
+	}
+
 	for _, fn := range expected {
 		found := false
 		for _, infoFn := range info.Funcs {
