@@ -62,20 +62,9 @@ See [scoop](https://scoop.sh/).
 The [asdf version manager](https://asdf-vm.com/) is a tool for installing release binaries from Github. With asdf installed, the [asdf plugin for mage](https://github.com/mathew-fleisch/asdf-mage) can be used to install any released version of mage.
 
 ```shell
-# Install asdf plugin for mage
 asdf plugin add mage
-
-# Show all installable versions
-asdf list-all mage
-
-# Install specific version
 asdf install mage latest
-
-# Set a version globally (on your ~/.tool-versions file)
 asdf global mage latest
-
-# Now mage commands are available
-mage --version
 ```
 
 ## Example Magefile
