@@ -57,6 +57,16 @@ See [mage homebrew formula](https://formulae.brew.sh/formula/mage).
 
 See [scoop](https://scoop.sh/).
 
+### Using asdf
+
+The [asdf version manager](https://asdf-vm.com/) is a tool for installing release binaries from Github. With asdf installed, the [asdf plugin for mage](https://github.com/mathew-fleisch/asdf-mage) can be used to install any released version of mage.
+
+```shell
+asdf plugin add mage
+asdf install mage latest
+asdf global mage latest
+```
+
 ## Example Magefile
 
 ```go
