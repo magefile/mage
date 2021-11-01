@@ -601,6 +601,15 @@ func removeDeinitFuncFromTargets(pi *PkgInfo) {
 		pi.Funcs = append(pi.Funcs[:i], pi.Funcs[i+1:]...)
 		return
 	}
+	for _, imp := range pi.Imports {
+		for i, f := range imp.Info.Funcs {
+			if !reflect.DeepEqual(f, pi.DeinitFunc) {
+				continue
+			}
+			imp.Info.Funcs = append(imp.Info.Funcs[:i], imp.Info.Funcs[i+1:]...)
+			return
+		}
+	}
 }
 
 func lit2string(l *ast.BasicLit) (string, bool) {

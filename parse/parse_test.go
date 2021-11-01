@@ -134,6 +134,31 @@ func TestGetImportSelf(t *testing.T) {
 	}
 }
 
+func TestDeinitRemovesItselfFromImports(t *testing.T) {
+	info, err := PrimaryPackage("go", "./testdata/deinit_import", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if info.DeinitFunc == nil {
+		t.Fatal("expected deinit func to exist, but was not found")
+	}
+
+	validateNoFunc := func(pi PkgInfo) {
+		for _, infoFn := range pi.Funcs {
+			if reflect.DeepEqual(infoFn, info.DeinitFunc) {
+				t.Fatalf("Did not expect to find Deinit target in the list of targets")
+			}
+		}
+	}
+
+	// Make sure Deinit target has been removed from the target list
+	validateNoFunc(*info)
+	for _, imp := range info.Imports {
+		validateNoFunc(imp.Info)
+	}
+}
+
 func TestNoDeinitByDefault(t *testing.T) {
 	info, err := PrimaryPackage("go", "./testdata", []string{"func.go", "repeating_synopsis.go", "subcommands.go"})
 	if err != nil {
