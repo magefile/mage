@@ -21,8 +21,8 @@ Now you can `go run mage.go <target>` and it'll work just as if you ran
 package main
 
 import (
-	"os"
-	"github.com/magefile/mage/mage"
+    "os"
+    "github.com/magefile/mage/mage"
 )
 
 func main() { os.Exit(mage.Main()) }
