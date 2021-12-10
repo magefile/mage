@@ -24,6 +24,8 @@ jobs:
       with:
         go-version: ${{ matrix.go-version }}
 
+    - name: Install
+      run: go get github.com/magefile/mage
     - name: Test
       run: |
         go vet ./...
