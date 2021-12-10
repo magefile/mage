@@ -19,13 +19,12 @@ jobs:
           - 1.9.x
     steps:
     - uses: actions/checkout@v2
-    - name: Set up Go ${{ matrix.go-version }}
+    - name: Set up Go 1.17.x
       uses: actions/setup-go@v2
       with:
-        go-version: ${{ matrix.go-version }}
-
-    - name: Install
-      run: go get github.com/magefile/mage
+        go-version: 1.17.x
+    - name: Setup tmate session
+      uses: mxschmitt/action-tmate@v3
     - name: Test
       run: |
         go vet ./...
