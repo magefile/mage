@@ -15,8 +15,6 @@ jobs:
           - 1.13.x
           - 1.12.x
           - 1.11.x
-          - 1.10.x
-          - 1.9.x
     steps:
     - uses: actions/checkout@v2
     - name: Set up Go ${{ matrix.go-version }}
