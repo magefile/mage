@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -70,6 +71,9 @@ var releaseTag = regexp.MustCompile(`^v1\.[0-9]+\.[0-9]+$`)
 
 // Generates a new release. Expects a version tag in v1.x.x format.
 func Release(tag string) (err error) {
+	if _, err := exec.LookPath("goreleaser"); err != nil {
+		return fmt.Errorf("can't find goreleaser: %w", err)
+	}
 	if !releaseTag.MatchString(tag) {
 		return errors.New("TAG environment variable must be in semver v1.x.x format, but was " + tag)
 	}
