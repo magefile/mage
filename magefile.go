@@ -1,4 +1,5 @@
-//+build mage
+//go:build mage
+// +build mage
 
 // This is the build script for Mage. The install target is all you really need.
 // The release target is for generating official releases and is really only
@@ -81,8 +82,8 @@ func Release(tag string) (err error) {
 	}
 	defer func() {
 		if err != nil {
-			sh.RunV("git", "tag", "--delete", "$TAG")
-			sh.RunV("git", "push", "--delete", "origin", "$TAG")
+			sh.RunV("git", "tag", "--delete", tag)
+			sh.RunV("git", "push", "--delete", "origin", tag)
 		}
 	}()
 	return sh.RunV("goreleaser")
