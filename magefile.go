@@ -19,6 +19,16 @@ import (
 	"github.com/magefile/mage/sh"
 )
 
+var Aliases = map[string]interface{}{
+	"Speak": Say,
+}
+
+// Say says something.
+func Say(msg string, i int, b bool, d time.Duration) error {
+	_, err := fmt.Printf("%v(%T) %v(%T) %v(%T) %v(%T)\n", msg, msg, i, i, b, b, d, d)
+	return err
+}
+
 // Runs "go install" for mage.  This generates the version info the binary.
 func Install() error {
 	name := "mage"
@@ -57,10 +67,8 @@ func Install() error {
 
 var releaseTag = regexp.MustCompile(`^v1\.[0-9]+\.[0-9]+$`)
 
-// Generates a new release.  Expects the TAG environment variable to be set,
-// which will create a new tag with that name.
-func Release() (err error) {
-	tag := os.Getenv("TAG")
+// Generates a new release. Expects a version tag in v1.x.x format.
+func Release(tag string) (err error) {
 	if !releaseTag.MatchString(tag) {
 		return errors.New("TAG environment variable must be in semver v1.x.x format, but was " + tag)
 	}

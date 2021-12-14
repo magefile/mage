@@ -38,6 +38,104 @@ Targets:
 	}
 }
 
+func TestMageImportsHelp(t *testing.T) {
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:    "./testdata/mageimport",
+		Stdout: stdout,
+		Stderr: stderr,
+		Help:   true,
+		Args:   []string{"buildSubdir"},
+	}
+
+	code := Invoke(inv)
+	if code != 0 {
+		t.Fatalf("expected to exit with code 0, but got %v, stderr:\n%s", code, stderr)
+	}
+	actual := stdout.String()
+	expected := `
+BuildSubdir Builds stuff.
+
+Usage:
+
+	mage buildsubdir
+
+`[1:]
+
+	if actual != expected {
+		t.Logf("expected: %q", expected)
+		t.Logf("  actual: %q", actual)
+		t.Fatalf("expected:\n%v\n\ngot:\n%v", expected, actual)
+	}
+}
+
+func TestMageImportsHelpNamed(t *testing.T) {
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:    "./testdata/mageimport",
+		Stdout: stdout,
+		Stderr: stderr,
+		Help:   true,
+		Args:   []string{"zz:buildSubdir2"},
+	}
+
+	code := Invoke(inv)
+	if code != 0 {
+		t.Fatalf("expected to exit with code 0, but got %v, stderr:\n%s", code, stderr)
+	}
+	actual := stdout.String()
+	expected := `
+BuildSubdir2 Builds stuff.
+
+Usage:
+
+	mage zz:buildsubdir2
+
+`[1:]
+
+	if actual != expected {
+		t.Logf("expected: %q", expected)
+		t.Logf("  actual: %q", actual)
+		t.Fatalf("expected:\n%v\n\ngot:\n%v", expected, actual)
+	}
+}
+
+func TestMageImportsHelpNamedNS(t *testing.T) {
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:    "./testdata/mageimport",
+		Stdout: stdout,
+		Stderr: stderr,
+		Help:   true,
+		Args:   []string{"zz:ns:deploy2"},
+	}
+
+	code := Invoke(inv)
+	if code != 0 {
+		t.Fatalf("expected to exit with code 0, but got %v, stderr:\n%s", code, stderr)
+	}
+	actual := stdout.String()
+	expected := `
+Deploy2 deploys stuff.
+
+Usage:
+
+	mage zz:ns:deploy2
+
+Aliases: nsd2
+
+`[1:]
+
+	if actual != expected {
+		t.Logf("expected: %q", expected)
+		t.Logf("  actual: %q", actual)
+		t.Fatalf("expected:\n%v\n\ngot:\n%v", expected, actual)
+	}
+}
+
 func TestMageImportsRoot(t *testing.T) {
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}

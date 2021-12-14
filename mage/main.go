@@ -59,8 +59,10 @@ var mainfileTemplate = template.Must(template.New("").Funcs(map[string]interface
 }).Parse(mageMainfileTplString))
 var initOutput = template.Must(template.New("").Parse(mageTpl))
 
-const mainfile = "mage_output_file.go"
-const initFile = "magefile.go"
+const (
+	mainfile = "mage_output_file.go"
+	initFile = "magefile.go"
+)
 
 var debug = log.New(ioutil.Discard, "DEBUG: ", log.Ltime|log.Lmicroseconds)
 
@@ -106,6 +108,7 @@ type Invocation struct {
 	CompileOut string        // tells mage to compile a static binary to this path, but not execute
 	GOOS       string        // sets the GOOS when producing a binary with -compileout
 	GOARCH     string        // sets the GOARCH when producing a binary with -compileout
+	Ldflags    string        // sets the ldflags when producing a binary with -compileout
 	Stdout     io.Writer     // writer to write stdout messages to
 	Stderr     io.Writer     // writer to write stderr messages to
 	Stdin      io.Reader     // reader to read stdin from
@@ -182,6 +185,7 @@ func Parse(stderr, stdout io.Writer, args []string) (inv Invocation, cmd Command
 	fs.StringVar(&inv.GoCmd, "gocmd", mg.GoCmd(), "use the given go binary to compile the output")
 	fs.StringVar(&inv.GOOS, "goos", "", "set GOOS for binary produced with -compile")
 	fs.StringVar(&inv.GOARCH, "goarch", "", "set GOARCH for binary produced with -compile")
+	fs.StringVar(&inv.Ldflags, "ldflags", "", "set ldflags for binary produced with -compile")
 
 	// commands below
 
@@ -219,6 +223,7 @@ Options:
   -gocmd <string>
 		    use the given go binary to compile the output (default: "go")
   -goos     sets the GOOS for the binary created by -compile (default: current OS)
+  -ldflags  sets the ldflags for the binary created by -compile (default: "")
   -h        show description of a target
   -keep     keep intermediate mage files around after running
   -t <string>
@@ -258,7 +263,6 @@ Options:
 		if fs.NArg() > 0 {
 			// Temporary dupe of below check until we refactor the other commands to use this check
 			return inv, cmd, errors.New("-h, -init, -clean, -compile and -version cannot be used simultaneously")
-
 		}
 	}
 	if inv.Help {
@@ -380,6 +384,10 @@ func Invoke(inv Invocation) int {
 		return 1
 	}
 
+	// reproducible output for deterministic builds
+	sort.Sort(info.Funcs)
+	sort.Sort(info.Imports)
+
 	main := filepath.Join(inv.Dir, mainfile)
 	binaryName := "mage"
 	if inv.CompileOut != "" {
@@ -395,7 +403,7 @@ func Invoke(inv Invocation) int {
 		defer os.RemoveAll(main)
 	}
 	files = append(files, main)
-	if err := Compile(inv.GOOS, inv.GOARCH, inv.Dir, inv.GoCmd, exePath, files, inv.Debug, inv.Stderr, inv.Stdout); err != nil {
+	if err := Compile(inv.GOOS, inv.GOARCH, inv.Ldflags, inv.Dir, inv.GoCmd, exePath, files, inv.Debug, inv.Stderr, inv.Stdout); err != nil {
 		errlog.Println("Error:", err)
 		return 1
 	}
@@ -491,7 +499,7 @@ func Magefiles(magePath, goos, goarch, goCmd string, stderr io.Writer, isDebug b
 }
 
 // Compile uses the go tool to compile the files into an executable at path.
-func Compile(goos, goarch, magePath, goCmd, compileTo string, gofiles []string, isDebug bool, stderr, stdout io.Writer) error {
+func Compile(goos, goarch, ldflags, magePath, goCmd, compileTo string, gofiles []string, isDebug bool, stderr, stdout io.Writer) error {
 	debug.Println("compiling to", compileTo)
 	debug.Println("compiling using gocmd:", goCmd)
 	if isDebug {
@@ -506,7 +514,12 @@ func Compile(goos, goarch, magePath, goCmd, compileTo string, gofiles []string, 
 	for i := range gofiles {
 		gofiles[i] = filepath.Base(gofiles[i])
 	}
-	args := append([]string{"build", "-o", compileTo}, gofiles...)
+	buildArgs := []string{"build", "-o", compileTo}
+	if ldflags != "" {
+		buildArgs = append(buildArgs, "-ldflags", ldflags)
+	}
+	args := append(buildArgs, gofiles...)
+
 	debug.Printf("running %s %s", goCmd, strings.Join(args, " "))
 	c := exec.Command(goCmd, args...)
 	c.Env = environ
@@ -688,5 +701,4 @@ func removeContents(dir string) error {
 		}
 	}
 	return nil
-
 }

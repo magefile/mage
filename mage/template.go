@@ -333,47 +333,19 @@ Options:
 		return
 	}
 
-	targets := map[string]bool {
-		{{range $alias, $funci := .Aliases}}"{{lower $alias}}": true,
-		{{end}}
-		{{range .Funcs}}"{{lower .TargetName}}": true,
-		{{end}}
-		{{range .Imports}}
-			{{$imp := .}}
-			{{range $alias, $funci := .Info.Aliases}}"{{if ne $imp.Alias "."}}{{lower $imp.Alias}}:{{end}}{{lower $alias}}": true,
-			{{end}}
-			{{range .Info.Funcs}}"{{lower .TargetName}}": true,
-			{{end}}
-		{{end}}
-	}
-
-	var unknown []string
-	for _, arg := range args.Args {
-		if !targets[strings.ToLower(arg)] {
-			unknown = append(unknown, arg)
-		}
-	}
-	if len(unknown) == 1 {
-		logger.Println("Unknown target specified:", unknown[0])
-		os.Exit(2)
-	}
-	if len(unknown) > 1 {
-		logger.Println("Unknown targets specified:", strings.Join(unknown, ", "))
-		os.Exit(2)
-	}
-
 	if args.Help {
 		if len(args.Args) < 1 {
 			logger.Println("no target specified")
-			os.Exit(1)
+			os.Exit(2)
 		}
 		switch strings.ToLower(args.Args[0]) {
-			{{range .Funcs}}case "{{lower .TargetName}}":
-				fmt.Print("{{$.BinaryName}} {{lower .TargetName}}:\n\n")
+			{{range .Funcs -}}
+			case "{{lower .TargetName}}":
 				{{if ne .Comment "" -}}
 				fmt.Println({{printf "%q" .Comment}})
 				fmt.Println()
 				{{end}}
+				fmt.Print("Usage:\n\n\t{{$.BinaryName}} {{lower .TargetName}}{{range .Args}} <{{.Name}}>{{end}}\n\n")
 				var aliases []string
 				{{- $name := .Name -}}
 				{{- $recv := .Receiver -}}
@@ -384,10 +356,30 @@ Options:
 					fmt.Printf("Aliases: %s\n\n", strings.Join(aliases, ", "))
 				}
 				return
-			{{end}}
+			{{end -}}
+			{{range .Imports -}}
+				{{range .Info.Funcs -}}
+			case "{{lower .TargetName}}":
+				{{if ne .Comment "" -}}
+				fmt.Println({{printf "%q" .Comment}})
+				fmt.Println()
+				{{end}}
+				fmt.Print("Usage:\n\n\t{{$.BinaryName}} {{lower .TargetName}}{{range .Args}} <{{.Name}}>{{end}}\n\n")
+				var aliases []string
+				{{- $name := .Name -}}
+				{{- $recv := .Receiver -}}
+				{{range $alias, $func := $.Aliases}}
+				{{if and (eq $name $func.Name) (eq $recv $func.Receiver)}}aliases = append(aliases, "{{$alias}}"){{end -}}
+				{{- end}}
+				if len(aliases) > 0 {
+					fmt.Printf("Aliases: %s\n\n", strings.Join(aliases, ", "))
+				}
+				return
+				{{end -}}
+			{{end -}}
 			default:
 				logger.Printf("Unknown target: %q\n", args.Args[0])
-				os.Exit(1)
+				os.Exit(2)
 		}
 	}
 	if len(args.Args) < 1 {
@@ -401,7 +393,7 @@ Options:
 			return
 		}
 		{{.DefaultFunc.ExecCode}}
-		handleError(logger, err)
+		handleError(logger, ret)
 		return
 	{{- else}}
 		if err := list(); err != nil {
@@ -411,37 +403,55 @@ Options:
 		return
 	{{- end}}
 	}
-	for _, target := range args.Args {
+	for x := 0; x < len(args.Args); {
+		target := args.Args[x]
+		x++
+
+		// resolve aliases
 		switch strings.ToLower(target) {
 		{{range $alias, $func := .Aliases}}
 			case "{{lower $alias}}":
 				target = "{{$func.TargetName}}"
 		{{- end}}
 		}
+
 		switch strings.ToLower(target) {
 		{{range .Funcs }}
 			case "{{lower .TargetName}}":
+				expected := x + {{len .Args}}
+				if expected > len(args.Args) {
+					// note that expected and args at this point include the arg for the target itself
+					// so we subtract 1 here to show the number of args without the target.
+					logger.Printf("not enough arguments for target \"{{.TargetName}}\", expected %v, got %v\n", expected-1, len(args.Args)-1)
+					os.Exit(2)
+				}
 				if args.Verbose {
 					logger.Println("Running target:", "{{.TargetName}}")
 				}
 				{{.ExecCode}}
-				handleError(logger, err)
+				handleError(logger, ret)
 		{{- end}}
 		{{range .Imports}}
 		{{$imp := .}}
 			{{range .Info.Funcs }}
 				case "{{lower .TargetName}}":
+					expected := x + {{len .Args}}
+					if expected > len(args.Args) {
+						// note that expected and args at this point include the arg for the target itself
+						// so we subtract 1 here to show the number of args without the target.
+						logger.Printf("not enough arguments for target \"{{.TargetName}}\", expected %v, got %v\n", expected-1, len(args.Args)-1)
+						os.Exit(2)
+					}
 					if args.Verbose {
 						logger.Println("Running target:", "{{.TargetName}}")
 					}
 					{{.ExecCode}}
-					handleError(logger, err)
+					handleError(logger, ret)
 			{{- end}}
 		{{- end}}
 		default:
-			// should be impossible since we check this above.
-			logger.Printf("Unknown target: %q\n", args.Args[0])
-			os.Exit(1)
+			logger.Printf("Unknown target specified: %q\n", target)
+			os.Exit(2)
 		}
 	}
 }
