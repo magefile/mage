@@ -132,11 +132,15 @@ func run(env map[string]string, stdout, stderr io.Writer, cmd string, args ...st
 	c.Stderr = stderr
 	c.Stdout = stdout
 	c.Stdin = os.Stdin
-	log.Println("exec:", cmd, strings.Join(args, " "))
+
+	var quoted []string 
+	for i := range args {
+		quoted = append(quoted, fmt.Sprintf("%q", args[i]));
+	}
+	log.Println("exec:", cmd,  strings.Join(quoted, " "))
 	err = c.Run()
 	return CmdRan(err), ExitStatus(err), err
 }
-
 // CmdRan examines the error to determine if it was generated as a result of a
 // command running via os/exec.Command.  If the error is nil, or the command ran
 // (even if it exited with a non-zero exit code), CmdRan reports true.  If the
