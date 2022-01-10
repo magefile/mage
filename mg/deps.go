@@ -130,13 +130,17 @@ func runDeps(ctx context.Context, fns []Fn) {
 func checkFns(fns []interface{}) []Fn {
 	funcs := make([]Fn, len(fns))
 	for i, f := range fns {
-		if f == nil {
-			panic("A dependency of the current target was defined improperly, with parenthesis. Dependencies should be defined as mg.Deps(MyDep), not mg.Deps(MyDep())")
-		}
 		if fn, ok := f.(Fn); ok {
 			funcs[i] = fn
 			continue
 		}
+
+		// Check if the target provided is a not function so we can give a clear warning
+		t := reflect.TypeOf(f)
+		if t == nil || t.Kind() != reflect.Func {
+			panic(fmt.Errorf("non-function used as a target dependency: %T. The mg.Deps, mg.SerialDeps and mg.CtxDeps functions accept function names, such as mg.Deps(TargetA, TargetB)", f))
+		}
+
 		funcs[i] = F(f)
 	}
 	return funcs
