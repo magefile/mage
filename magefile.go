@@ -1,4 +1,5 @@
-//+build mage
+//go:build mage
+// +build mage
 
 // This is the build script for Mage. The install target is all you really need.
 // The release target is for generating official releases and is really only
@@ -9,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -69,6 +71,9 @@ var releaseTag = regexp.MustCompile(`^v1\.[0-9]+\.[0-9]+$`)
 
 // Generates a new release. Expects a version tag in v1.x.x format.
 func Release(tag string) (err error) {
+	if _, err := exec.LookPath("goreleaser"); err != nil {
+		return fmt.Errorf("can't find goreleaser: %w", err)
+	}
 	if !releaseTag.MatchString(tag) {
 		return errors.New("TAG environment variable must be in semver v1.x.x format, but was " + tag)
 	}
@@ -81,8 +86,8 @@ func Release(tag string) (err error) {
 	}
 	defer func() {
 		if err != nil {
-			sh.RunV("git", "tag", "--delete", "$TAG")
-			sh.RunV("git", "push", "--delete", "origin", "$TAG")
+			sh.RunV("git", "tag", "--delete", tag)
+			sh.RunV("git", "push", "--delete", "origin", tag)
 		}
 	}()
 	return sh.RunV("goreleaser")

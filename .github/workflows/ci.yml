@@ -1,0 +1,31 @@
+name: ci
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        go-version:
+          - 1.17.x
+          - 1.16.x
+          - 1.15.x
+          - 1.14.x
+          - 1.13.x
+          - 1.12.x
+          - 1.11.x
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Go ${{ matrix.go-version }}
+      uses: actions/setup-go@v2
+      with:
+        go-version: ${{ matrix.go-version }}
+
+    - name: Test
+      run: |
+        go vet ./...
+        go test -tags CI -race ./...
+      env:
+        GOPATH: /home/runner/go
