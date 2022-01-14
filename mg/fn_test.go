@@ -3,6 +3,7 @@ package mg
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -211,6 +212,40 @@ func TestFNilError(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+}
+
+func TestFVariadic(t *testing.T) {
+	fn := F(func(args ...string) {
+		if !reflect.DeepEqual(args, []string{"a", "b"}) {
+			t.Errorf("Wrong args, got %v, want [a b]", args)
+		}
+	}, "a", "b")
+	err := fn.Run(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	fn = F(func(a string, b ...string) {}, "a", "b1", "b2")
+	err = fn.Run(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	fn = F(func(a ...string) {})
+	err = fn.Run(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	func() {
+		defer func() {
+			err, _ := recover().(error)
+			if err == nil || err.Error() != "too few arguments for target, got 0 for func(string, ...string)" {
+				t.Fatal(err)
+			}
+		}()
+		F(func(a string, b ...string) {})
+	}()
 }
 
 type Foo Namespace
