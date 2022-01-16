@@ -312,3 +312,57 @@ Error parsing magefiles: error running "go list -f {{.Dir}}||{{.Name}} github.co
 		t.Fatalf("expected:\n%s\n\ngot:\n%s", expected, actualShortened)
 	}
 }
+
+func TestMageImportsSameNamespaceUniqueTargets(t *testing.T) {
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:    "./testdata/mageimport/samenamespace/uniquetargets",
+		Stdout: stdout,
+		Stderr: stderr,
+		List:   true,
+	}
+
+	code := Invoke(inv)
+	if code != 0 {
+		t.Fatalf("expected to exit with code 0, but got %v, stderr:\n%s", code, stderr)
+	}
+	actual := stdout.String()
+	expected := `
+Targets:
+  samenamespace:build1    
+  samenamespace:build2    
+`[1:]
+
+	if actual != expected {
+		t.Logf("expected: %q", expected)
+		t.Logf("  actual: %q", actual)
+		t.Fatalf("expected:\n%v\n\ngot:\n%v", expected, actual)
+	}
+}
+
+func TestMageImportsSameNamespaceDupTargets(t *testing.T) {
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:    "./testdata/mageimport/samenamespace/duptargets",
+		Stdout: stdout,
+		Stderr: stderr,
+		List:   true,
+	}
+
+	code := Invoke(inv)
+	if code != 1 {
+		t.Fatalf("expected to exit with code 1, but got %v, stderr:\n%s", code, stderr)
+	}
+	actual := stderr.String()
+	expected := `
+Error parsing magefiles: "samenamespace:build" target has multiple definitions: github.com/magefile/mage/mage/testdata/mageimport/samenamespace/duptargets/package1.Build, github.com/magefile/mage/mage/testdata/mageimport/samenamespace/duptargets/package2.Build
+
+`[1:]
+	if actual != expected {
+		t.Logf("expected: %q", expected)
+		t.Logf("  actual: %q", actual)
+		t.Fatalf("expected:\n%v\n\ngot:\n%v", expected, actual)
+	}
+}
