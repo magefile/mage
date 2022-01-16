@@ -267,7 +267,7 @@ func Package(path string, files []string) (*PkgInfo, error) {
 
 func getNamedImports(gocmd string, pkgs map[string]string) ([]*Import, error) {
 	var imports []*Import
-	for alias, pkg := range pkgs {
+	for pkg, alias := range pkgs {
 		debug.Printf("getting import package %q, alias %q", pkg, alias)
 		imp, err := getImport(gocmd, pkg, alias)
 		if err != nil {
@@ -411,10 +411,7 @@ func setImports(gocmd string, pi *PkgInfo) error {
 				}
 				if alias != "" {
 					debug.Printf("found %s: %s (%s)", importTag, name, alias)
-					if importNames[alias] != "" {
-						return fmt.Errorf("duplicate import alias: %q", alias)
-					}
-					importNames[alias] = name
+					importNames[name] = alias
 				} else {
 					debug.Printf("found %s: %s", importTag, name)
 					rootImports = append(rootImports, name)
