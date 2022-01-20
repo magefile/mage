@@ -302,16 +302,25 @@ func Invoke(inv Invocation) int {
 	if inv.GoCmd == "" {
 		inv.GoCmd = "go"
 	}
+
+	inv.Dir = filepath.Clean(inv.Dir)
 	if inv.Dir == "" {
 		inv.Dir = "."
 	}
+	resolved, err := filepath.Abs(inv.Dir)
+	if err != nil {
+		errlog.Println("Cannot resolve absolute path from dir:", err)
+	} else {
+		inv.Dir = resolved
+	}
+
 	if inv.WorkDir == "" {
 		inv.WorkDir = inv.Dir
 	}
 	if inv.CacheDir == "" {
 		inv.CacheDir = mg.CacheDir()
 	}
-
+FINDFILES:
 	files, err := Magefiles(inv.Dir, inv.GOOS, inv.GOARCH, inv.GoCmd, inv.Stderr, inv.Debug)
 	if err != nil {
 		errlog.Println("Error determining list of magefiles:", err)
@@ -319,6 +328,15 @@ func Invoke(inv Invocation) int {
 	}
 
 	if len(files) == 0 {
+		if strings.HasSuffix(inv.Dir, "/") {
+			debug.Println("Reached root searching for magefiles")
+		} else {
+			inv.Dir = filepath.Dir(inv.Dir)
+			debug.Println("No .go files marked with the mage build tag in this directory")
+			debug.Println("Moving to parent to find magefiles")
+			goto FINDFILES
+		}
+
 		errlog.Println("No .go files marked with the mage build tag in this directory.")
 		return 1
 	}
