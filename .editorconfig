@@ -28,3 +28,7 @@ trim_trailing_whitespace = true
 [*.sh]
 indent_style = space
 indent_size = 4
+
+[*.{go,mod,sum}]
+indent_style = tab
+indent_size = 4
