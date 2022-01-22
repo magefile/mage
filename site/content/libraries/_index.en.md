@@ -4,9 +4,9 @@ weight = 45
 +++
 
 There are three helper libraries bundled with mage,
-[mg](https://godoc.org/github.com/magefile/mage/mg),
-[sh](https://godoc.org/github.com/magefile/mage/sh), and 
-[target](https://godoc.org/github.com/magefile/mage/target)  
+[mg](https://pkg.go.dev/github.com/magefile/mage/mg),
+[sh](https://pkg.go.dev/github.com/magefile/mage/sh) and 
+[target](https://pkg.go.dev/github.com/magefile/mage/target).
 
 Package `mg` contains mage-specific helpers, such as Deps for declaring
 dependent functions, and functions for returning errors with specific error

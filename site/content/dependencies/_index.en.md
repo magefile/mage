@@ -4,8 +4,8 @@ weight = 30
 +++
 
 Mage supports a makefile-style tree of dependencies using the helper library
-[github.com/magefile/mage/mg](https://godoc.org/github.com/magefile/mage/mg). To
-declare dependencies, pass any number of dependent functions to mg.Deps.
+[github.com/magefile/mage/mg](https://pkg.go.dev/github.com/magefile/mage/mg). To declare dependencies,
+pass any number of dependent functions to mg.Deps.
 
 A dependent function may be any function that has an optional first argument of context.Context, has
 either no return or just an error return, and where the other arguments are all of type string, int,

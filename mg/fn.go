@@ -100,8 +100,8 @@ func (f fn) Run(ctx context.Context) error {
 
 func checkF(target interface{}, args []interface{}) (hasContext, isNamespace bool, _ error) {
 	t := reflect.TypeOf(target)
-	if t.Kind() != reflect.Func {
-		return false, false, fmt.Errorf("non-function passed to mg.F: %T", target)
+	if t == nil || t.Kind() != reflect.Func {
+		return false, false, fmt.Errorf("non-function passed to mg.F: %T. The mg.F function accepts function names, such as mg.F(TargetA, \"arg1\", \"arg2\")", target)
 	}
 
 	if t.NumOut() > 1 {

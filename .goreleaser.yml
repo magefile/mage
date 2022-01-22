@@ -26,7 +26,8 @@ build:
       goarm: 6
   env:
     - CGO_ENABLED=0
-archive:
+archives:
+- 
   name_template: "{{.Binary}}_{{.Version}}_{{.Os}}-{{.Arch}}"
   replacements:
     amd64: 64bit
