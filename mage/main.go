@@ -108,6 +108,7 @@ type Invocation struct {
 	CompileOut string        // tells mage to compile a static binary to this path, but not execute
 	GOOS       string        // sets the GOOS when producing a binary with -compileout
 	GOARCH     string        // sets the GOARCH when producing a binary with -compileout
+	GOARM      string        // sets the GOARM when producing a binary with -compileout
 	Ldflags    string        // sets the ldflags when producing a binary with -compileout
 	Stdout     io.Writer     // writer to write stdout messages to
 	Stderr     io.Writer     // writer to write stderr messages to
@@ -185,6 +186,7 @@ func Parse(stderr, stdout io.Writer, args []string) (inv Invocation, cmd Command
 	fs.StringVar(&inv.GoCmd, "gocmd", mg.GoCmd(), "use the given go binary to compile the output")
 	fs.StringVar(&inv.GOOS, "goos", "", "set GOOS for binary produced with -compile")
 	fs.StringVar(&inv.GOARCH, "goarch", "", "set GOARCH for binary produced with -compile")
+	fs.StringVar(&inv.GOARM, "goarm", "", "set GOARM for binary produced with -compile")
 	fs.StringVar(&inv.Ldflags, "ldflags", "", "set ldflags for binary produced with -compile")
 
 	// commands below
@@ -220,6 +222,7 @@ Options:
   -debug    turn on debug messages
   -f        force recreation of compiled magefile
   -goarch   sets the GOARCH for the binary created by -compile (default: current arch)
+	-goarm    sets the GOARM for the binary created by -compile (default: empty or current ARM version depending on arch)
   -gocmd <string>
 		    use the given go binary to compile the output (default: "go")
   -goos     sets the GOOS for the binary created by -compile (default: current OS)
@@ -280,8 +283,8 @@ Options:
 		return inv, cmd, errors.New("-h, -init, -clean, -compile and -version cannot be used simultaneously")
 	}
 
-	if cmd != CompileStatic && (inv.GOARCH != "" || inv.GOOS != "") {
-		return inv, cmd, errors.New("-goos and -goarch only apply when running with -compile")
+	if cmd != CompileStatic && (inv.GOARCH != "" || inv.GOOS != "" || inv.GOARM != "") {
+		return inv, cmd, errors.New("-goos, -goarch and -goarm only apply when running with -compile")
 	}
 
 	inv.Args = fs.Args()
@@ -312,7 +315,7 @@ func Invoke(inv Invocation) int {
 		inv.CacheDir = mg.CacheDir()
 	}
 
-	files, err := Magefiles(inv.Dir, inv.GOOS, inv.GOARCH, inv.GoCmd, inv.Stderr, inv.Debug)
+	files, err := Magefiles(inv.Dir, inv.GOOS, inv.GOARCH, inv.GOARM, inv.GoCmd, inv.Stderr, inv.Debug)
 	if err != nil {
 		errlog.Println("Error determining list of magefiles:", err)
 		return 1
@@ -403,7 +406,7 @@ func Invoke(inv Invocation) int {
 		defer os.RemoveAll(main)
 	}
 	files = append(files, main)
-	if err := Compile(inv.GOOS, inv.GOARCH, inv.Ldflags, inv.Dir, inv.GoCmd, exePath, files, inv.Debug, inv.Stderr, inv.Stdout); err != nil {
+	if err := Compile(inv.GOOS, inv.GOARCH, inv.GOARM, inv.Ldflags, inv.Dir, inv.GoCmd, exePath, files, inv.Debug, inv.Stderr, inv.Stdout); err != nil {
 		errlog.Println("Error:", err)
 		return 1
 	}
@@ -433,7 +436,7 @@ type mainfileTemplateData struct {
 }
 
 // Magefiles returns the list of magefiles in dir.
-func Magefiles(magePath, goos, goarch, goCmd string, stderr io.Writer, isDebug bool) ([]string, error) {
+func Magefiles(magePath, goos, goarch, goarm, goCmd string, stderr io.Writer, isDebug bool) ([]string, error) {
 	start := time.Now()
 	defer func() {
 		debug.Println("time to scan for Magefiles:", time.Since(start))
@@ -442,7 +445,7 @@ func Magefiles(magePath, goos, goarch, goCmd string, stderr io.Writer, isDebug b
 		return nil, err
 	}
 
-	env, err := internal.EnvWithGOOS(goos, goarch)
+	env, err := internal.EnvWithGOOS(goos, goarch, goarm)
 	if err != nil {
 		return nil, err
 	}
@@ -499,14 +502,14 @@ func Magefiles(magePath, goos, goarch, goCmd string, stderr io.Writer, isDebug b
 }
 
 // Compile uses the go tool to compile the files into an executable at path.
-func Compile(goos, goarch, ldflags, magePath, goCmd, compileTo string, gofiles []string, isDebug bool, stderr, stdout io.Writer) error {
+func Compile(goos, goarch, goarm, ldflags, magePath, goCmd, compileTo string, gofiles []string, isDebug bool, stderr, stdout io.Writer) error {
 	debug.Println("compiling to", compileTo)
 	debug.Println("compiling using gocmd:", goCmd)
 	if isDebug {
 		internal.RunDebug(goCmd, "version")
 		internal.RunDebug(goCmd, "env")
 	}
-	environ, err := internal.EnvWithGOOS(goos, goarch)
+	environ, err := internal.EnvWithGOOS(goos, goarch, goarm)
 	if err != nil {
 		return err
 	}

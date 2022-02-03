@@ -9,6 +9,8 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
+
+	"golang.org/x/sys/cpu"
 )
 
 var debug *log.Logger = log.New(ioutil.Discard, "", 0)
@@ -83,7 +85,8 @@ func joinEnv(env map[string]string) []string {
 }
 
 // EnvWithCurrentGOOS returns a copy of os.Environ with the GOOS and GOARCH set
-// to runtime.GOOS and runtime.GOARCH.
+// to runtime.GOOS and runtime.GOARCH. It sets GOARM if GOARCH is set to `arm`
+// using the runtime properties of the CPU.
 func EnvWithCurrentGOOS() ([]string, error) {
 	vals, err := splitEnv(os.Environ())
 	if err != nil {
@@ -91,12 +94,17 @@ func EnvWithCurrentGOOS() ([]string, error) {
 	}
 	vals["GOOS"] = runtime.GOOS
 	vals["GOARCH"] = runtime.GOARCH
+
+	if vals["GOARCH"] == "arm" {
+		vals["GOARM"] = runtimeGoARM()
+	}
+
 	return joinEnv(vals), nil
 }
 
-// EnvWithGOOS retuns the os.Environ() values with GOOS and/or GOARCH either set
-// to their runtime value, or the given value if non-empty.
-func EnvWithGOOS(goos, goarch string) ([]string, error) {
+// EnvWithGOOS retuns the os.Environ() values with GOOS and/or GOARCH
+// and/or GOARM set to their runtime value, or the given value if non-empty.
+func EnvWithGOOS(goos, goarch, goarm string) ([]string, error) {
 	env, err := splitEnv(os.Environ())
 	if err != nil {
 		return nil, err
@@ -111,5 +119,26 @@ func EnvWithGOOS(goos, goarch string) ([]string, error) {
 	} else {
 		env["GOARCH"] = goarch
 	}
+
+	if env["GOARCH"] == "arm" {
+		if goarm == "" {
+			env["GOARM"] = runtimeGoARM()
+		} else {
+			env["GOARM"] = goarm
+		}
+	}
+
 	return joinEnv(env), nil
+}
+
+func runtimeGoARM() (goarm string) {
+	// No runtime.GOARM exists, see https://github.com/golang/go/issues/38987
+	goarm = "5"
+	if cpu.ARM.HasVFP {
+		goarm = "6"
+	}
+	if cpu.ARM.HasVFPv3 {
+		goarm = "7"
+	}
+	return goarm
 }
