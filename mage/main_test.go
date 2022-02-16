@@ -342,6 +342,38 @@ func TestMixedMageImports(t *testing.T) {
 	}
 }
 
+func TestMagefolder(t *testing.T) {
+	resetTerm()
+	wd, err := os.Getwd()
+	t.Log(wd)
+	if err != nil {
+		t.Fatalf("finding current working directory: %v", err)
+	}
+	if err := os.Chdir("testdata/with_magefolder"); err != nil {
+		t.Fatalf("changing to magefolders tests data: %v", err)
+	}
+	// restore previous state
+	defer os.Chdir(wd)
+
+	stderr := &bytes.Buffer{}
+	stdout := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:    "",
+		Stdout: stdout,
+		Stderr: stderr,
+		List:   true,
+	}
+	code := Invoke(inv)
+	if code != 0 {
+		t.Errorf("expected to exit with code 0, but got %v, stderr: %s", code, stderr)
+	}
+	expected := "Targets:\n  build    \n"
+	actual := stdout.String()
+	if actual != expected {
+		t.Fatalf("expected %q but got %q", expected, actual)
+	}
+}
+
 func TestGoRun(t *testing.T) {
 	c := exec.Command("go", "run", "main.go")
 	c.Dir = "./testdata"
@@ -1615,7 +1647,7 @@ func TestWrongDependency(t *testing.T) {
 	}
 }
 
-/// This code liberally borrowed from https://github.com/rsc/goversion/blob/master/version/exe.go
+// / This code liberally borrowed from https://github.com/rsc/goversion/blob/master/version/exe.go
 
 type (
 	exeType  int
