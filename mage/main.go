@@ -216,7 +216,7 @@ Commands:
 
 Options:
   -d <string> 
-            directory to read magefiles from (default ".")
+            directory to read magefiles from (default "." or "magefolder" if exists)
   -debug    turn on debug messages
   -f        force recreation of compiled magefile
   -goarch   sets the GOARCH for the binary created by -compile (default: current arch)
@@ -296,18 +296,38 @@ Options:
 	return inv, cmd, err
 }
 
+// Folder is the name of the default folder to look for if no directory was specified,
+// if this folder exists it will be assumed mage package lives inside it.
+const Folder = "magefolder"
+const dotFolder = "."
+
 // Invoke runs Mage with the given arguments.
 func Invoke(inv Invocation) int {
 	errlog := log.New(inv.Stderr, "", 0)
 	if inv.GoCmd == "" {
 		inv.GoCmd = "go"
 	}
+	var noDir bool
 	if inv.Dir == "" {
-		inv.Dir = "."
+		noDir = true
+		inv.Dir = dotFolder
+		// . will be default unless we find a mage folder.
+		mfSt, err := os.Stat(Folder)
+		if err != nil {
+			if mfSt.IsDir() {
+				inv.Dir = Folder
+			}
+		}
 	}
+
 	if inv.WorkDir == "" {
-		inv.WorkDir = inv.Dir
+		if noDir {
+			inv.WorkDir = dotFolder
+		} else {
+			inv.WorkDir = inv.Dir
+		}
 	}
+
 	if inv.CacheDir == "" {
 		inv.CacheDir = mg.CacheDir()
 	}
