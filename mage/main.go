@@ -180,7 +180,7 @@ func Parse(stderr, stdout io.Writer, args []string) (inv Invocation, cmd Command
 	fs.BoolVar(&inv.Help, "h", false, "show this help")
 	fs.DurationVar(&inv.Timeout, "t", 0, "timeout in duration parsable format (e.g. 5m30s)")
 	fs.BoolVar(&inv.Keep, "keep", false, "keep intermediate mage files around after running")
-	fs.StringVar(&inv.Dir, "d", ".", "directory to read magefiles from")
+	fs.StringVar(&inv.Dir, "d", "", "directory to read magefiles from")
 	fs.StringVar(&inv.WorkDir, "w", "", "working directory where magefiles will run")
 	fs.StringVar(&inv.GoCmd, "gocmd", mg.GoCmd(), "use the given go binary to compile the output")
 	fs.StringVar(&inv.GOOS, "goos", "", "set GOOS for binary produced with -compile")
@@ -313,7 +313,7 @@ func Invoke(inv Invocation) int {
 		inv.Dir = dotFolder
 		// . will be default unless we find a mage folder.
 		mfSt, err := os.Stat(Folder)
-		if err != nil {
+		if err == nil {
 			if mfSt.IsDir() {
 				inv.Dir = Folder
 			}
