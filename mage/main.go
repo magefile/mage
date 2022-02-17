@@ -118,6 +118,15 @@ type Invocation struct {
 	HashFast   bool          // don't rely on GOCACHE, just hash the magefiles
 }
 
+// MagefilesDirName is the name of the default folder to look for if no directory was specified,
+// if this folder exists it will be assumed mage package lives inside it.
+const MagefilesDirName = "magefiles"
+
+// UsesMagefiles returns true if we are getting our mage files from a magefiles directory.
+func (i Invocation) UsesMagefiles() bool {
+	return i.Dir == MagefilesDirName
+}
+
 // ParseAndRun parses the command line, and then compiles and runs the mage
 // files in the given directory with the given args (do not include the command
 // name in the args).
@@ -216,7 +225,7 @@ Commands:
 
 Options:
   -d <string> 
-            directory to read magefiles from (default "." or "magefolder" if exists)
+            directory to read magefiles from (default "." or "magefiles" if exists)
   -debug    turn on debug messages
   -f        force recreation of compiled magefile
   -goarch   sets the GOARCH for the binary created by -compile (default: current arch)
@@ -296,10 +305,7 @@ Options:
 	return inv, cmd, err
 }
 
-// Folder is the name of the default folder to look for if no directory was specified,
-// if this folder exists it will be assumed mage package lives inside it.
-const Folder = "magefolder"
-const dotFolder = "."
+const dotDirectory = "."
 
 // Invoke runs Mage with the given arguments.
 func Invoke(inv Invocation) int {
@@ -310,19 +316,19 @@ func Invoke(inv Invocation) int {
 	var noDir bool
 	if inv.Dir == "" {
 		noDir = true
-		inv.Dir = dotFolder
+		inv.Dir = dotDirectory
 		// . will be default unless we find a mage folder.
-		mfSt, err := os.Stat(Folder)
+		mfSt, err := os.Stat(MagefilesDirName)
 		if err == nil {
 			if mfSt.IsDir() {
-				inv.Dir = Folder
+				inv.Dir = MagefilesDirName
 			}
 		}
 	}
 
 	if inv.WorkDir == "" {
 		if noDir {
-			inv.WorkDir = dotFolder
+			inv.WorkDir = dotDirectory
 		} else {
 			inv.WorkDir = inv.Dir
 		}
@@ -332,7 +338,7 @@ func Invoke(inv Invocation) int {
 		inv.CacheDir = mg.CacheDir()
 	}
 
-	files, err := Magefiles(inv.Dir, inv.GOOS, inv.GOARCH, inv.GoCmd, inv.Stderr, inv.Debug)
+	files, err := Magefiles(inv.Dir, inv.GOOS, inv.GOARCH, inv.GoCmd, inv.Stderr, inv.UsesMagefiles(), inv.Debug)
 	if err != nil {
 		errlog.Println("Error determining list of magefiles:", err)
 		return 1
@@ -452,26 +458,13 @@ type mainfileTemplateData struct {
 	BinaryName  string
 }
 
-// Magefiles returns the list of magefiles in dir.
-func Magefiles(magePath, goos, goarch, goCmd string, stderr io.Writer, isDebug bool) ([]string, error) {
-	start := time.Now()
-	defer func() {
-		debug.Println("time to scan for Magefiles:", time.Since(start))
-	}()
-	fail := func(err error) ([]string, error) {
-		return nil, err
+func listGoFiles(magePath, goCmd, tags string, env []string) ([]string, error) {
+	args := []string{"list"}
+	if tags != "" {
+		args = append(args, fmt.Sprintf("-tags=%s", tags))
 	}
-
-	env, err := internal.EnvWithGOOS(goos, goarch)
-	if err != nil {
-		return nil, err
-	}
-
-	debug.Println("getting all non-mage files in", magePath)
-
-	// // first, grab all the files with no build tags specified.. this is actually
-	// // our exclude list of things without the mage build tag.
-	cmd := exec.Command(goCmd, "list", "-e", "-f", `{{join .GoFiles "||"}}`)
+	args = append(args, "-e", "-f", `{{join .GoFiles "||"}}`)
+	cmd := exec.Command(goCmd, args...)
 	cmd.Env = env
 	buf := &bytes.Buffer{}
 	cmd.Stderr = buf
@@ -482,32 +475,56 @@ func Magefiles(magePath, goos, goarch, goCmd string, stderr io.Writer, isDebug b
 		// if the error is "cannot find module", that can mean that there's no
 		// non-mage files, which is fine, so ignore it.
 		if !strings.Contains(stderr, "cannot find module for path") {
-			return fail(fmt.Errorf("failed to list non-mage gofiles: %v: %s", err, stderr))
+			if tags == "" {
+				return nil, fmt.Errorf("failed to list un-tagged gofiles: %v: %s", err, stderr)
+			}
+			return nil, fmt.Errorf("failed to list gofiles tagged with %q: %v: %s", tags, err, stderr)
 		}
 	}
 	list := strings.TrimSpace(string(b))
-	debug.Println("found non-mage files", list)
+	return strings.Split(list, "||"), nil
+}
+
+// Magefiles returns the list of magefiles in dir.
+func Magefiles(magePath, goos, goarch, goCmd string, stderr io.Writer, isMagefilesDirectory, isDebug bool) ([]string, error) {
+	start := time.Now()
+	defer func() {
+		debug.Println("time to scan for Magefiles:", time.Since(start))
+	}()
+
+	env, err := internal.EnvWithGOOS(goos, goarch)
+	if err != nil {
+		return nil, err
+	}
+
+	if !isMagefilesDirectory {
+		debug.Println("getting all non-mage files in", magePath)
+	}
+
+	// // first, grab all the files with no build tags specified.. this is actually
+	// // our exclude list of things without the mage build tag.
 	exclude := map[string]bool{}
-	for _, f := range strings.Split(list, "||") {
-		if f != "" {
-			debug.Printf("marked file as non-mage: %q", f)
-			exclude[f] = true
+	if !isMagefilesDirectory {
+		goFiles, err := listGoFiles(magePath, goCmd, "", env)
+		if err != nil {
+			return nil, fmt.Errorf("listing non-mage files: %w", err)
+		}
+
+		for _, f := range goFiles {
+			if f != "" {
+				debug.Printf("marked file as non-mage: %q", f)
+				exclude[f] = true
+			}
 		}
 	}
-	debug.Println("getting all files plus mage files")
-	cmd = exec.Command(goCmd, "list", "-tags=mage", "-e", "-f", `{{join .GoFiles "||"}}`)
-	cmd.Env = env
 
-	buf.Reset()
-	cmd.Dir = magePath
-	b, err = cmd.Output()
+	goFiles, err := listGoFiles(magePath, goCmd, "mage", env)
 	if err != nil {
-		return fail(fmt.Errorf("failed to list mage gofiles: %v: %s", err, buf.Bytes()))
+		return nil, fmt.Errorf("listing mage files: %w", err)
 	}
 
-	list = strings.TrimSpace(string(b))
-	files := []string{}
-	for _, f := range strings.Split(list, "||") {
+	var files []string
+	for _, f := range goFiles {
 		if f != "" && !exclude[f] {
 			files = append(files, f)
 		}

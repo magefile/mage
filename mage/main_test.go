@@ -189,7 +189,7 @@ func TestTransitiveHashFast(t *testing.T) {
 
 func TestListMagefilesMain(t *testing.T) {
 	buf := &bytes.Buffer{}
-	files, err := Magefiles("testdata/mixed_main_files", "", "", "go", buf, false)
+	files, err := Magefiles("testdata/mixed_main_files", "", "", "go", buf, false, false)
 	if err != nil {
 		t.Errorf("error from magefile list: %v: %s", err, buf)
 	}
@@ -210,7 +210,7 @@ func TestListMagefilesIgnoresGOOS(t *testing.T) {
 		os.Setenv("GOOS", "windows")
 	}
 	defer os.Setenv("GOOS", runtime.GOOS)
-	files, err := Magefiles("testdata/goos_magefiles", "", "", "go", buf, false)
+	files, err := Magefiles("testdata/goos_magefiles", "", "", "go", buf, false, false)
 	if err != nil {
 		t.Errorf("error from magefile list: %v: %s", err, buf)
 	}
@@ -234,7 +234,7 @@ func TestListMagefilesIgnoresRespectsGOOSArg(t *testing.T) {
 		goos = "windows"
 	}
 	// Set GOARCH as amd64 because windows is not on all non-x86 architectures.
-	files, err := Magefiles("testdata/goos_magefiles", goos, "amd64", "go", buf, false)
+	files, err := Magefiles("testdata/goos_magefiles", goos, "amd64", "go", buf, false, false)
 	if err != nil {
 		t.Errorf("error from magefile list: %v: %s", err, buf)
 	}
@@ -308,7 +308,7 @@ func TestCompileDiffGoosGoarch(t *testing.T) {
 
 func TestListMagefilesLib(t *testing.T) {
 	buf := &bytes.Buffer{}
-	files, err := Magefiles("testdata/mixed_lib_files", "", "", "go", buf, false)
+	files, err := Magefiles("testdata/mixed_lib_files", "", "", "go", buf, false, false)
 	if err != nil {
 		t.Errorf("error from magefile list: %v: %s", err, buf)
 	}
@@ -342,14 +342,46 @@ func TestMixedMageImports(t *testing.T) {
 	}
 }
 
-func TestMagefolder(t *testing.T) {
+func TestMagefilesFolder(t *testing.T) {
 	resetTerm()
 	wd, err := os.Getwd()
 	t.Log(wd)
 	if err != nil {
 		t.Fatalf("finding current working directory: %v", err)
 	}
-	if err := os.Chdir("testdata/with_magefolder"); err != nil {
+	if err := os.Chdir("testdata/with_magefiles_folder"); err != nil {
+		t.Fatalf("changing to magefolders tests data: %v", err)
+	}
+	// restore previous state
+	defer os.Chdir(wd)
+
+	stderr := &bytes.Buffer{}
+	stdout := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:    "",
+		Stdout: stdout,
+		Stderr: stderr,
+		List:   true,
+	}
+	code := Invoke(inv)
+	if code != 0 {
+		t.Errorf("expected to exit with code 0, but got %v, stderr: %s", code, stderr)
+	}
+	expected := "Targets:\n  build    \n"
+	actual := stdout.String()
+	if actual != expected {
+		t.Fatalf("expected %q but got %q", expected, actual)
+	}
+}
+
+func TestUntaggedMagefilesFolder(t *testing.T) {
+	resetTerm()
+	wd, err := os.Getwd()
+	t.Log(wd)
+	if err != nil {
+		t.Fatalf("finding current working directory: %v", err)
+	}
+	if err := os.Chdir("testdata/with_untagged_magefiles_folder"); err != nil {
 		t.Fatalf("changing to magefolders tests data: %v", err)
 	}
 	// restore previous state
