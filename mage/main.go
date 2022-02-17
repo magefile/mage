@@ -504,23 +504,27 @@ func Magefiles(magePath, goos, goarch, goCmd string, stderr io.Writer, isMagefil
 	// // first, grab all the files with no build tags specified.. this is actually
 	// // our exclude list of things without the mage build tag.
 	exclude := map[string]bool{}
-	if !isMagefilesDirectory {
-		goFiles, err := listGoFiles(magePath, goCmd, "", env)
-		if err != nil {
-			return nil, fmt.Errorf("listing non-mage files: %w", err)
-		}
 
-		for _, f := range goFiles {
-			if f != "" {
-				debug.Printf("marked file as non-mage: %q", f)
-				exclude[f] = true
-			}
+	goFiles, err := listGoFiles(magePath, goCmd, "", env)
+	if err != nil {
+		return nil, fmt.Errorf("listing non-mage files: %w", err)
+	}
+
+	for _, f := range goFiles {
+		if f != "" {
+			debug.Printf("marked file as non-mage: %q", f)
+			exclude[f] = true
 		}
 	}
 
-	goFiles, err := listGoFiles(magePath, goCmd, "mage", env)
+	goFiles, err = listGoFiles(magePath, goCmd, "mage", env)
 	if err != nil {
 		return nil, fmt.Errorf("listing mage files: %w", err)
+	}
+
+	// there are only mage tagged files
+	if len(exclude) == len(goFiles) && isMagefilesDirectory {
+		exclude = map[string]bool{}
 	}
 
 	var files []string
