@@ -507,7 +507,7 @@ func Magefiles(magePath, goos, goarch, goCmd string, stderr io.Writer, isMagefil
 
 	goFiles, err := listGoFiles(magePath, goCmd, "", env)
 	if err != nil {
-		return nil, fmt.Errorf("listing non-mage files: %w", err)
+		return nil, fmt.Errorf("listing non-mage files: %v", err)
 	}
 
 	for _, f := range goFiles {
@@ -519,7 +519,7 @@ func Magefiles(magePath, goos, goarch, goCmd string, stderr io.Writer, isMagefil
 
 	goFiles, err = listGoFiles(magePath, goCmd, "mage", env)
 	if err != nil {
-		return nil, fmt.Errorf("listing mage files: %w", err)
+		return nil, fmt.Errorf("listing mage files: %v", err)
 	}
 
 	// there are only mage tagged files
