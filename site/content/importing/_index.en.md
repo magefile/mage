@@ -27,15 +27,15 @@ like a normal magefile.
 
 ## Two Ways to Import
 
-Importing targets from a package simply requires adding a `// mage:import`
+Importing targets from a package simply requires adding a `//mage:import`
 comment on an import statement in your magefile.  If there is a name after this
 tag, the targets will be imported into what is effectively like a namespace.
 
 ```go
 import (
-    // mage:import
+    //mage:import
     _ "example.com/me/foobar" 
-    // mage:import build
+    //mage:import build
     "example.com/me/builder"
 )
 ```

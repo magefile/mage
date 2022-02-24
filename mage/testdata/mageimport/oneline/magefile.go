@@ -2,5 +2,5 @@
 
 package main
 
-// mage:import
+//mage:import
 import _ "github.com/magefile/mage/mage/testdata/mageimport/oneline/other"
