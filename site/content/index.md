@@ -45,7 +45,7 @@ You may also install a binary release from our
 ## Example Magefile
 
 ```go
-//+build mage
+//go:build mage
 
 package main
 

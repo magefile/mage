@@ -1,6 +1,7 @@
 package mage
 
-var mageTpl = `// +build mage
+var mageTpl = `//go:build mage
+// +build mage
 
 package main
 

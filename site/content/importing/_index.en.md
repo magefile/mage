@@ -16,7 +16,7 @@ let you import a main package.
 
 In addition, all package files will be imported, so long as they don't have a 
 build tag.  If you try to import a package consisting only of files with build 
-tags (e.g. `//+build mage`), it will cause an error since mage doesn't set any 
+tags (e.g. `//go:build mage`), it will cause an error since mage doesn't set any 
 build tags when importing packages.  Any exported function, in imported 
 packages, that matches Mage's allowed formats will be picked up as a target.
 
