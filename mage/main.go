@@ -481,8 +481,12 @@ func listGoFiles(magePath, goCmd, tags string, env []string) ([]string, error) {
 			return nil, fmt.Errorf("failed to list gofiles tagged with %q: %v: %s", tags, err, stderr)
 		}
 	}
-	list := strings.TrimSpace(string(b))
-	return strings.Split(list, "||"), nil
+	out := strings.TrimSpace(string(b))
+	list := strings.Split(out, "||")
+	for i := range list {
+		list[i] = filepath.Join(magePath, list[i])
+	}
+	return list, nil
 }
 
 // Magefiles returns the list of magefiles in dir.
@@ -497,44 +501,43 @@ func Magefiles(magePath, goos, goarch, goCmd string, stderr io.Writer, isMagefil
 		return nil, err
 	}
 
-	if !isMagefilesDirectory {
-		debug.Println("getting all non-mage files in", magePath)
+	debug.Println("getting all files including those with mage tag in", magePath)
+	mageFiles, err := listGoFiles(magePath, goCmd, "mage", env)
+	if err != nil {
+		return nil, fmt.Errorf("listing mage files: %v", err)
 	}
 
-	// first, grab all the files with no build tags specified..
-	// this is actually our exclude list of things without the mage build tag.
-	exclude := map[string]bool{}
+	if isMagefilesDirectory {
+		// For the magefiles directory, we always use all go files, both with
+		// and without the mage tag, as per normal go build tag rules.
+		debug.Println("using all go files in magefiles directory", magePath)
+		return mageFiles, nil
+	}
 
-	goFiles, err := listGoFiles(magePath, goCmd, "", env)
+	// For folders other than the magefiles directory, we only consider files
+	// that have the mage build tag and ignore those that don't.
+
+	debug.Println("getting all files without mage tag in", magePath)
+	nonMageFiles, err := listGoFiles(magePath, goCmd, "", env)
 	if err != nil {
 		return nil, fmt.Errorf("listing non-mage files: %v", err)
 	}
 
-	for _, f := range goFiles {
+	// convert non-Mage list to a map of files to exclude.
+	exclude := map[string]bool{}
+	for _, f := range nonMageFiles {
 		if f != "" {
 			debug.Printf("marked file as non-mage: %q", f)
 			exclude[f] = true
 		}
 	}
 
-	goFiles, err = listGoFiles(magePath, goCmd, "mage", env)
-	if err != nil {
-		return nil, fmt.Errorf("listing mage files: %v", err)
-	}
-
-	// we accept mixed tagging within a magefiles folder, all files are used.
-	if isMagefilesDirectory {
-		exclude = map[string]bool{}
-	}
-
+	// filter out the non-mage files from the mage files.
 	var files []string
-	for _, f := range goFiles {
+	for _, f := range mageFiles {
 		if f != "" && !exclude[f] {
 			files = append(files, f)
 		}
-	}
-	for i := range files {
-		files[i] = filepath.Join(magePath, files[i])
 	}
 	return files, nil
 }
