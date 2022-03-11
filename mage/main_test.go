@@ -431,7 +431,7 @@ func TestMixedTaggingMagefilesFolder(t *testing.T) {
 	if code != 0 {
 		t.Errorf("expected to exit with code 0, but got %v, stderr: %s", code, stderr)
 	}
-	expected := "Targets:\n  build    \n"
+	expected := "Targets:\n  build            \n  untaggedBuild    \n"
 	actual := stdout.String()
 	if actual != expected {
 		t.Fatalf("expected %q but got %q", expected, actual)

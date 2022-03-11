@@ -4,6 +4,4 @@
 
 package main
 
-func main() {}
-
-func Build() {}
+func UntaggedBuild() {}

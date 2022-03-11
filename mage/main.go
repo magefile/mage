@@ -501,8 +501,8 @@ func Magefiles(magePath, goos, goarch, goCmd string, stderr io.Writer, isMagefil
 		debug.Println("getting all non-mage files in", magePath)
 	}
 
-	// // first, grab all the files with no build tags specified.. this is actually
-	// // our exclude list of things without the mage build tag.
+	// first, grab all the files with no build tags specified..
+	// this is actually our exclude list of things without the mage build tag.
 	exclude := map[string]bool{}
 
 	goFiles, err := listGoFiles(magePath, goCmd, "", env)
@@ -522,8 +522,8 @@ func Magefiles(magePath, goos, goarch, goCmd string, stderr io.Writer, isMagefil
 		return nil, fmt.Errorf("listing mage files: %v", err)
 	}
 
-	// there are only mage tagged files
-	if len(exclude) == len(goFiles) && isMagefilesDirectory {
+	// we accept mixed tagging within a magefiles folder, all files are used.
+	if isMagefilesDirectory {
 		exclude = map[string]bool{}
 	}
 
