@@ -321,7 +321,17 @@ func Invoke(inv Invocation) int {
 		mfSt, err := os.Stat(MagefilesDirName)
 		if err == nil {
 			if mfSt.IsDir() {
-				inv.Dir = MagefilesDirName
+				stderrBuf := &bytes.Buffer{}
+				inv.Dir = MagefilesDirName // preemptive assignment
+				// TODO: Remove this fallback and the above Magefiles invocation when the bw compatibility is removed.
+				files, err := Magefiles(dotDirectory, inv.GOOS, inv.GOARCH, inv.GoCmd, stderrBuf, false, inv.Debug)
+				if err == nil {
+					if len(files) != 0 {
+						errlog.Println("[WARNING] You have both a magefiles directory and mage files in the " +
+							"current directory, in future versions the files will be ignored in favor of the directory")
+						inv.Dir = dotDirectory
+					}
+				}
 			}
 		}
 	}
