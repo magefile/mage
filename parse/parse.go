@@ -225,8 +225,10 @@ func checkDupes(info *PkgInfo, imports []*Import) error {
 		for _, f := range funcs[d] {
 			ids = append(ids, f.ID())
 		}
+		sort.Strings(ids)
 		errs = append(errs, fmt.Sprintf("%q target has multiple definitions: %s\n", d, strings.Join(ids, ", ")))
 	}
+	sort.Strings(errs)
 	return errors.New(strings.Join(errs, "\n"))
 }
 
