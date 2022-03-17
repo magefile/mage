@@ -40,12 +40,12 @@
 	{{$numn := add $num $.count }}
 
 {{(printf "<h%d>" $numn)|safeHTML}}
-<a href="{{.URL}}" >{{ .Title }}</a>
+<a href="{{.RelPermalink}}" >{{ .Title }}</a>
 {{(printf "</h%d>" $numn)|safeHTML}}
 
 {{else}}
 {{(printf "<%s>" $.style)|safeHTML}}
-<a href="{{.URL}}" >{{ .Title }}</a>
+<a href="{{.RelPermalink}}" >{{ .Title }}</a>
 {{(printf "</%s>" $.style)|safeHTML}}
 {{end}}
 
