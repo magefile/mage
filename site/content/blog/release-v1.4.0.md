@@ -3,7 +3,7 @@ title = "Release v1.4.0 - Go Modules"
 date = 2018-09-11T09:17:52-04:00
 type = "post"
 author = "Nate Finch"
-authorLink = "twitter.com/natethefinch"
+authorLink = "https://twitter.com/natethefinch"
 +++
 
 [Mage v1.4.0](https://github.com/magefile/mage/releases/tag/v1.4.0) is released

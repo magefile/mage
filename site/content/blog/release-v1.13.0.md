@@ -3,7 +3,7 @@ title = "Release v1.13.0 - Magefiles Directory"
 date = 2022-03-18T08:17:52-05:00
 type = "post"
 author = "Nate Finch"
-authorLink = "twitter.com/natethefinch"
+authorLink = "https://twitter.com/natethefinch"
 +++
 
 [Mage v1.13.0](https://github.com/magefile/mage/releases/tag/v1.13.0) is now

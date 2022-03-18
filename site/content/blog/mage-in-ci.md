@@ -3,7 +3,7 @@ title = "Mage in CI"
 date = 2018-09-06T21:41:23-04:00
 type = "post"
 author = "Nate Finch"
-authorLink = "twitter.com/natethefinch"
+authorLink = "https://twitter.com/natethefinch"
 +++
 
 So, there's a bootstrap problem with Mage.  What if you want to use Mage for
