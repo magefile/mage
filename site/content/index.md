@@ -70,7 +70,7 @@ asdf global mage latest
 ## Example Magefile
 
 ```go
-//+build mage
+//go:build mage
 
 package main
 

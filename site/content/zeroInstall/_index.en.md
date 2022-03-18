@@ -8,7 +8,7 @@ Don't want to depend on another binary in your environment?  You can run
 mage directly out of your vendor directory (or GOPATH) with `go run`.
 
 Just save a file like this (I'll call it `mage.go`, but it can be named
-anything) and note that the build tag is *not* `+build mage`. Mage will
+anything) and note that the build tag is *not* `go:build mage`. Mage will
 create its own main file, so we need this one to be excluded
 from when your magefiles are compiled.
 

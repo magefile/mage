@@ -4,7 +4,7 @@ weight = 50
 +++
 
 Mage scans the current directory for go files with the `mage` build tag (i.e.
-`// +build mage`), using the normal go build rules for following build
+`//go:build mage`), using the normal go build rules for following build
 constraints (aside from requiring the mage tag).  It then parses those files to
 find the build targets, generates a main file for the command, and compiles a
 binary from those files.  The magefiles are hashed so that if they remain

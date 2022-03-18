@@ -5,10 +5,10 @@ package main
 import (
 	"fmt"
 
-	// mage:import
+	//mage:import
 	_ "github.com/magefile/mage/parse/testdata/importself"
 )
 
-func Build(){
+func Build() {
 	fmt.Println("built")
 }
