@@ -1,6 +1,6 @@
 +++
 title = "Release v1.13.0 - Magefiles Directory"
-date = 2022-03-18T09:17:52-05:00
+date = 2022-03-18T08:17:52-05:00
 type = "post"
 author = "Nate Finch"
 authorLink = "twitter.com/natethefinch"
