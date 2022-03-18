@@ -6,11 +6,10 @@ author = "Nate Finch"
 authorLink = "twitter.com/natethefinch"
 +++
 
-[Mage v1.13.0](https://github.com/magefile/mage/releases/tag/v1.13.0) is
-released with a big new feature - the magefiles subdirectory.
+[Mage v1.13.0](https://github.com/magefile/mage/releases/tag/v1.13.0) is now
+released with a few fixes and one big new feature - the magefiles subdirectory.
 
-Mage v1.13 is now released, which includes a few minor updates and one big
-feature. You can now put your magefiles in a subdirectory of your repo called
+You can now put your magefiles in a subdirectory of your repo called
 `/magefiles`, and Mage will find them automatically, like it always has for
 files in the root. Files in `/magefiles` do not need the `mage` build tag to be
 discovered by Mage (but if it’s there, it’ll still find them).
