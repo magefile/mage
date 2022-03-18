@@ -3,7 +3,7 @@ title = "Release v1.3.0 - GoCmd"
 date = 2018-09-07T21:19:49-04:00
 type = "post"
 author = "Nate Finch"
-authorLink = "twitter.com/natethefinch"
+authorLink = "https://twitter.com/natethefinch"
 aliases = ["/blog/2018/09/release-1.3.0/"]
 +++
 

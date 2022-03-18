@@ -3,7 +3,7 @@ title = "On Release Versions"
 date = 2018-09-07T09:39:13-04:00
 type = "post"
 author = "Nate Finch"
-authorLink = "twitter.com/natethefinch"
+authorLink = "https://twitter.com/natethefinch"
 +++
 
 If you've been using Mage for a while (thank you!) then you may have noticed
