@@ -134,6 +134,13 @@ func checkFns(fns []interface{}) []Fn {
 			funcs[i] = fn
 			continue
 		}
+
+		// Check if the target provided is a not function so we can give a clear warning
+		t := reflect.TypeOf(f)
+		if t == nil || t.Kind() != reflect.Func {
+			panic(fmt.Errorf("non-function used as a target dependency: %T. The mg.Deps, mg.SerialDeps and mg.CtxDeps functions accept function names, such as mg.Deps(TargetA, TargetB)", f))
+		}
+
 		funcs[i] = F(f)
 	}
 	return funcs

@@ -89,3 +89,17 @@ mage target:
 The first sentence in the comment will be the short help text shown with mage -l.
 The rest of the comment is long help text that will be shown with mage -h <target>
 ```
+
+### Magefiles directory
+
+Some development IDEs might work erratically with magefiles sharing location with other go files which very well might
+have a different package name. 
+
+To simplify development, if you place your Magefiles inside a `magefiles` directory, and none remains in your
+main folder, the `mage` command will pick the directory as the source of your targets while keeping the current directory
+as the working one.
+
+The `magefiles` directory does not require for you to add build tags to the files in it, it is optional, however we 
+encourage you to keep it consistent, either all or none.
+
+Effectively this is the equivalent of running: `mage -d magefiles -w .`

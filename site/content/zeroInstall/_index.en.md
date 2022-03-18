@@ -21,8 +21,8 @@ Now you can `go run mage.go <target>` and it'll work just as if you ran
 package main
 
 import (
-	"os"
-	"github.com/magefile/mage/mage"
+    "os"
+    "github.com/magefile/mage/mage"
 )
 
 func main() { os.Exit(mage.Main()) }
@@ -44,8 +44,8 @@ required = ["github.com/magefile/mage/mage"]
 
 ## Use Mage as a library
 
-All of mage's functionality is accessible as a compile-in library.  Checkout
-[godoc.org/github.com/magefile/mage/mage](https://godoc.org/github.com/magefile/mage/mage)
+All of mage's functionality is accessible as a compile-in library.  Check out
+[pkg.go.dev/github.com/magefile/mage/mage](https://pkg.go.dev/github.com/magefile/mage/mage)
 for full details.
 
 Fair warning, the API of mage/mage may change, so be sure to use vendoring.

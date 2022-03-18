@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
@@ -31,10 +32,10 @@ type PkgInfo struct {
 	AstPkg      *ast.Package
 	DocPkg      *doc.Package
 	Description string
-	Funcs       []*Function
+	Funcs       Functions
 	DefaultFunc *Function
 	Aliases     map[string]*Function
-	Imports     []*Import
+	Imports     Imports
 }
 
 // Function represented a job function from a mage file
@@ -49,6 +50,24 @@ type Function struct {
 	Synopsis   string
 	Comment    string
 	Args       []Arg
+}
+
+var _ sort.Interface = (Functions)(nil)
+
+// Functions implements sort interface to optimize compiled output with
+// deterministic generated mainfile.
+type Functions []*Function
+
+func (s Functions) Len() int {
+	return len(s)
+}
+
+func (s Functions) Less(i, j int) bool {
+	return s[i].TargetName() < s[j].TargetName()
+}
+
+func (s Functions) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
 }
 
 // Arg is an argument to a Function.
@@ -206,8 +225,10 @@ func checkDupes(info *PkgInfo, imports []*Import) error {
 		for _, f := range funcs[d] {
 			ids = append(ids, f.ID())
 		}
+		sort.Strings(ids)
 		errs = append(errs, fmt.Sprintf("%q target has multiple definitions: %s\n", d, strings.Join(ids, ", ")))
 	}
+	sort.Strings(errs)
 	return errors.New(strings.Join(errs, "\n"))
 }
 
@@ -248,7 +269,7 @@ func Package(path string, files []string) (*PkgInfo, error) {
 
 func getNamedImports(gocmd string, pkgs map[string]string) ([]*Import, error) {
 	var imports []*Import
-	for alias, pkg := range pkgs {
+	for pkg, alias := range pkgs {
 		debug.Printf("getting import package %q, alias %q", pkg, alias)
 		imp, err := getImport(gocmd, pkg, alias)
 		if err != nil {
@@ -300,6 +321,24 @@ type Import struct {
 	UniqueName string // a name unique across all imports
 	Path       string
 	Info       PkgInfo
+}
+
+var _ sort.Interface = (Imports)(nil)
+
+// Imports implements sort interface to optimize compiled output with
+// deterministic generated mainfile.
+type Imports []*Import
+
+func (s Imports) Len() int {
+	return len(s)
+}
+
+func (s Imports) Less(i, j int) bool {
+	return s[i].UniqueName < s[j].UniqueName
+}
+
+func (s Imports) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
 }
 
 func setFuncs(pi *PkgInfo) {
@@ -374,10 +413,7 @@ func setImports(gocmd string, pi *PkgInfo) error {
 				}
 				if alias != "" {
 					debug.Printf("found %s: %s (%s)", importTag, name, alias)
-					if importNames[alias] != "" {
-						return fmt.Errorf("duplicate import alias: %q", alias)
-					}
-					importNames[alias] = name
+					importNames[name] = alias
 				} else {
 					debug.Printf("found %s: %s", importTag, name)
 					rootImports = append(rootImports, name)
@@ -586,7 +622,6 @@ func setAliases(pi *PkgInfo) {
 }
 
 func getFunction(exp ast.Expr, pi *PkgInfo) (*Function, error) {
-
 	// selector expressions are in LIFO format.
 	// So, in  foo.bar.baz the first selector.Name is
 	// actually "baz", the second is "bar", and the last is "foo"

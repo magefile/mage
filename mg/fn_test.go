@@ -114,6 +114,16 @@ func TestFuncCheck(t *testing.T) {
 	if err == nil {
 		t.Error("expected func(*int) error to be invalid")
 	}
+
+	defer func() {
+		if r := recover(); r !=nil {
+			t.Error("expected a nil function argument to be handled gracefully")
+		}
+	}()
+	_, _, err = checkF(nil, []interface{}{1,2})
+	if err == nil {
+		t.Error("expected a nil function argument to be invalid")
+	}
 }
 
 func TestF(t *testing.T) {
