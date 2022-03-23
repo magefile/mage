@@ -71,6 +71,20 @@ func TestParse(t *testing.T) {
 		t.Fatalf("expected DefaultName to be ReturnsNilError")
 	}
 
+	if info.DeinitFunc == nil {
+		t.Fatal("expected deinit func to exist, but was nil")
+	}
+
+	// DeinitIsError
+	if info.DeinitFunc.IsError != true {
+		t.Fatalf("expected DeinitIsError to be true")
+	}
+
+	// DeinitName
+	if info.DeinitFunc.Name != "Shutdown" {
+		t.Fatalf("expected DeinitName to be Shutdown")
+	}
+
 	if info.Aliases["void"].Name != "ReturnsVoid" {
 		t.Fatalf("expected alias of void to be ReturnsVoid")
 	}
@@ -101,6 +115,13 @@ func TestParse(t *testing.T) {
 			t.Fatalf("expected:\n%#v\n\nto be in:\n%#v", fn, info.Funcs)
 		}
 	}
+
+	// Make sure Deinit target has been removed from the target list
+	for _, infoFn := range info.Funcs {
+		if reflect.DeepEqual(infoFn, info.DeinitFunc) {
+			t.Fatalf("Did not expect to find Deinit target in the list of targets")
+		}
+	}
 }
 
 func TestGetImportSelf(t *testing.T) {
@@ -110,5 +131,41 @@ func TestGetImportSelf(t *testing.T) {
 	}
 	if imp.Info.AstPkg.Name != "importself" {
 		t.Fatalf("expected package importself, got %v", imp.Info.AstPkg.Name)
+	}
+}
+
+func TestDeinitRemovesItselfFromImports(t *testing.T) {
+	info, err := PrimaryPackage("go", "./testdata/deinit_import", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if info.DeinitFunc == nil {
+		t.Fatal("expected deinit func to exist, but was not found")
+	}
+
+	validateNoFunc := func(pi PkgInfo) {
+		for _, infoFn := range pi.Funcs {
+			if reflect.DeepEqual(infoFn, info.DeinitFunc) {
+				t.Fatalf("Did not expect to find Deinit target in the list of targets")
+			}
+		}
+	}
+
+	// Make sure Deinit target has been removed from the target list
+	validateNoFunc(*info)
+	for _, imp := range info.Imports {
+		validateNoFunc(imp.Info)
+	}
+}
+
+func TestNoDeinitByDefault(t *testing.T) {
+	info, err := PrimaryPackage("go", "./testdata", []string{"func.go", "repeating_synopsis.go", "subcommands.go"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if info.DeinitFunc != nil {
+		t.Fatal("expected deinit func to not exist, but was not nil")
 	}
 }
