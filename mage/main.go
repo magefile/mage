@@ -66,13 +66,6 @@ const (
 
 var debug = log.New(ioutil.Discard, "DEBUG: ", log.Ltime|log.Lmicroseconds)
 
-// set by ldflags when you "mage build"
-var (
-	commitHash = "<not set>"
-	timestamp  = "<not set>"
-	gitTag     = "<not set>"
-)
-
 //go:generate stringer -type=Command
 
 // Command tracks invocations of mage that run without targets or other flags.
@@ -146,8 +139,8 @@ func ParseAndRun(stdout, stderr io.Writer, stdin io.Reader, args []string) int {
 
 	switch cmd {
 	case Version:
-		out.Println("Mage Build Tool", gitTag)
-		out.Println("Build Date:", timestamp)
+		out.Println("Mage Build Tool", getTag())
+		out.Println("Commit Date:", timestamp)
 		out.Println("Commit:", commitHash)
 		out.Println("built with:", runtime.Version())
 		return 0
