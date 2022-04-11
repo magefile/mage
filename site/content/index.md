@@ -51,6 +51,12 @@ You may also install a binary release from our
 
 See [mage homebrew formula](https://formulae.brew.sh/formula/mage).
 
+### With MacPorts (MacOS)
+
+`sudo port install mage`
+
+See [port page](https://ports.macports.org/port/mage/)
+
 ### With Scoop (Windows)
 
 `scoop install mage`
