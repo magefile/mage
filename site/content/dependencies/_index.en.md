@@ -46,7 +46,7 @@ there are two calls to mg.F(compile, "server"), then compile("server") will only
 ## Parallelism
 
 If run with `mg.Deps` or `mg.CtxDeps`, dependencies are run in their own
-goroutines, so they are parellelized as much as possible given the dependency
+goroutines, so they are parallelized as much as possible given the dependency
 tree ordering restrictions.  If run with `mg.SerialDeps` or `mg.SerialCtxDeps`,
 the dependencies are run serially, though each dependency or sub-dependency will
 still only ever be run once. 
