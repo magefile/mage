@@ -2,7 +2,9 @@ package sh
 
 import (
 	"bytes"
+	"fmt"
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -68,5 +70,46 @@ func TestAutoExpand(t *testing.T) {
 	if s != "baz" {
 		t.Fatalf(`Expected "baz" but got %q`, s)
 	}
+}
 
+func Test_When_execution_fails_quoted_command_without_arguments_is_formatted_without_trailing_whitespace(t *testing.T) {
+	t.Parallel()
+
+	command := "false"
+
+	ran, err := Exec(nil, nil, nil, command)
+	if err == nil {
+		t.Fatalf("Expected runner to return error")
+	}
+
+	if !ran {
+		t.Fatalf("Expected command %q to run", command)
+	}
+
+	expectedErrorFragment := fmt.Sprintf("running %q", command)
+
+	if !strings.Contains(err.Error(), expectedErrorFragment) {
+		t.Fatalf("Expected error message to contain %q, got %q", expectedErrorFragment, err.Error())
+	}
+}
+
+func Test_When_command_without_arguments_is_not_found_it_is_formatted_without_trailing_whitespace(t *testing.T) {
+	t.Parallel()
+
+	command := "nonexistentcommand"
+
+	ran, err := Exec(nil, nil, nil, command)
+	if err == nil {
+		t.Fatalf("Expected runner to return error")
+	}
+
+	if ran {
+		t.Fatalf("Expected command %q to not run", command)
+	}
+
+	expectedErrorFragment := fmt.Sprintf("run %q", command)
+
+	if !strings.Contains(err.Error(), expectedErrorFragment) {
+		t.Fatalf("Expected error message to contain %q, got %q", expectedErrorFragment, err.Error())
+	}
 }
