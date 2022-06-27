@@ -55,6 +55,24 @@ func TestParse(t *testing.T) {
 			Receiver: "Build",
 			IsError:  false,
 		},
+		{
+			Name:            "Foo",
+			Receiver:        "Nested",
+			ReceiverParents: []string{"Init"},
+			IsError:         true,
+		},
+		{
+			Name:            "Bar",
+			Receiver:        "Nested",
+			ReceiverParents: []string{"Init"},
+			IsError:         false,
+		},
+		{
+			Name:            "Foobar",
+			Receiver:        "DoubleNested",
+			ReceiverParents: []string{"Init", "Nested"},
+			IsError:         true,
+		},
 	}
 
 	if info.DefaultFunc == nil {
