@@ -9,6 +9,8 @@ package main
 
 import (
 	"context"
+	_runtime_debug "runtime/debug"
+	_errors "errors"
 	_flag "flag"
 	_fmt "fmt"
 	_ioutil "io/ioutil"
@@ -279,7 +281,12 @@ Options:
 		go func() {
 			defer func() {
 				err := recover()
-				d <- err
+				isDebug, _ := strconv.ParseBool(os.Getenv("MAGEFILE_DEBUG"))
+				if isDebug {
+					d <- _errors.New(string(_runtime_debug.Stack()))
+				} else {
+					d <- err
+				}
 			}()
 			err := fn(ctx)
 			d <- err
