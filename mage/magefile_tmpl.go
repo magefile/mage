@@ -8,9 +8,9 @@ package main
 import (
 	"fmt"
 	"os"
-	"os/exec"
 
 	"github.com/magefile/mage/mg" // mg contains helpful utility functions, like Deps
+	"github.com/magefile/mage/sh"
 )
 
 // Default target to run when none is specified
@@ -21,8 +21,7 @@ import (
 func Build() error {
 	mg.Deps(InstallDeps)
 	fmt.Println("Building...")
-	cmd := exec.Command("go", "build", "-o", "MyApp", ".")
-	return cmd.Run()
+	return sh.Run("go", "build", "-o", "MyApp", ".")
 }
 
 // A custom install step if you need your bin someplace other than go/bin
@@ -35,8 +34,7 @@ func Install() error {
 // Manage your deps, or running package managers.
 func InstallDeps() error {
 	fmt.Println("Installing Deps...")
-	cmd := exec.Command("go", "get", "github.com/stretchr/piglatin")
-	return cmd.Run()
+	return sh.Run("go", "get", "github.com/stretchr/piglatin")
 }
 
 // Clean up after yourself
