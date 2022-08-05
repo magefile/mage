@@ -14,7 +14,7 @@ func init() {
 }
 
 func TestParse(t *testing.T) {
-	info, err := PrimaryPackage("go", "./testdata", []string{"func.go", "command.go", "alias.go", "repeating_synopsis.go", "subcommands.go"})
+	info, err := PrimaryPackage("go", "./testdata", []string{"func.go", "command.go", "alias.go", "repeating_synopsis.go", "subcommands.go", "kebab_targets.go"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -59,6 +59,10 @@ func TestParse(t *testing.T) {
 
 	if info.DefaultFunc == nil {
 		t.Fatal("expected default func to exist, but was nil")
+	}
+
+	if info.UseKebabTargets != true {
+		t.Fatal("expected UseKebabTargest to be true")
 	}
 
 	// DefaultIsError

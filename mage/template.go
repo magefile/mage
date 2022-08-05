@@ -18,11 +18,40 @@ import (
 	_sort "sort"
 	"strconv"
 	_strings "strings"
+	_unicode "unicode"
 	_tabwriter "text/tabwriter"
 	"time"
 	{{range .Imports}}{{.UniqueName}} "{{.Path}}"
 	{{end}}
 )
+
+func _getTargetName(target string) string {
+	{{if .UseKebabTargets}}
+		return _kebabCase(target)
+	{{else}}
+	    return strings.ToLower(target)
+	{{end}}
+}
+
+
+func _kebabCase(s string) string {
+	output := _strings.Builder{}
+	afterColon := false
+	for i, srune := range s {
+		if i > 0 && !afterColon && srune >= 'A' && srune <= 'Z' {
+			output.WriteRune('-')
+			output.WriteRune(_unicode.ToLower(rune(srune)))
+		} else {
+			output.WriteRune(_unicode.ToLower(srune))
+		}
+		if srune == ':' {
+			afterColon = true
+		} else {
+			afterColon = false
+		}
+	}
+	return output.String()
+}
 
 func main() {
 	// Use local types and functions in order to avoid name conflicts with additional magefiles.
@@ -226,11 +255,11 @@ Options:
 		{{- $default := .DefaultFunc}}
 		targets := map[string]string{
 		{{- range .Funcs}}
-			"{{lowerFirst .TargetName}}{{if and (eq .Name $default.Name) (eq .Receiver $default.Receiver)}}*{{end}}": {{printf "%q" .Synopsis}},
+			_getTargetName("{{.TargetName}}{{if and (eq .Name $default.Name) (eq .Receiver $default.Receiver)}}*{{end}}"): {{printf "%q" .Synopsis}},
 		{{- end}}
 		{{- range .Imports}}{{$imp := .}}
 			{{- range .Info.Funcs}}
-			"{{lowerFirst .TargetName}}{{if and (eq .Name $default.Name) (eq .Receiver $default.Receiver)}}*{{end}}": {{printf "%q" .Synopsis}},
+			_getTargetName("{{.TargetName}}{{if and (eq .Name $default.Name) (eq .Receiver $default.Receiver)}}*{{end}}"): {{printf "%q" .Synopsis}},
 			{{- end}}
 		{{- end}}
 		}
@@ -340,12 +369,12 @@ Options:
 		}
 		switch _strings.ToLower(args.Args[0]) {
 			{{range .Funcs -}}
-			case "{{lower .TargetName}}":
+			case _getTargetName("{{.TargetName}}"):
 				{{if ne .Comment "" -}}
 				_fmt.Println({{printf "%q" .Comment}})
 				_fmt.Println()
 				{{end}}
-				_fmt.Print("Usage:\n\n\t{{$.BinaryName}} {{lower .TargetName}}{{range .Args}} <{{.Name}}>{{end}}\n\n")
+				_fmt.Printf("Usage:\n\n\t{{$.BinaryName}} %s{{range .Args}} <{{.Name}}>{{end}}\n\n", _getTargetName("{{.TargetName}}"))
 				var aliases []string
 				{{- $name := .Name -}}
 				{{- $recv := .Receiver -}}
@@ -359,12 +388,12 @@ Options:
 			{{end -}}
 			{{range .Imports -}}
 				{{range .Info.Funcs -}}
-			case "{{lower .TargetName}}":
+			case _getTargetName("{{.TargetName}}"):
 				{{if ne .Comment "" -}}
 				_fmt.Println({{printf "%q" .Comment}})
 				_fmt.Println()
 				{{end}}
-				_fmt.Print("Usage:\n\n\t{{$.BinaryName}} {{lower .TargetName}}{{range .Args}} <{{.Name}}>{{end}}\n\n")
+				_fmt.Printf("Usage:\n\n\t{{$.BinaryName}} %s{{range .Args}} <{{.Name}}>{{end}}\n\n", _getTargetName("{{.TargetName}}"))
 				var aliases []string
 				{{- $name := .Name -}}
 				{{- $recv := .Receiver -}}
@@ -411,13 +440,13 @@ Options:
 		switch _strings.ToLower(target) {
 		{{range $alias, $func := .Aliases}}
 			case "{{lower $alias}}":
-				target = "{{$func.TargetName}}"
+				target = _getTargetName("{{$func.TargetName}}")
 		{{- end}}
 		}
 
 		switch _strings.ToLower(target) {
 		{{range .Funcs }}
-			case "{{lower .TargetName}}":
+			case _getTargetName("{{.TargetName}}"):
 				expected := x + {{len .Args}}
 				if expected > len(args.Args) {
 					// note that expected and args at this point include the arg for the target itself
@@ -434,7 +463,7 @@ Options:
 		{{range .Imports}}
 		{{$imp := .}}
 			{{range .Info.Funcs }}
-				case "{{lower .TargetName}}":
+				case _getTargetName("{{.TargetName}}"):
 					expected := x + {{len .Args}}
 					if expected > len(args.Args) {
 						// note that expected and args at this point include the arg for the target itself

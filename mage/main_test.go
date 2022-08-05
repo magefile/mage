@@ -342,6 +342,27 @@ func TestMixedMageImports(t *testing.T) {
 	}
 }
 
+func TestKebabCaseTargets(t *testing.T) {
+	resetTerm()
+	stderr := &bytes.Buffer{}
+	stdout := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:    "./testdata/kebab_targets",
+		Stdout: stdout,
+		Stderr: stderr,
+		List:   true,
+	}
+	code := Invoke(inv)
+	if code != 0 {
+		t.Errorf("expected to exit with code 0, but got %v, stderr: %s", code, stderr)
+	}
+	expected := "Targets:\n  multi-word-namespace:multi-word-task    \n  multi-word-task                         \n"
+	actual := stdout.String()
+	if actual != expected {
+		t.Fatalf("expected %q but got %q", expected, actual)
+	}
+}
+
 func TestMagefilesFolder(t *testing.T) {
 	resetTerm()
 	wd, err := os.Getwd()

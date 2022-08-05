@@ -460,12 +460,13 @@ func Invoke(inv Invocation) int {
 }
 
 type mainfileTemplateData struct {
-	Description string
-	Funcs       []*parse.Function
-	DefaultFunc parse.Function
-	Aliases     map[string]*parse.Function
-	Imports     []*parse.Import
-	BinaryName  string
+	Description     string
+	Funcs           []*parse.Function
+	DefaultFunc     parse.Function
+	Aliases         map[string]*parse.Function
+	Imports         []*parse.Import
+	BinaryName      string
+	UseKebabTargets bool
 }
 
 func listGoFiles(magePath, goCmd, tags string, env []string) ([]string, error) {
@@ -599,11 +600,12 @@ func GenerateMainfile(binaryName, path string, info *parse.PkgInfo) error {
 	}
 	defer f.Close()
 	data := mainfileTemplateData{
-		Description: info.Description,
-		Funcs:       info.Funcs,
-		Aliases:     info.Aliases,
-		Imports:     info.Imports,
-		BinaryName:  binaryName,
+		Description:     info.Description,
+		Funcs:           info.Funcs,
+		Aliases:         info.Aliases,
+		Imports:         info.Imports,
+		BinaryName:      binaryName,
+		UseKebabTargets: info.UseKebabTargets,
 	}
 
 	if info.DefaultFunc != nil {

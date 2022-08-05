@@ -29,13 +29,14 @@ func EnableDebug() {
 // PkgInfo contains inforamtion about a package of files according to mage's
 // parsing rules.
 type PkgInfo struct {
-	AstPkg      *ast.Package
-	DocPkg      *doc.Package
-	Description string
-	Funcs       Functions
-	DefaultFunc *Function
-	Aliases     map[string]*Function
-	Imports     Imports
+	AstPkg          *ast.Package
+	DocPkg          *doc.Package
+	Description     string
+	Funcs           Functions
+	DefaultFunc     *Function
+	UseKebabTargets bool
+	Aliases         map[string]*Function
+	Imports         Imports
 }
 
 // Function represented a job function from a mage file
@@ -185,6 +186,7 @@ func PrimaryPackage(gocmd, path string, files []string) (*PkgInfo, error) {
 	}
 
 	setDefault(info)
+	setUseKebabTargets(info)
 	setAliases(info)
 	return info, nil
 }
@@ -560,6 +562,30 @@ func setDefault(pi *PkgInfo) {
 				return
 			}
 			pi.DefaultFunc = f
+			return
+		}
+	}
+}
+
+func setUseKebabTargets(pi *PkgInfo) {
+	for _, c := range pi.DocPkg.Consts {
+		for x, name := range c.Names {
+			if name != "UseKebabTargets" {
+				continue
+			}
+			spec := c.Decl.Specs[x].(*ast.ValueSpec)
+			if len(spec.Values) != 1 {
+				log.Println("warning: UseKebabTargets declaration has multiple values")
+			}
+
+			value, ok := spec.Values[0].(*ast.Ident)
+			if !ok {
+				log.Println("warning, UseKebabTargets declaration not valid, must be true or false")
+				return
+			}
+			if value.String() == "true" {
+				pi.UseKebabTargets = true
+			}
 			return
 		}
 	}
