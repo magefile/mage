@@ -73,3 +73,23 @@ The supported ANSI color names are any of these:
 - BrightWhite
 
 The names are case-insensitive.
+
+## MAGE_NOCACHE
+
+Set to "1" or "true" to turn off the binary cache
+
+## MAGEFILE_MAX_CACHE_SIZE
+
+Set to the number of bytes that you want to keep in the binary caches.
+
+Default value: 200000000
+
+## MAGEFILE_MAX_CACHE_AGE
+
+Set to the number of days that you want to keep binary caches.
+
+Default value: 10
+
+## MAGEFILE_AUTOCLENAUP
+
+Set to "0" or "false" to turn off the binary cache cleanup process

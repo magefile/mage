@@ -15,6 +15,7 @@ import (
 	"regexp"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 	"text/template"
 	"time"
@@ -30,6 +31,9 @@ import (
 // changed. This can be used when we change how we parse files, or otherwise
 // change the inputs to the compiling process.
 const magicRebuildKey = "v0.3"
+
+const defaultMaxCacheSize = 200000000
+const defaultMaxCacheAge = 10
 
 // (Aaaa)(Bbbb) -> aaaaBbbb
 var firstWordRx = regexp.MustCompile(`^([[:upper:]][^[:upper:]]+)([[:upper:]].*)$`)
@@ -456,7 +460,62 @@ func Invoke(inv Invocation) int {
 		return 0
 	}
 
+	if noCache, err := strconv.ParseBool(os.Getenv("MAGE_NOCACHE")); err == nil && noCache {
+		defer os.Remove(exePath)
+	}
+
+	autoCleanup, err := strconv.ParseBool(os.Getenv("MAGEFILE_AUTOCLEANUP"))
+	if err != nil {
+		autoCleanup = true
+	}
+	if autoCleanup {
+		defer cleanCache(inv.CacheDir)
+	}
+
 	return RunCompiled(inv, exePath, errlog)
+}
+
+func cleanCache(cacheDir string) error {
+	maxCacheSize, _ := strconv.ParseInt(os.Getenv("MAGEFILE_MAX_CACHE_SIZE"), 10, 64)
+	maxCacheAge, _ := strconv.ParseInt(os.Getenv("MAGEFILE_MAX_CACHE_AGE"), 10, 64)
+
+	if maxCacheSize == 0 {
+		maxCacheSize = defaultMaxCacheSize
+	}
+
+	if maxCacheAge == 0 {
+		maxCacheAge = defaultMaxCacheAge
+	}
+
+	files, err := ioutil.ReadDir(cacheDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	sort.Slice(files, func(i, j int) bool {
+		return files[i].ModTime().After(files[j].ModTime())
+	})
+
+	timeLimit := time.Now().Local()
+	maxCacheDays := time.Duration(-maxCacheAge*24) * time.Hour
+	timeLimit = timeLimit.Add(maxCacheDays)
+
+	var totalSize int64 = 0
+	for _, f := range files {
+		if f.IsDir() {
+			continue
+		}
+		totalSize += f.Size()
+		if maxCacheAge > 0 && timeLimit.After(f.ModTime()) {
+			os.Remove(filepath.Join(cacheDir, f.Name()))
+		}
+		if maxCacheSize > 0 && totalSize > maxCacheSize {
+			os.Remove(filepath.Join(cacheDir, f.Name()))
+		}
+	}
+	return nil
 }
 
 type mainfileTemplateData struct {
@@ -687,6 +746,9 @@ func generateInit(dir string) error {
 // RunCompiled runs an already-compiled mage command with the given args,
 func RunCompiled(inv Invocation, exePath string, errlog *log.Logger) int {
 	debug.Println("running binary", exePath)
+	currentTime := time.Now().Local()
+	os.Chtimes(exePath, currentTime, currentTime)
+
 	c := exec.Command(exePath, inv.Args...)
 	c.Stderr = inv.Stderr
 	c.Stdout = inv.Stdout

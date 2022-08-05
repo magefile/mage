@@ -1749,6 +1749,167 @@ func TestWrongDependency(t *testing.T) {
 	}
 }
 
+func TestNoCache(t *testing.T) {
+}
+
+func TestCleanCacheBySize(t *testing.T) {
+	tCases := []struct {
+		name      string
+		expected  string
+		cacheSize int
+	}{
+		{
+			"no-cache-size",
+			"1,2,3,4,5,6,7,8,9",
+			0,
+		},
+		{
+			"big-cache-size",
+			"1,2,3,4,5,6,7,8,9",
+			10000000000,
+		},
+		{
+			"mid-cache-size",
+			"1,2,3,4,5",
+			5500000,
+		},
+		{
+			"small-cache-size",
+			"",
+			1,
+		},
+	}
+
+	for _, tc := range tCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.cacheSize != 0 {
+				os.Setenv("MAGEFILE_MAX_CACHE_SIZE", fmt.Sprintf("%d", tc.cacheSize))
+				defer os.Unsetenv("MAGEFILE_MAX_CACHE_SIZE")
+			}
+
+			dir, err := ioutil.TempDir("", "test")
+			if err != nil {
+				log.Fatal(err)
+			}
+			defer os.RemoveAll(dir)
+
+			counter := 0
+			for {
+				counter++
+				f, err := os.Create(filepath.Join(dir, fmt.Sprintf("%d", counter)))
+				if err != nil {
+					t.Fatalf("unable to create temporary test files %q", err)
+				}
+
+				if err = f.Truncate(1000000); err != nil {
+					t.Fatalf("unable to create temporary test files %q", err)
+				}
+
+				if counter >= 9 {
+					break
+				}
+			}
+
+			cleanCache(dir)
+
+			files, err := ioutil.ReadDir(dir)
+			if err != nil {
+				t.Fatalf("unable to list the files in the temporary directory %q", err)
+			}
+			fileNames := []string{}
+
+			for _, file := range files {
+				fileNames = append(fileNames, file.Name())
+			}
+
+			actual := strings.Join(fileNames, ",")
+
+			if actual != tc.expected {
+				t.Fatalf("expected %q, but got %q", tc.expected, actual)
+			}
+		})
+	}
+}
+
+func TestCleanCacheByAge(t *testing.T) {
+	tCases := []struct {
+		name     string
+		expected string
+		cacheAge int
+	}{
+		{
+			"no-cache-age",
+			"1,2,3,4,5,6,7,8,9",
+			0,
+		},
+		{
+			"big-cache-age",
+			"1,2,3,4,5,6,7,8,9",
+			1000,
+		},
+		{
+			"mid-cache-age",
+			"1,2,3,4",
+			5,
+		},
+		{
+			"small-cache-age",
+			"",
+			1,
+		},
+	}
+
+	for _, tc := range tCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.cacheAge != 0 {
+				os.Setenv("MAGEFILE_MAX_CACHE_AGE", fmt.Sprintf("%d", tc.cacheAge))
+				defer os.Unsetenv("MAGEFILE_MAX_CACHE_AGE")
+			}
+
+			dir, err := ioutil.TempDir("", "test")
+			if err != nil {
+				log.Fatal(err)
+			}
+			defer os.RemoveAll(dir)
+
+			counter := 0
+			for {
+				counter++
+				_, err := os.Create(filepath.Join(dir, fmt.Sprintf("%d", counter)))
+				if err != nil {
+					t.Fatalf("unable to create temporary test files %q", err)
+				}
+				modTime := time.Now().Local().Add(time.Duration(-counter*24) * time.Hour)
+				if err = os.Chtimes(filepath.Join(dir, fmt.Sprintf("%d", counter)), modTime, modTime); err != nil {
+					t.Fatalf("unable to create temporary test files %q", err)
+				}
+
+				if counter >= 9 {
+					break
+				}
+			}
+
+			cleanCache(dir)
+
+			files, err := ioutil.ReadDir(dir)
+			if err != nil {
+				t.Fatalf("unable to list the files in the temporary directory %q", err)
+			}
+			fileNames := []string{}
+
+			for _, file := range files {
+				fileNames = append(fileNames, file.Name())
+			}
+
+			actual := strings.Join(fileNames, ",")
+
+			if actual != tc.expected {
+				t.Fatalf("expected %q, but got %q", tc.expected, actual)
+			}
+		})
+	}
+}
+
 // / This code liberally borrowed from https://github.com/rsc/goversion/blob/master/version/exe.go
 
 type (

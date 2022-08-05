@@ -17,6 +17,10 @@ binary is also used in the hash.
 Compiled magefile binaries are stored in $HOME/.magefile.  This location can be
 customized by setting the MAGEFILE_CACHE environment variable.
 
+You can disable or adjust your binary cache using the MAGE_NOCACHE,
+MAGEFILE_AUTOCLEANUP, MAGEFILE_MAX_CACHE_SIZE and MAGEFILE_MAX_CACHE_AGE
+environment variables.
+
 ## Go Environment
 
 Mage itself requires no dependencies to run. However, because it is compiling go
