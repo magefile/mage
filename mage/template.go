@@ -19,6 +19,7 @@ import (
 	"strconv"
 	_strings "strings"
 	_unicode "unicode"
+	_regexp "regexp"
 	_tabwriter "text/tabwriter"
 	"time"
 	{{range .Imports}}{{.UniqueName}} "{{.Path}}"
@@ -29,10 +30,37 @@ func _getTargetName(target string) string {
 	{{if .UseKebabTargets}}
 		return _kebabCase(target)
 	{{else}}
-	    return strings.ToLower(target)
+	    return _lowerFirst(target)
 	{{end}}
 }
 
+func _getLowerTargetName(target string) string {
+	return _strings.ToLower(_getTargetName(target))
+}
+
+// (Aaaa)(Bbbb) -> aaaaBbbb
+var _firstWordRx = _regexp.MustCompile("^([[:upper:]][^[:upper:]]+)([[:upper:]].*)$")
+
+// (AAAA)(Bbbb) -> aaaaBbbb
+var _firstAbbrevRx = _regexp.MustCompile("^([[:upper:]]+)([[:upper:]][^[:upper:]].*)$")
+
+func _lowerFirstWord(s string) string {
+	if match := _firstWordRx.FindStringSubmatch(s); match != nil {
+		return _strings.ToLower(match[1]) + match[2]
+	}
+	if match := _firstAbbrevRx.FindStringSubmatch(s); match != nil {
+		return _strings.ToLower(match[1]) + match[2]
+	}
+	return _strings.ToLower(s)
+}
+
+func _lowerFirst(s string) string {
+	parts := _strings.Split(s, ":")
+	for i, t := range parts {
+		parts[i] = _lowerFirstWord(t)
+	}
+	return _strings.Join(parts, ":")
+}
 
 func _kebabCase(s string) string {
 	output := _strings.Builder{}
@@ -369,7 +397,7 @@ Options:
 		}
 		switch _strings.ToLower(args.Args[0]) {
 			{{range .Funcs -}}
-			case _getTargetName("{{.TargetName}}"):
+			case _getLowerTargetName("{{.TargetName}}"):
 				{{if ne .Comment "" -}}
 				_fmt.Println({{printf "%q" .Comment}})
 				_fmt.Println()
@@ -388,7 +416,7 @@ Options:
 			{{end -}}
 			{{range .Imports -}}
 				{{range .Info.Funcs -}}
-			case _getTargetName("{{.TargetName}}"):
+			case _getLowerTargetName("{{.TargetName}}"):
 				{{if ne .Comment "" -}}
 				_fmt.Println({{printf "%q" .Comment}})
 				_fmt.Println()
@@ -446,7 +474,7 @@ Options:
 
 		switch _strings.ToLower(target) {
 		{{range .Funcs }}
-			case _getTargetName("{{.TargetName}}"):
+			case _getLowerTargetName("{{.TargetName}}"):
 				expected := x + {{len .Args}}
 				if expected > len(args.Args) {
 					// note that expected and args at this point include the arg for the target itself
@@ -463,7 +491,7 @@ Options:
 		{{range .Imports}}
 		{{$imp := .}}
 			{{range .Info.Funcs }}
-				case _getTargetName("{{.TargetName}}"):
+				case _getLowerTargetName("{{.TargetName}}"):
 					expected := x + {{len .Args}}
 					if expected > len(args.Args) {
 						// note that expected and args at this point include the arg for the target itself
