@@ -1750,33 +1750,101 @@ func TestWrongDependency(t *testing.T) {
 }
 
 func TestNoCache(t *testing.T) {
+	os.Setenv("MAGE_NOCACHE", "true")
+	defer os.Unsetenv("MAGE_NOCACHE")
+
+	if err := os.RemoveAll(mg.CacheDir()); err != nil {
+		t.Error("error removing cache dir:", err)
+	}
+	code := ParseAndRun(ioutil.Discard, ioutil.Discard, &bytes.Buffer{}, []string{"-clean"})
+	if code != 0 {
+		t.Errorf("expected 0, but got %v", code)
+	}
+
+	TestAlias(t) // make sure we've got something in the CACHE_DIR
+	files, err := ioutil.ReadDir(mg.CacheDir())
+	if err != nil {
+		t.Error("issue reading file:", err)
+	}
+
+	if len(files) != 0 {
+		t.Error("Expected no cache file created")
+	}
+
+	os.Setenv("MAGE_NOCACHE", "false")
+
+	TestAlias(t) // make sure we've got something in the CACHE_DIR
+
+	files, err = ioutil.ReadDir(mg.CacheDir())
+	if err != nil {
+		t.Error("issue reading file:", err)
+	}
+
+	if len(files) == 0 {
+		t.Error("Expected cache file created")
+	}
 }
 
-func TestCleanCacheBySize(t *testing.T) {
+func TestCleanCacheByAgeAndSize(t *testing.T) {
 	tCases := []struct {
 		name      string
 		expected  string
 		cacheSize int
+		cacheAge  int
 	}{
 		{
 			"no-cache-size",
 			"1,2,3,4,5,6,7,8,9",
+			0,
 			0,
 		},
 		{
 			"big-cache-size",
 			"1,2,3,4,5,6,7,8,9",
 			10000000000,
+			0,
 		},
 		{
 			"mid-cache-size",
 			"1,2,3,4,5",
 			5500000,
+			0,
 		},
 		{
 			"small-cache-size",
 			"",
 			1,
+			0,
+		},
+		{
+			"no-cache-age",
+			"1,2,3,4,5,6,7,8,9",
+			0,
+			0,
+		},
+		{
+			"big-cache-age",
+			"1,2,3,4,5,6,7,8,9",
+			0,
+			1000,
+		},
+		{
+			"mid-cache-age",
+			"1,2,3,4",
+			0,
+			5,
+		},
+		{
+			"small-cache-age",
+			"",
+			0,
+			1,
+		},
+		{
+			"mid-cache-age-and-size",
+			"1,2,3,4",
+			5500000,
+			5,
 		},
 	}
 
@@ -1785,6 +1853,10 @@ func TestCleanCacheBySize(t *testing.T) {
 			if tc.cacheSize != 0 {
 				os.Setenv("MAGEFILE_MAX_CACHE_SIZE", fmt.Sprintf("%d", tc.cacheSize))
 				defer os.Unsetenv("MAGEFILE_MAX_CACHE_SIZE")
+			}
+			if tc.cacheAge != 0 {
+				os.Setenv("MAGEFILE_MAX_CACHE_AGE", fmt.Sprintf("%d", tc.cacheAge))
+				defer os.Unsetenv("MAGEFILE_MAX_CACHE_AGE")
 			}
 
 			dir, err := ioutil.TempDir("", "test")
@@ -1805,80 +1877,6 @@ func TestCleanCacheBySize(t *testing.T) {
 					t.Fatalf("unable to create temporary test files %q", err)
 				}
 
-				if counter >= 9 {
-					break
-				}
-			}
-
-			cleanCache(dir)
-
-			files, err := ioutil.ReadDir(dir)
-			if err != nil {
-				t.Fatalf("unable to list the files in the temporary directory %q", err)
-			}
-			fileNames := []string{}
-
-			for _, file := range files {
-				fileNames = append(fileNames, file.Name())
-			}
-
-			actual := strings.Join(fileNames, ",")
-
-			if actual != tc.expected {
-				t.Fatalf("expected %q, but got %q", tc.expected, actual)
-			}
-		})
-	}
-}
-
-func TestCleanCacheByAge(t *testing.T) {
-	tCases := []struct {
-		name     string
-		expected string
-		cacheAge int
-	}{
-		{
-			"no-cache-age",
-			"1,2,3,4,5,6,7,8,9",
-			0,
-		},
-		{
-			"big-cache-age",
-			"1,2,3,4,5,6,7,8,9",
-			1000,
-		},
-		{
-			"mid-cache-age",
-			"1,2,3,4",
-			5,
-		},
-		{
-			"small-cache-age",
-			"",
-			1,
-		},
-	}
-
-	for _, tc := range tCases {
-		t.Run(tc.name, func(t *testing.T) {
-			if tc.cacheAge != 0 {
-				os.Setenv("MAGEFILE_MAX_CACHE_AGE", fmt.Sprintf("%d", tc.cacheAge))
-				defer os.Unsetenv("MAGEFILE_MAX_CACHE_AGE")
-			}
-
-			dir, err := ioutil.TempDir("", "test")
-			if err != nil {
-				log.Fatal(err)
-			}
-			defer os.RemoveAll(dir)
-
-			counter := 0
-			for {
-				counter++
-				_, err := os.Create(filepath.Join(dir, fmt.Sprintf("%d", counter)))
-				if err != nil {
-					t.Fatalf("unable to create temporary test files %q", err)
-				}
 				modTime := time.Now().Local().Add(time.Duration(-counter*24) * time.Hour)
 				if err = os.Chtimes(filepath.Join(dir, fmt.Sprintf("%d", counter)), modTime, modTime); err != nil {
 					t.Fatalf("unable to create temporary test files %q", err)

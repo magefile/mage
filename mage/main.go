@@ -510,8 +510,7 @@ func cleanCache(cacheDir string) error {
 		totalSize += f.Size()
 		if maxCacheAge > 0 && timeLimit.After(f.ModTime()) {
 			os.Remove(filepath.Join(cacheDir, f.Name()))
-		}
-		if maxCacheSize > 0 && totalSize > maxCacheSize {
+		} else if maxCacheSize > 0 && totalSize > maxCacheSize {
 			os.Remove(filepath.Join(cacheDir, f.Name()))
 		}
 	}
