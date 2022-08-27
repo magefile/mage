@@ -1,11 +1,13 @@
 package mage
 
 import (
+	"bufio"
 	"bytes"
 	"crypto/sha1"
 	"errors"
 	"flag"
 	"fmt"
+	"go/build/constraint"
 	"io"
 	"io/ioutil"
 	"log"
@@ -468,35 +470,68 @@ type mainfileTemplateData struct {
 	BinaryName  string
 }
 
-func listGoFiles(magePath, goCmd, tags string, env []string) ([]string, error) {
-	args := []string{"list"}
-	if tags != "" {
-		args = append(args, fmt.Sprintf("-tags=%s", tags))
-	}
-	args = append(args, "-e", "-f", `{{join .GoFiles "||"}}`)
-	cmd := exec.Command(goCmd, args...)
-	cmd.Env = env
-	buf := &bytes.Buffer{}
-	cmd.Stderr = buf
-	cmd.Dir = magePath
-	b, err := cmd.Output()
+// listGoFiles returns a list of all .go files in a given directory,
+// matching the provided tag
+func listGoFiles(magePath, goCmd, tag string, env []string) ([]string, error) {
+	files, err := os.ReadDir(magePath)
 	if err != nil {
-		stderr := buf.String()
-		// if the error is "cannot find module", that can mean that there's no
-		// non-mage files, which is fine, so ignore it.
-		if !strings.Contains(stderr, "cannot find module for path") {
-			if tags == "" {
-				return nil, fmt.Errorf("failed to list un-tagged gofiles: %v: %s", err, stderr)
+		return nil, err
+	}
+
+	var goFiles []string
+	for _, file := range files {
+		if file.IsDir() {
+			continue
+		}
+
+		if filepath.Ext(file.Name()) != ".go" {
+			continue
+		}
+
+		f, err := os.Open(filepath.Join(magePath, file.Name()))
+		if err != nil {
+			return nil, err
+		}
+
+		scanner := bufio.NewScanner(f)
+		satisifiesBuildConstraints := false
+		hadBuildConstraint := false
+
+		// Scan the first three lines for the build tags
+		for lines := 0; scanner.Scan() && lines != 3; lines++ {
+			if lines > 2 {
+				break
 			}
-			return nil, fmt.Errorf("failed to list gofiles tagged with %q: %v: %s", tags, err, stderr)
+
+			line := scanner.Text()
+
+			// parse the build constraint so we can check if the tag is present
+			expr, err := constraint.Parse(line)
+			if err != nil {
+				continue
+			}
+			hadBuildConstraint = true
+
+			// check if the expression matches the tag we specified, if it doesn't
+			// then continue
+			satisifiesBuildConstraints = expr.Eval(func(goBuildTag string) bool {
+				debug.Printf("checking build tag %s against %s (file: %q, line: %q)", goBuildTag, tag, file.Name(), line)
+				return goBuildTag == tag
+			})
+		}
+
+		// If we didn't satisfy the build constraints AND we're not looking for a tag, then
+		// add the file. This ensures we skip files that DO have a build constraint.
+		//
+		// However, if we DID satisfy the build constraint AND we're looking for a tag, then
+		// add the file so we include constrained files.
+		if (!satisifiesBuildConstraints && tag == "" && !hadBuildConstraint) || (hadBuildConstraint && satisifiesBuildConstraints && tag != "") {
+			goFiles = append(goFiles, file.Name())
 		}
 	}
-	out := strings.TrimSpace(string(b))
-	list := strings.Split(out, "||")
-	for i := range list {
-		list[i] = filepath.Join(magePath, list[i])
-	}
-	return list, nil
+
+	debug.Printf("found %d go files with build tag %s (files: %v)", len(goFiles), tag, goFiles)
+	return goFiles, nil
 }
 
 // Magefiles returns the list of magefiles in dir.
@@ -549,6 +584,7 @@ func Magefiles(magePath, goos, goarch, goCmd string, stderr io.Writer, isMagefil
 			files = append(files, f)
 		}
 	}
+
 	return files, nil
 }
 
