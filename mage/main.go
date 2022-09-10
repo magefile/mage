@@ -506,7 +506,7 @@ func listGoFiles(magePath, goCmd, tag string, envStr []string) ([]string, error)
 
 		// Allow multiple packages in the same directory
 		if _, ok := err.(*build.MultiplePackageError); !ok {
-			return nil, err
+			return nil, fmt.Errorf("failed to parse go source files: %v", err)
 		}
 	}
 
