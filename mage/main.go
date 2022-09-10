@@ -483,7 +483,7 @@ func listGoFiles(magePath, goCmd, tag string, envStr []string) ([]string, error)
 
 	env, err := internal.SplitEnv(envStr)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error parsing environment variables: %v", err)
 	}
 
 	bctx := build.Default
