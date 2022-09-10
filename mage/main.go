@@ -476,7 +476,7 @@ func listGoFiles(magePath, goCmd, tag string, envStr []string) ([]string, error)
 	if !filepath.IsAbs(magePath) {
 		cwd, err := os.Getwd()
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("can't get current working directory: %v", err)
 		}
 		magePath = filepath.Join(cwd, magePath)
 	}
