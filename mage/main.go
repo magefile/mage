@@ -487,7 +487,6 @@ func listGoFiles(magePath, goCmd, tag string, envStr []string) ([]string, error)
 	}
 
 	bctx := build.Default
-	bctx.Dir = magePath
 	bctx.BuildTags = []string{tag}
 
 	if _, ok := env["GOOS"]; ok {
@@ -498,7 +497,7 @@ func listGoFiles(magePath, goCmd, tag string, envStr []string) ([]string, error)
 		bctx.GOARCH = env["GOARCH"]
 	}
 
-	pkg, err := bctx.Import(".", bctx.Dir, 0)
+	pkg, err := bctx.Import(".", magePath, 0)
 	if err != nil {
 		if _, ok := err.(*build.NoGoError); ok {
 			return []string{}, nil
