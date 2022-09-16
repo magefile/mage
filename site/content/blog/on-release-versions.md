@@ -29,7 +29,7 @@ Since I really want to keep Mage as backwards compatible as possible (CI runs
 tests with versions as far back as 1.7)... I didn't want this headache.  I also
 didn't want everyone to have to make their import statements say /v2. Mage's
 libraries are and always will be backwards compatible.  The tags on the repo
-previosuly were not intended to be semantic versions.  In fact, I had intended
+previously were not intended to be semantic versions.  In fact, I had intended
 to simply make each new release a major version specifically to make it clear
 that these aren't semantic versions (just like Chrome is on v70 right now).
 However, I wasn't very careful, and some of my tags were in semantic version

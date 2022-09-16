@@ -6,6 +6,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"go/build"
 	"io"
 	"io/ioutil"
 	"log"
@@ -468,35 +469,53 @@ type mainfileTemplateData struct {
 	BinaryName  string
 }
 
-func listGoFiles(magePath, goCmd, tags string, env []string) ([]string, error) {
-	args := []string{"list"}
-	if tags != "" {
-		args = append(args, fmt.Sprintf("-tags=%s", tags))
+// listGoFiles returns a list of all .go files in a given directory,
+// matching the provided tag
+func listGoFiles(magePath, goCmd, tag string, envStr []string) ([]string, error) {
+	origMagePath := magePath
+	if !filepath.IsAbs(magePath) {
+		cwd, err := os.Getwd()
+		if err != nil {
+			return nil, fmt.Errorf("can't get current working directory: %v", err)
+		}
+		magePath = filepath.Join(cwd, magePath)
 	}
-	args = append(args, "-e", "-f", `{{join .GoFiles "||"}}`)
-	cmd := exec.Command(goCmd, args...)
-	cmd.Env = env
-	buf := &bytes.Buffer{}
-	cmd.Stderr = buf
-	cmd.Dir = magePath
-	b, err := cmd.Output()
+
+	env, err := internal.SplitEnv(envStr)
 	if err != nil {
-		stderr := buf.String()
-		// if the error is "cannot find module", that can mean that there's no
-		// non-mage files, which is fine, so ignore it.
-		if !strings.Contains(stderr, "cannot find module for path") {
-			if tags == "" {
-				return nil, fmt.Errorf("failed to list un-tagged gofiles: %v: %s", err, stderr)
-			}
-			return nil, fmt.Errorf("failed to list gofiles tagged with %q: %v: %s", tags, err, stderr)
+		return nil, fmt.Errorf("error parsing environment variables: %v", err)
+	}
+
+	bctx := build.Default
+	bctx.BuildTags = []string{tag}
+
+	if _, ok := env["GOOS"]; ok {
+		bctx.GOOS = env["GOOS"]
+	}
+
+	if _, ok := env["GOARCH"]; ok {
+		bctx.GOARCH = env["GOARCH"]
+	}
+
+	pkg, err := bctx.Import(".", magePath, 0)
+	if err != nil {
+		if _, ok := err.(*build.NoGoError); ok {
+			return []string{}, nil
+		}
+
+		// Allow multiple packages in the same directory
+		if _, ok := err.(*build.MultiplePackageError); !ok {
+			return nil, fmt.Errorf("failed to parse go source files: %v", err)
 		}
 	}
-	out := strings.TrimSpace(string(b))
-	list := strings.Split(out, "||")
-	for i := range list {
-		list[i] = filepath.Join(magePath, list[i])
+
+	goFiles := make([]string, len(pkg.GoFiles))
+	for i := range pkg.GoFiles {
+		goFiles[i] = filepath.Join(origMagePath, pkg.GoFiles[i])
 	}
-	return list, nil
+
+	debug.Printf("found %d go files with build tag %s (files: %v)", len(goFiles), tag, goFiles)
+	return goFiles, nil
 }
 
 // Magefiles returns the list of magefiles in dir.
@@ -549,6 +568,7 @@ func Magefiles(magePath, goos, goarch, goCmd string, stderr io.Writer, isMagefil
 			files = append(files, f)
 		}
 	}
+
 	return files, nil
 }
 

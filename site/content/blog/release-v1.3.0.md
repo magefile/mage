@@ -18,13 +18,13 @@ As you may or may not know (it hasn't been well advertised), it's now extremely
 easy to run multiple go versions side by side.  You can `go get
 golang.org/dl/go1.xx` for any version of go from 1.8 and up.  It'll drop a
 binary on your system that you can then run `go1.xx download` and it'll download
-and set up a new go environment for that verison of go.  From then on, you can
+and set up a new go environment for that version of go.  From then on, you can
 `go1.xx build` etc just like you do with the "go" binary.   
 
 This makes it super easy to work on different projects with different required
 versions of go support.  I used to work at Canonical, and we were restricted to
 the versions of Go that shipped in the latest Ubuntu release, because our code
-was going to shiop with that release, too, and it needed to buid with the
+was going to ship with that release, too, and it needed to build with the
 built-in go compiler.  This meant that we were almost always behind the latest
 go version.  Of course, go is backwards compatible, so you can build 1.6
 compatible code with go 1.11.... but you can also accidentally introduce

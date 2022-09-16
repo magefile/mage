@@ -33,3 +33,6 @@ Session.vim
 
 # GNU Screen
 .screenrc
+
+# Hugo build lock
+.hugo_build.lock
