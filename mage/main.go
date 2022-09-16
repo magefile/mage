@@ -132,18 +132,19 @@ func (i Invocation) UsesMagefiles() bool {
 // files in the given directory with the given args (do not include the command
 // name in the args).
 func ParseAndRun(stdout, stderr io.Writer, stdin io.Reader, args []string) int {
-	errlog := log.New(stderr, "", 0)
-	out := log.New(stdout, "", 0)
 	inv, cmd, err := Parse(stderr, stdout, args)
-	inv.Stderr = stderr
+	if retcode, doExit := HandleParseError(err, stderr); doExit {
+		return retcode
+	}
 	inv.Stdin = stdin
-	if err == flag.ErrHelp {
-		return 0
-	}
-	if err != nil {
-		errlog.Println("Error:", err)
-		return 2
-	}
+	return Run(inv, cmd)
+}
+
+// Run compiles and runs the mage files in invocation parsed by Parse function.
+// The parameters to this function are the same as the return values of Parse.
+func Run(inv Invocation, cmd Command) int {
+	errlog := log.New(inv.Stderr, "", 0)
+	out := log.New(inv.Stdout, "", 0)
 
 	switch cmd {
 	case Version:
@@ -179,6 +180,7 @@ func ParseAndRun(stdout, stderr io.Writer, stdin io.Reader, args []string) int {
 // flag.ErrHelp, the calling process should exit with code 0.
 func Parse(stderr, stdout io.Writer, args []string) (inv Invocation, cmd Command, err error) {
 	inv.Stdout = stdout
+	inv.Stderr = stderr
 	fs := flag.FlagSet{}
 	fs.SetOutput(stdout)
 
@@ -304,6 +306,20 @@ Options:
 	}
 	inv.HashFast = mg.HashFast()
 	return inv, cmd, err
+}
+
+// HandleParseError handles errors returned by Parse function. It returns the
+// return code and a boolean indicating whether the program should exit.
+func HandleParseError(err error, stderr io.Writer) (int, bool) {
+	errlog := log.New(stderr, "", 0)
+	if err == flag.ErrHelp {
+		return 0, true
+	}
+	if err != nil {
+		errlog.Println("Error:", err)
+		return 2, true
+	}
+	return 0, false
 }
 
 const dotDirectory = "."
