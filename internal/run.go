@@ -57,9 +57,9 @@ func OutputDebug(cmd string, args ...string) (string, error) {
 	return strings.TrimSpace(buf.String()), nil
 }
 
-// splitEnv takes the results from os.Environ() (a []string of foo=bar values)
+// SplitEnv takes the results from os.Environ() (a []string of foo=bar values)
 // and makes a map[string]string out of it.
-func splitEnv(env []string) (map[string]string, error) {
+func SplitEnv(env []string) (map[string]string, error) {
 	out := map[string]string{}
 
 	for _, s := range env {
@@ -85,7 +85,7 @@ func joinEnv(env map[string]string) []string {
 // EnvWithCurrentGOOS returns a copy of os.Environ with the GOOS and GOARCH set
 // to runtime.GOOS and runtime.GOARCH.
 func EnvWithCurrentGOOS() ([]string, error) {
-	vals, err := splitEnv(os.Environ())
+	vals, err := SplitEnv(os.Environ())
 	if err != nil {
 		return nil, err
 	}
@@ -97,7 +97,7 @@ func EnvWithCurrentGOOS() ([]string, error) {
 // EnvWithGOOS retuns the os.Environ() values with GOOS and/or GOARCH either set
 // to their runtime value, or the given value if non-empty.
 func EnvWithGOOS(goos, goarch string) ([]string, error) {
-	env, err := splitEnv(os.Environ())
+	env, err := SplitEnv(os.Environ())
 	if err != nil {
 		return nil, err
 	}
