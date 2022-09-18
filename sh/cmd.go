@@ -2,6 +2,7 @@ package sh
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"log"
@@ -16,19 +17,19 @@ import (
 // useful for creating command aliases to make your scripts easier to read, like
 // this:
 //
-//  // in a helper file somewhere
-//  var g0 = sh.RunCmd("go")  // go is a keyword :(
+//	 // in a helper file somewhere
+//	 var g0 = sh.RunCmd("go")  // go is a keyword :(
 //
-//  // somewhere in your main code
-//	if err := g0("install", "github.com/gohugo/hugo"); err != nil {
-//		return err
-//  }
+//	 // somewhere in your main code
+//		if err := g0("install", "github.com/gohugo/hugo"); err != nil {
+//			return err
+//	 }
 //
 // Args passed to command get baked in as args to the command when you run it.
 // Any args passed in when you run the returned function will be appended to the
 // original args.  For example, this is equivalent to the above:
 //
-//  var goInstall = sh.RunCmd("go", "install") goInstall("github.com/gohugo/hugo")
+//	var goInstall = sh.RunCmd("go", "install") goInstall("github.com/gohugo/hugo")
 //
 // RunCmd uses Exec underneath, so see those docs for more details.
 func RunCmd(cmd string, args ...string) func(args ...string) error {
@@ -89,53 +90,123 @@ func OutputWith(env map[string]string, cmd string, args ...string) (string, erro
 	return strings.TrimSuffix(buf.String(), "\n"), err
 }
 
-// Exec executes the command, piping its stderr to mage's stderr and
-// piping its stdout to the given writer. If the command fails, it will return
-// an error that, if returned from a target or mg.Deps call, will cause mage to
-// exit with the same code as the command failed with.  Env is a list of
-// environment variables to set when running the command, these override the
-// current environment variables set (which are also passed to the command). cmd
-// and args may include references to environment variables in $FOO format, in
-// which case these will be expanded before the command is run.
+// Exec executes the command, piping its stdout and stderr to the given writers.
+// If the command fails, it will return an error that, if returned from a target
+// or mg.Deps call, will cause mage to exit with the same code as the command
+// failed with.
+// Env is a list of environment variables to set when running the command,
+// these override the current environment variables set (which are also passed
+// to the command).
+// cmd and args may include references to environment variables in $FOO format,
+// in which case these will be expanded before the command is run.
 //
 // Ran reports if the command ran (rather than was not found or not executable).
 // Code reports the exit code the command returned if it ran. If err == nil, ran
 // is always true and code is always 0.
 func Exec(env map[string]string, stdout, stderr io.Writer, cmd string, args ...string) (ran bool, err error) {
+	return Command{
+		Cmd:    cmd,
+		Args:   args,
+		Stdout: stdout,
+		Stderr: stderr,
+		Env:    env,
+	}.Exec(context.Background())
+}
+
+// Command is a command to be executed.
+//
+// Both Path and Args may include references to environment variables in $FOO
+// format, // in which case these will be expanded before the command is run.
+type Command struct {
+	// Cmd is the path of the command to execute.
+	// Relative paths are evaluated with respect to WorkingDir.
+	//
+	// Environment variable references of the form $FOO will be expanded before
+	// the command is run.
+	Cmd string
+	// Args are the command line arguments to pass to the command.
+	//
+	// Environment variable references of the form $FOO will be expanded before
+	// the command is run.
+	Args []string
+
+	// Env is a list of environment variables to set when running the command.
+	// These override the current environment variables set (which are also
+	// passed to the command).
+	Env map[string]string
+
+	// Stdout is the command's stdout stream.
+	Stdout io.Writer
+	// Stderr is the command's stderr stream.
+	Stderr io.Writer
+
+	// WorkingDir specifies the working directory this will command execute in.
+	// An empty string indicates the command should run in the current working
+	// directory.
+	WorkingDir string
+}
+
+// Output and Exec use value receivers to avoid race conditions when modifying
+// the Command's internal state during shell expansion.
+
+// Output runs the [Command] and returns the text from stdout.
+//
+// See [Command.Exec] for more detailts.
+func (cmd Command) Output(ctx context.Context) (string, error) {
+	buf := &bytes.Buffer{}
+	cmd.Stdout = buf
+	_, err := cmd.Exec(ctx)
+	return strings.TrimSuffix(buf.String(), "\n"), err
+}
+
+// Exec executes the [Command] using the provided [context.Context] for
+// cancellation, and piping the stdout and stderr to the given writers.
+// If the command fails, it will return an error that, if returned from a target
+// or [mg.Deps] call, will cause mage to exit with the same code as the command
+// failed with.
+//
+// Ran reports if the Command ran (rather than was not found or not executable).
+// Code reports the exit code the command returned if it ran, and can be
+// retrieved from err with [mg.ExitStatus].
+// If err == nil, ran is always true and code is always 0.
+func (cmd Command) Exec(ctx context.Context) (ran bool, err error) {
 	expand := func(s string) string {
-		s2, ok := env[s]
+		s2, ok := cmd.Env[s]
 		if ok {
 			return s2
 		}
 		return os.Getenv(s)
 	}
-	cmd = os.Expand(cmd, expand)
-	for i := range args {
-		args[i] = os.Expand(args[i], expand)
+	cmd.Cmd = os.Expand(cmd.Cmd, expand)
+	for i := range cmd.Args {
+		cmd.Args[i] = os.Expand(cmd.Args[i], expand)
 	}
-	ran, code, err := run(env, stdout, stderr, cmd, args...)
+	ran, code, err := cmd.run(ctx)
 	if err == nil {
 		return true, nil
 	}
 	if ran {
-		return ran, mg.Fatalf(code, `running "%s %s" failed with exit code %d`, cmd, strings.Join(args, " "), code)
+		return ran, mg.Fatalf(code, `running "%s %s" failed with exit code %d`, cmd.Cmd, strings.Join(cmd.Args, " "), code)
 	}
-	return ran, fmt.Errorf(`failed to run "%s %s: %v"`, cmd, strings.Join(args, " "), err)
+	return ran, fmt.Errorf(`failed to run "%s %s: %v"`, cmd.Cmd, strings.Join(cmd.Args, " "), err)
+
 }
 
-func run(env map[string]string, stdout, stderr io.Writer, cmd string, args ...string) (ran bool, code int, err error) {
-	c := exec.Command(cmd, args...)
-	c.Env = os.Environ()
-	for k, v := range env {
-		c.Env = append(c.Env, k+"="+v)
+func (cmd *Command) run(ctx context.Context) (ran bool, code int, err error) {
+	c := exec.CommandContext(ctx, cmd.Cmd, cmd.Args...)
+	env := os.Environ()
+	for k, v := range cmd.Env {
+		env = append(c.Env, k+"="+v)
 	}
-	c.Stderr = stderr
-	c.Stdout = stdout
+	c.Env = env
+	c.Stderr = cmd.Stderr
+	c.Stdout = cmd.Stdout
 	c.Stdin = os.Stdin
+	c.Dir = cmd.WorkingDir
 
-	var quoted []string 
-	for i := range args {
-		quoted = append(quoted, fmt.Sprintf("%q", args[i]));
+	quoted := make([]string, 0, len(cmd.Args))
+	for _, c := range cmd.Args {
+		quoted = append(quoted, fmt.Sprintf("%q", c))
 	}
 	// To protect against logging from doing exec in global variables
 	if mg.Verbose() {
@@ -144,6 +215,7 @@ func run(env map[string]string, stdout, stderr io.Writer, cmd string, args ...st
 	err = c.Run()
 	return CmdRan(err), ExitStatus(err), err
 }
+
 // CmdRan examines the error to determine if it was generated as a result of a
 // command running via os/exec.Command.  If the error is nil, or the command ran
 // (even if it exited with a non-zero exit code), CmdRan reports true.  If the

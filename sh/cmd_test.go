@@ -2,8 +2,10 @@ package sh
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"testing"
+	"time"
 )
 
 func TestOutCmd(t *testing.T) {
@@ -68,5 +70,40 @@ func TestAutoExpand(t *testing.T) {
 	if s != "baz" {
 		t.Fatalf(`Expected "baz" but got %q`, s)
 	}
+}
 
+func TestContextTimeout(t *testing.T) {
+	d := 1 * time.Second
+	ctx, cancel := context.WithTimeout(context.Background(), d)
+	defer cancel()
+	start := time.Now()
+	_, err := Command{
+		Cmd:  os.Args[0],
+		Args: []string{"-sleep", (2 * d).String()},
+	}.Exec(ctx)
+	dd := time.Since(start)
+	if err == nil {
+		t.Fatalf("Command should have errored")
+	}
+	if dd < d {
+		t.Fatalf("Duration too short: expected %v, got %v", d, dd)
+	}
+	// allow some wiggle room, too account for Exec overheard
+	if dd-d > 50*time.Millisecond {
+		t.Fatalf("Expected duration %v, got %v", d, dd)
+	}
+}
+
+func TestWorkingDirectory(t *testing.T) {
+	tmp := t.TempDir()
+	s, err := Command{
+		Cmd:        "pwd",
+		WorkingDir: tmp,
+	}.Output(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s != tmp {
+		t.Fatalf(`Expected %q but got %q`, tmp, s)
+	}
 }

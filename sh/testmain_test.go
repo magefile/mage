@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"testing"
+	"time"
 )
 
 var (
@@ -14,6 +15,7 @@ var (
 	stdout    string
 	exitCode  int
 	printVar  string
+	sleep     time.Duration
 )
 
 func init() {
@@ -23,6 +25,7 @@ func init() {
 	flag.StringVar(&stdout, "stdout", "", "")
 	flag.IntVar(&exitCode, "exit", 0, "")
 	flag.StringVar(&printVar, "printVar", "", "")
+	flag.DurationVar(&sleep, "sleep", 0, "")
 }
 
 func TestMain(m *testing.M) {
@@ -34,6 +37,11 @@ func TestMain(m *testing.M) {
 	}
 	if printVar != "" {
 		fmt.Println(os.Getenv(printVar))
+		return
+	}
+
+	if sleep != 0 {
+		time.Sleep(sleep)
 		return
 	}
 
