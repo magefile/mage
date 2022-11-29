@@ -169,7 +169,7 @@ func (f Function) ExecCode() string {
 	}
 	out += `
 				}
-				ret := runTarget(wrapFn)`
+				ret := runTarget(logger, wrapFn)`
 	return out
 }
 

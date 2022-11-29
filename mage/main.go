@@ -12,11 +12,13 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"regexp"
 	"runtime"
 	"sort"
 	"strings"
+	"syscall"
 	"text/template"
 	"time"
 
@@ -737,6 +739,10 @@ func RunCompiled(inv Invocation, exePath string, errlog *log.Logger) int {
 		c.Env = append(c.Env, fmt.Sprintf("MAGEFILE_TIMEOUT=%s", inv.Timeout.String()))
 	}
 	debug.Print("running magefile with mage vars:\n", strings.Join(filter(c.Env, "MAGEFILE"), "\n"))
+	// catch SIGINT to allow magefile to handle them
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGINT)
+	defer signal.Stop(sigCh)
 	err := c.Run()
 	if !sh.CmdRan(err) {
 		errlog.Printf("failed to run compiled magefile: %v", err)
