@@ -2,15 +2,39 @@
 title = "Targets"
 weight = 10
 +++
-A target is any exported function that is one of the following types:
-```go
-func()
-func() error 
-func(context.Context)
-func(context.Context) error
+A target is any exported function that has an optional first argument of context.Context, has either
+no return or just an error return, and where the arguments are all of type string, int, bool, or
+time.Duration.
+
+e.g. these are all acceptable targets
+
 ```
+func Build()
+func Install(ctx context.Context) error
+func Run(what string) error
+func Exec(ctx context.Context, name string, count int, debug bool, timeout time.Duration) error
+```
+
 A target is effectively a subcommand of mage while running mage in
 this directory.  i.e. you can run a target by running `mage <target>`
+
+## Arguments
+
+Arguments aside from context are taken from the CLI arguments after the target name.
+Strings are passed as-is, ints are converted with strconv.Atoi, bools are converted with
+strconv.ParseBool, and time.Durations are converted with time.ParseDuration.
+
+Thus you could call Exec above by running
+
+`mage exec somename 5 true 100ms`
+
+All arguments are mandatory and must be specified in the order they appear in the function.
+
+You can intersperse multiple targets with arguments as you'd expect:
+
+`mage run foo.exe exec somename 5 true 100ms`
+
+## Errors
 
 If the function has an error return, errors returned from the function will
 print to stdout and cause the magefile to exit with an exit code of 1.  Any

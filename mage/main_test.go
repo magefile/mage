@@ -2,8 +2,10 @@ package mage
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"debug/macho"
 	"debug/pe"
+	"encoding/hex"
 	"flag"
 	"fmt"
 	"go/build"
@@ -188,7 +190,7 @@ func TestTransitiveHashFast(t *testing.T) {
 
 func TestListMagefilesMain(t *testing.T) {
 	buf := &bytes.Buffer{}
-	files, err := Magefiles("testdata/mixed_main_files", "", "", "go", buf, false)
+	files, err := Magefiles("testdata/mixed_main_files", "", "", "go", buf, false, false)
 	if err != nil {
 		t.Errorf("error from magefile list: %v: %s", err, buf)
 	}
@@ -209,7 +211,7 @@ func TestListMagefilesIgnoresGOOS(t *testing.T) {
 		os.Setenv("GOOS", "windows")
 	}
 	defer os.Setenv("GOOS", runtime.GOOS)
-	files, err := Magefiles("testdata/goos_magefiles", "", "", "go", buf, false)
+	files, err := Magefiles("testdata/goos_magefiles", "", "", "go", buf, false, false)
 	if err != nil {
 		t.Errorf("error from magefile list: %v: %s", err, buf)
 	}
@@ -233,7 +235,7 @@ func TestListMagefilesIgnoresRespectsGOOSArg(t *testing.T) {
 		goos = "windows"
 	}
 	// Set GOARCH as amd64 because windows is not on all non-x86 architectures.
-	files, err := Magefiles("testdata/goos_magefiles", goos, "amd64", "go", buf, false)
+	files, err := Magefiles("testdata/goos_magefiles", goos, "amd64", "go", buf, false, false)
 	if err != nil {
 		t.Errorf("error from magefile list: %v: %s", err, buf)
 	}
@@ -307,7 +309,7 @@ func TestCompileDiffGoosGoarch(t *testing.T) {
 
 func TestListMagefilesLib(t *testing.T) {
 	buf := &bytes.Buffer{}
-	files, err := Magefiles("testdata/mixed_lib_files", "", "", "go", buf, false)
+	files, err := Magefiles("testdata/mixed_lib_files", "", "", "go", buf, false, false)
 	if err != nil {
 		t.Errorf("error from magefile list: %v: %s", err, buf)
 	}
@@ -335,6 +337,140 @@ func TestMixedMageImports(t *testing.T) {
 		t.Errorf("expected to exit with code 0, but got %v, stderr: %s", code, stderr)
 	}
 	expected := "Targets:\n  build    \n"
+	actual := stdout.String()
+	if actual != expected {
+		t.Fatalf("expected %q but got %q", expected, actual)
+	}
+}
+
+func TestMagefilesFolder(t *testing.T) {
+	resetTerm()
+	wd, err := os.Getwd()
+	t.Log(wd)
+	if err != nil {
+		t.Fatalf("finding current working directory: %v", err)
+	}
+	if err := os.Chdir("testdata/with_magefiles_folder"); err != nil {
+		t.Fatalf("changing to magefolders tests data: %v", err)
+	}
+	// restore previous state
+	defer os.Chdir(wd)
+
+	stderr := &bytes.Buffer{}
+	stdout := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:    "",
+		Stdout: stdout,
+		Stderr: stderr,
+		List:   true,
+	}
+	code := Invoke(inv)
+	if code != 0 {
+		t.Errorf("expected to exit with code 0, but got %v, stderr: %s", code, stderr)
+	}
+	expected := "Targets:\n  build    \n"
+	actual := stdout.String()
+	if actual != expected {
+		t.Fatalf("expected %q but got %q", expected, actual)
+	}
+}
+
+func TestMagefilesFolderMixedWithMagefiles(t *testing.T) {
+	resetTerm()
+	wd, err := os.Getwd()
+	t.Log(wd)
+	if err != nil {
+		t.Fatalf("finding current working directory: %v", err)
+	}
+	if err := os.Chdir("testdata/with_magefiles_folder_and_mage_files_in_dot"); err != nil {
+		t.Fatalf("changing to magefolders tests data: %v", err)
+	}
+	// restore previous state
+	defer os.Chdir(wd)
+
+	stderr := &bytes.Buffer{}
+	stdout := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:    "",
+		Stdout: stdout,
+		Stderr: stderr,
+		List:   true,
+	}
+	code := Invoke(inv)
+	if code != 0 {
+		t.Errorf("expected to exit with code 0, but got %v, stderr: %s", code, stderr)
+	}
+	expected := "Targets:\n  build    \n"
+	actual := stdout.String()
+	if actual != expected {
+		t.Fatalf("expected %q but got %q", expected, actual)
+	}
+
+	expectedErr := "[WARNING] You have both a magefiles directory and mage files in the current directory, in future versions the files will be ignored in favor of the directory\n"
+	actualErr := stderr.String()
+	if actualErr != expectedErr {
+		t.Fatalf("expected Warning %q but got %q", expectedErr, actualErr)
+	}
+}
+
+func TestUntaggedMagefilesFolder(t *testing.T) {
+	resetTerm()
+	wd, err := os.Getwd()
+	t.Log(wd)
+	if err != nil {
+		t.Fatalf("finding current working directory: %v", err)
+	}
+	if err := os.Chdir("testdata/with_untagged_magefiles_folder"); err != nil {
+		t.Fatalf("changing to magefolders tests data: %v", err)
+	}
+	// restore previous state
+	defer os.Chdir(wd)
+
+	stderr := &bytes.Buffer{}
+	stdout := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:    "",
+		Stdout: stdout,
+		Stderr: stderr,
+		List:   true,
+	}
+	code := Invoke(inv)
+	if code != 0 {
+		t.Errorf("expected to exit with code 0, but got %v, stderr: %s", code, stderr)
+	}
+	expected := "Targets:\n  build    \n"
+	actual := stdout.String()
+	if actual != expected {
+		t.Fatalf("expected %q but got %q", expected, actual)
+	}
+}
+
+func TestMixedTaggingMagefilesFolder(t *testing.T) {
+	resetTerm()
+	wd, err := os.Getwd()
+	t.Log(wd)
+	if err != nil {
+		t.Fatalf("finding current working directory: %v", err)
+	}
+	if err := os.Chdir("testdata/with_mixtagged_magefiles_folder"); err != nil {
+		t.Fatalf("changing to magefolders tests data: %v", err)
+	}
+	// restore previous state
+	defer os.Chdir(wd)
+
+	stderr := &bytes.Buffer{}
+	stdout := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:    "",
+		Stdout: stdout,
+		Stderr: stderr,
+		List:   true,
+	}
+	code := Invoke(inv)
+	if code != 0 {
+		t.Errorf("expected to exit with code 0, but got %v, stderr: %s", code, stderr)
+	}
+	expected := "Targets:\n  build            \n  untaggedBuild    \n"
 	actual := stdout.String()
 	if actual != expected {
 		t.Fatalf("expected %q but got %q", expected, actual)
@@ -405,6 +541,7 @@ func TestVerboseEnv(t *testing.T) {
 		t.Fatalf("expected %t, but got %t ", expected, inv.Verbose)
 	}
 }
+
 func TestVerboseFalseEnv(t *testing.T) {
 	os.Setenv("MAGEFILE_VERBOSE", "0")
 	defer os.Unsetenv("MAGEFILE_VERBOSE")
@@ -827,10 +964,10 @@ func TestBadSecondTargets(t *testing.T) {
 	}
 	code := Invoke(inv)
 	if code != 2 {
-		t.Errorf("expected 0, but got %v", code)
+		t.Errorf("expected 2, but got %v", code)
 	}
 	actual := stderr.String()
-	expected := "Unknown target specified: NotGonnaWork\n"
+	expected := "Unknown target specified: \"NotGonnaWork\"\n"
 	if actual != expected {
 		t.Errorf("expected %q, but got %q", expected, actual)
 	}
@@ -869,7 +1006,6 @@ func TestParse(t *testing.T) {
 	if s := buf.String(); s != "" {
 		t.Fatalf("expected no stdout output but got %q", s)
 	}
-
 }
 
 func TestSetDir(t *testing.T) {
@@ -936,6 +1072,7 @@ func TestTimeout(t *testing.T) {
 		t.Fatalf("expected %q, but got %q", expected, actual)
 	}
 }
+
 func TestParseHelp(t *testing.T) {
 	buf := &bytes.Buffer{}
 	_, _, err := Parse(ioutil.Discard, buf, []string{"-h"})
@@ -968,7 +1105,7 @@ func TestHelpTarget(t *testing.T) {
 		t.Errorf("expected to exit with code 0, but got %v", code)
 	}
 	actual := stdout.String()
-	expected := "mage panics:\n\nFunction that panics.\n\n"
+	expected := "Function that panics.\n\nUsage:\n\n\tmage panics\n\n"
 	if actual != expected {
 		t.Fatalf("expected %q, but got %q", expected, actual)
 	}
@@ -988,7 +1125,7 @@ func TestHelpAlias(t *testing.T) {
 		t.Errorf("expected to exit with code 0, but got %v", code)
 	}
 	actual := stdout.String()
-	expected := "mage status:\n\nPrints status.\n\nAliases: st, stat\n\n"
+	expected := "Prints status.\n\nUsage:\n\n\tmage status\n\nAliases: st, stat\n\n"
 	if actual != expected {
 		t.Fatalf("expected %q, but got %q", expected, actual)
 	}
@@ -1005,7 +1142,7 @@ func TestHelpAlias(t *testing.T) {
 		t.Errorf("expected to exit with code 0, but got %v", code)
 	}
 	actual = stdout.String()
-	expected = "mage checkout:\n\nAliases: co\n\n"
+	expected = "Usage:\n\n\tmage checkout\n\nAliases: co\n\n"
 	if actual != expected {
 		t.Fatalf("expected %q, but got %q", expected, actual)
 	}
@@ -1054,10 +1191,10 @@ func TestInvalidAlias(t *testing.T) {
 	}
 	code := Invoke(inv)
 	if code != 2 {
-		t.Errorf("expected to exit with code 1, but got %v", code)
+		t.Errorf("expected to exit with code 2, but got %v", code)
 	}
 	actual := stderr.String()
-	expected := "Unknown target specified: co\n"
+	expected := "Unknown target specified: \"co\"\n"
 	if actual != expected {
 		t.Fatalf("expected %q, but got %q", expected, actual)
 	}
@@ -1122,7 +1259,7 @@ func TestCompiledFlags(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := strings.TrimSpace(stdout.String())
-	want := filepath.Base(name) + " deploy:\n\nThis is the synopsis for Deploy. This part shouldn't show up."
+	want := "This is the synopsis for Deploy. This part shouldn't show up.\n\nUsage:\n\n\t" + filepath.Base(name) + " deploy"
 	if got != want {
 		t.Errorf("got %q, want %q", got, want)
 	}
@@ -1207,8 +1344,8 @@ func TestCompiledEnvironmentVars(t *testing.T) {
 	if err := run(stdout, stderr, name, "MAGEFILE_HELP=1", "deploy"); err != nil {
 		t.Fatal(err)
 	}
-	got := strings.TrimSpace(stdout.String())
-	want := filepath.Base(name) + " deploy:\n\nThis is the synopsis for Deploy. This part shouldn't show up."
+	got := stdout.String()
+	want := "This is the synopsis for Deploy. This part shouldn't show up.\n\nUsage:\n\n\t" + filepath.Base(name) + " deploy\n\n"
 	if got != want {
 		t.Errorf("got %q, want %q", got, want)
 	}
@@ -1426,6 +1563,70 @@ func TestSignals(t *testing.T) {
 	}
 }
 
+func TestCompiledDeterministic(t *testing.T) {
+	dir := "./testdata/compiled"
+	compileDir, err := ioutil.TempDir(dir, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var exp string
+	outFile := filepath.Join(dir, mainfile)
+
+	// compile a couple times to be sure
+	for i, run := range []string{"one", "two", "three", "four"} {
+		run := run
+		t.Run(run, func(t *testing.T) {
+			// probably don't run this parallel
+			filename := filepath.Join(compileDir, "mage_out")
+			if runtime.GOOS == "windows" {
+				filename += ".exe"
+			}
+
+			// The CompileOut directory is relative to the
+			// invocation directory, so chop off the invocation dir.
+			outName := "./" + filename[len(dir)-1:]
+			defer os.RemoveAll(compileDir)
+			defer os.Remove(outFile)
+
+			inv := Invocation{
+				Stderr:     os.Stderr,
+				Stdout:     os.Stdout,
+				Verbose:    true,
+				Keep:       true,
+				Dir:        dir,
+				CompileOut: outName,
+			}
+
+			code := Invoke(inv)
+			if code != 0 {
+				t.Errorf("expected to exit with code 0, but got %v", code)
+			}
+
+			f, err := os.Open(outFile)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer f.Close()
+
+			hasher := sha256.New()
+			if _, err := io.Copy(hasher, f); err != nil {
+				t.Fatal(err)
+			}
+
+			got := hex.EncodeToString(hasher.Sum(nil))
+			// set exp on first iteration, subsequent iterations prove the compiled file is identical
+			if i == 0 {
+				exp = got
+			}
+
+			if i > 0 && got != exp {
+				t.Errorf("unexpected sha256 hash of %s; wanted %s, got %s", outFile, exp, got)
+			}
+		})
+	}
+}
+
 func TestClean(t *testing.T) {
 	if err := os.RemoveAll(mg.CacheDir()); err != nil {
 		t.Error("error removing cache dir:", err)
@@ -1542,6 +1743,18 @@ func Test() {
 	}
 	stderr.Reset()
 	stdout.Reset()
+
+	// we need to run go mod tidy, since go build will no longer auto-add dependencies.
+	cmd = exec.Command("go", "mod", "tidy")
+	cmd.Dir = dir
+	cmd.Env = os.Environ()
+	cmd.Stderr = stderr
+	cmd.Stdout = stdout
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("Error running go mod tidy: %v\nStdout: %s\nStderr: %s", err, stdout, stderr)
+	}
+	stderr.Reset()
+	stdout.Reset()
 	code := Invoke(Invocation{
 		Dir:    dir,
 		Stderr: stderr,
@@ -1622,10 +1835,7 @@ func TestNamespaceDefault(t *testing.T) {
 }
 
 func TestAliasToImport(t *testing.T) {
-
 }
-
-var wrongDepRx = regexp.MustCompile("^Error: Invalid type for dependent function.*@ main.FooBar .*magefile.go")
 
 func TestWrongDependency(t *testing.T) {
 	stderr := &bytes.Buffer{}
@@ -1638,16 +1848,19 @@ func TestWrongDependency(t *testing.T) {
 	if code != 1 {
 		t.Fatalf("expected 1, but got %v", code)
 	}
+	expected := "Error: argument 0 (complex128), is not a supported argument type\n"
 	actual := stderr.String()
-	if !wrongDepRx.MatchString(actual) {
-		t.Fatalf("expected matching %q, but got %q", wrongDepRx, actual)
+	if actual != expected {
+		t.Fatalf("expected %q, but got %q", expected, actual)
 	}
 }
 
-/// This code liberally borrowed from https://github.com/rsc/goversion/blob/master/version/exe.go
+// / This code liberally borrowed from https://github.com/rsc/goversion/blob/master/version/exe.go
 
-type exeType int
-type archSize int
+type (
+	exeType  int
+	archSize int
+)
 
 const (
 	winExe exeType = iota

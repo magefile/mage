@@ -12,8 +12,8 @@
         
         {{ define "menu-nextprev" }}
             {{$currentNode := .currentnode }}
-            {{ if ne .menu.Params.hidden true}}
-                {{if hasPrefix $currentNode.URL .menu.URL }}
+            {{ if ne .menu.Params.hidden true }}
+                {{if hasPrefix $currentNode.RelPermalink .menu.RelPermalink }}
                     {{ $currentNode.Scratch.Set "NextPageOK" "OK" }}
                     {{ $currentNode.Scratch.Set "prevPage" ($currentNode.Scratch.Get "prevPageTmp") }}
                 {{else}}
@@ -40,10 +40,10 @@
 
 
         {{with ($.Scratch.Get "prevPage")}}
-            <a class="nav nav-prev" href="{{.URL}}" title="{{.Title}}"> <i class="fa fa-chevron-left"></i></a>
+            <a class="nav nav-prev" href="{{.RelPermalink}}" title="{{.Title}}"> <i class="fa fa-chevron-left"></i></a>
         {{end}}
         {{with ($.Scratch.Get "nextPage")}}
-            <a class="nav nav-next" href="{{.URL}}" title="{{.Title}}" style="margin-right: 0px;"><i class="fa fa-chevron-right"></i></a>
+            <a class="nav nav-next" href="{{.RelPermalink}}" title="{{.Title}}" style="margin-right: 0px;"><i class="fa fa-chevron-right"></i></a>
         {{end}}
     </div>
 

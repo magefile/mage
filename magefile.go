@@ -1,4 +1,5 @@
-//+build mage
+//go:build mage
+// +build mage
 
 // This is the build script for Mage. The install target is all you really need.
 // The release target is for generating official releases and is really only
@@ -9,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -18,6 +20,16 @@ import (
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
 )
+
+var Aliases = map[string]interface{}{
+	"Speak": Say,
+}
+
+// Say says something.
+func Say(msg string, i int, b bool, d time.Duration) error {
+	_, err := fmt.Printf("%v(%T) %v(%T) %v(%T) %v(%T)\n", msg, msg, i, i, b, b, d, d)
+	return err
+}
 
 // Runs "go install" for mage.  This generates the version info the binary.
 func Install() error {
@@ -57,10 +69,11 @@ func Install() error {
 
 var releaseTag = regexp.MustCompile(`^v1\.[0-9]+\.[0-9]+$`)
 
-// Generates a new release.  Expects the TAG environment variable to be set,
-// which will create a new tag with that name.
-func Release() (err error) {
-	tag := os.Getenv("TAG")
+// Generates a new release. Expects a version tag in v1.x.x format.
+func Release(tag string) (err error) {
+	if _, err := exec.LookPath("goreleaser"); err != nil {
+		return fmt.Errorf("can't find goreleaser: %w", err)
+	}
 	if !releaseTag.MatchString(tag) {
 		return errors.New("TAG environment variable must be in semver v1.x.x format, but was " + tag)
 	}
@@ -73,8 +86,8 @@ func Release() (err error) {
 	}
 	defer func() {
 		if err != nil {
-			sh.RunV("git", "tag", "--delete", "$TAG")
-			sh.RunV("git", "push", "--delete", "origin", "$TAG")
+			sh.RunV("git", "tag", "--delete", tag)
+			sh.RunV("git", "push", "--delete", "origin", tag)
 		}
 	}()
 	return sh.RunV("goreleaser")

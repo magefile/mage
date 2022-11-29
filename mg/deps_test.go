@@ -1,10 +1,9 @@
 package mg
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
-	"log"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -79,7 +78,7 @@ func TestDepError(t *testing.T) {
 	// be recreated as a full-stack test.
 
 	f := func() error {
-		return errors.New("ouch!")
+		return errors.New("ouch")
 	}
 	defer func() {
 		err := recover()
@@ -87,8 +86,8 @@ func TestDepError(t *testing.T) {
 			t.Fatal("expected panic, but didn't get one")
 		}
 		actual := fmt.Sprint(err)
-		if "ouch!" != actual {
-			t.Fatalf(`expected to get "ouch!" but got "%s"`, actual)
+		if "ouch" != actual {
+			t.Fatalf(`expected to get "ouch" but got "%s"`, actual)
 		}
 	}()
 	Deps(f)
@@ -165,20 +164,19 @@ func TestDepWithUnhandledFunc(t *testing.T) {
 }
 
 func TestDepsErrors(t *testing.T) {
-	buf := &bytes.Buffer{}
-	log := log.New(buf, "", 0)
+	var hRan, gRan, fRan int64
 
 	h := func() error {
-		log.Println("running h")
+		atomic.AddInt64(&hRan, 1)
 		return errors.New("oops")
 	}
 	g := func() {
 		Deps(h)
-		log.Println("running g")
+		atomic.AddInt64(&gRan, 1)
 	}
 	f := func() {
 		Deps(g, h)
-		log.Println("running f")
+		atomic.AddInt64(&fRan, 1)
 	}
 
 	defer func() {
@@ -186,8 +184,14 @@ func TestDepsErrors(t *testing.T) {
 		if err == nil {
 			t.Fatal("expected f to panic")
 		}
-		if buf.String() != "running h\n" {
-			t.Fatalf("expected just h to run, but got\n%s", buf.String())
+		if hRan != 1 {
+			t.Fatalf("expected h to run once, but got %v", hRan)
+		}
+		if gRan > 0 {
+			t.Fatalf("expected g to panic before incrementing gRan to run, but got %v", gRan)
+		}
+		if fRan > 0 {
+			t.Fatalf("expected f to panic before incrementing fRan to run, but got %v", fRan)
 		}
 	}()
 	f()

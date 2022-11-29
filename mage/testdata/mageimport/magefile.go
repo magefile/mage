@@ -12,9 +12,9 @@ package main
 import (
 	"fmt"
 
-	// mage:import
+	//mage:import
 	_ "github.com/magefile/mage/mage/testdata/mageimport/subdir1"
-	// mage:import zz
+	//mage:import zz
 	"github.com/magefile/mage/mage/testdata/mageimport/subdir2"
 )
 

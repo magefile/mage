@@ -16,7 +16,7 @@ let you import a main package.
 
 In addition, all package files will be imported, so long as they don't have a 
 build tag.  If you try to import a package consisting only of files with build 
-tags (e.g. `//+build mage`), it will cause an error since mage doesn't set any 
+tags (e.g. `//go:build mage`), it will cause an error since mage doesn't set any 
 build tags when importing packages.  Any exported function, in imported 
 packages, that matches Mage's allowed formats will be picked up as a target.
 
@@ -27,15 +27,15 @@ like a normal magefile.
 
 ## Two Ways to Import
 
-Importing targets from a package simply requires adding a `// mage:import`
+Importing targets from a package simply requires adding a `//mage:import`
 comment on an import statement in your magefile.  If there is a name after this
 tag, the targets will be imported into what is effectively like a namespace.
 
 ```go
 import (
-    // mage:import
+    //mage:import
     _ "example.com/me/foobar" 
-    // mage:import build
+    //mage:import build
     "example.com/me/builder"
 )
 ```

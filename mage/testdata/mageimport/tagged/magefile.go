@@ -3,6 +3,6 @@
 package main
 
 import (
-	// mage:import
+	//mage:import
 	_ "github.com/magefile/mage/mage/testdata/mageimport/tagged/pkg"
 )

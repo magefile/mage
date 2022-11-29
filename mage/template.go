@@ -9,18 +9,18 @@ package main
 
 import (
 	"context"
-	"flag"
-	"fmt"
-	"io/ioutil"
-	"log"
+	_flag "flag"
+	_fmt "fmt"
+	_ioutil "io/ioutil"
+	_log "log"
 	"os"
 	"os/signal"
-	"path/filepath"
-	"sort"
+	_filepath "path/filepath"
+	_sort "sort"
 	"strconv"
-	"strings"
+	_strings "strings"
 	"syscall"
-	"text/tabwriter"
+	_tabwriter "text/tabwriter"
 	"time"
 	{{range .Imports}}{{.UniqueName}} "{{.Path}}"
 	{{end}}
@@ -43,7 +43,7 @@ func main() {
 		}		
 		b, err := strconv.ParseBool(val)
 		if err != nil {
-			log.Printf("warning: environment variable %s is not a valid bool value: %v", env, val)
+			_log.Printf("warning: environment variable %s is not a valid bool value: %v", env, val)
 			return false
 		}
 		return b
@@ -56,13 +56,13 @@ func main() {
 		}		
 		d, err := time.ParseDuration(val)
 		if err != nil {
-			log.Printf("warning: environment variable %s is not a valid duration value: %v", env, val)
+			_log.Printf("warning: environment variable %s is not a valid duration value: %v", env, val)
 			return 0
 		}
 		return d
 	}
 	args := arguments{}
-	fs := flag.FlagSet{}
+	fs := _flag.FlagSet{}
 	fs.SetOutput(os.Stdout)
 
 	// default flag set with ExitOnError and auto generated PrintDefaults should be sufficient
@@ -71,7 +71,7 @@ func main() {
 	fs.BoolVar(&args.Help, "h", parseBool("MAGEFILE_HELP"), "print out help for a specific target")
 	fs.DurationVar(&args.Timeout, "t", parseDuration("MAGEFILE_TIMEOUT"), "timeout in duration parsable format (e.g. 5m30s)")
 	fs.Usage = func() {
-		fmt.Fprintf(os.Stdout, ` + "`" + `
+		_fmt.Fprintf(os.Stdout, ` + "`" + `
 %s [options] [target]
 
 Commands:
@@ -83,7 +83,7 @@ Options:
   -t <string>
         timeout in duration parsable format (e.g. 5m30s)
   -v    show verbose output when running targets
- ` + "`" + `[1:], filepath.Base(os.Args[0]))
+ ` + "`" + `[1:], _filepath.Base(os.Args[0]))
 	}
 	if err := fs.Parse(os.Args[1:]); err != nil {
 		// flag will have printed out an error already.
@@ -159,7 +159,7 @@ Options:
 	var defaultTargetAnsiColor = ansiColor[cyan]
 
 	getAnsiColor := func(color string) (string, bool) {
-		colorLower := strings.ToLower(color)
+		colorLower := _strings.ToLower(color)
 		for k, v := range ansiColor {
 			colorConstLower := colorToLowerString(k)
 			if colorConstLower == colorLower {
@@ -216,14 +216,14 @@ Options:
 
 	printName := func(str string) string {
 		if enableColorValue {
-			return fmt.Sprintf("%s%s%s", targetColorValue, str, ansiColorReset)
+			return _fmt.Sprintf("%s%s%s", targetColorValue, str, ansiColorReset)
 		} else {
 			return str
 		}
 	}
 
 	list := func() error {
-		{{with .Description}}fmt.Println(` + "`{{.}}\n`" + `)
+		{{with .Description}}_fmt.Println(` + "`{{.}}\n`" + `)
 		{{- end}}
 		{{- $default := .DefaultFunc}}
 		targets := map[string]string{
@@ -241,17 +241,17 @@ Options:
 		for name := range targets {
 			keys = append(keys, name)
 		}
-		sort.Strings(keys)
+		_sort.Strings(keys)
 
-		fmt.Println("Targets:")
-		w := tabwriter.NewWriter(os.Stdout, 0, 4, 4, ' ', 0)
+		_fmt.Println("Targets:")
+		w := _tabwriter.NewWriter(os.Stdout, 0, 4, 4, ' ', 0)
 		for _, name := range keys {
-			fmt.Fprintf(w, "  %v\t%v\n", printName(name), targets[name])
+			_fmt.Fprintf(w, "  %v\t%v\n", printName(name), targets[name])
 		}
 		err := w.Flush()
 		{{- if .DefaultFunc.Name}}
 			if err == nil {
-				fmt.Println("\n* default target")
+				_fmt.Println("\n* default target")
 			}
 		{{- end}}
 		return err
@@ -278,7 +278,7 @@ Options:
 		return ctx, ctxCancel
 	}
 
-	runTarget := func(logger *log.Logger, fn func(context.Context) error) interface{} {
+	runTarget := func(logger *_log.Logger, fn func(context.Context) error) interface{} {
 		var err interface{}
 		ctx, cancel := getContext()
 		d := make(chan interface{})
@@ -304,16 +304,16 @@ Options:
 				return err
 			// cleanup timeout exceeded
 			case <-cleanupCh:
-				return fmt.Errorf("cleanup timeout exceeded")
+				return _fmt.Errorf("cleanup timeout exceeded")
 			// second SIGINT received
 			case <-sigCh:
 				logger.Println("exiting mage")
-				return fmt.Errorf("exit forced")
+				return _fmt.Errorf("exit forced")
 			}
 		case <-ctx.Done():
 			cancel()
 			e := ctx.Err()
-			fmt.Printf("ctx err: %v\n", e)
+			_fmt.Printf("ctx err: %v\n", e)
 			return e
 		case err = <-d:
 			// we intentionally don't cancel the context here, because
@@ -325,7 +325,7 @@ Options:
 	// variable error.
 	_ = runTarget
 
-	handleError := func(logger *log.Logger, err interface{}) {
+	handleError := func(logger *_log.Logger, err interface{}) {
 		if err != nil {
 			logger.Printf("Error: %+v\n", err)
 			type code interface {
@@ -346,60 +346,32 @@ Options:
 		os.Setenv("MAGEFILE_VERBOSE", "0")
 	}
 
-	log.SetFlags(0)
+	_log.SetFlags(0)
 	if !args.Verbose {
-		log.SetOutput(ioutil.Discard)
+		_log.SetOutput(_ioutil.Discard)
 	}
-	logger := log.New(os.Stderr, "", 0)
+	logger := _log.New(os.Stderr, "", 0)
 	if args.List {
 		if err := list(); err != nil {
-			log.Println(err)
+			_log.Println(err)
 			os.Exit(1)
 		}
 		return
 	}
 
-	targets := map[string]bool {
-		{{range $alias, $funci := .Aliases}}"{{lower $alias}}": true,
-		{{end}}
-		{{range .Funcs}}"{{lower .TargetName}}": true,
-		{{end}}
-		{{range .Imports}}
-			{{$imp := .}}
-			{{range $alias, $funci := .Info.Aliases}}"{{if ne $imp.Alias "."}}{{lower $imp.Alias}}:{{end}}{{lower $alias}}": true,
-			{{end}}
-			{{range .Info.Funcs}}"{{lower .TargetName}}": true,
-			{{end}}
-		{{end}}
-	}
-
-	var unknown []string
-	for _, arg := range args.Args {
-		if !targets[strings.ToLower(arg)] {
-			unknown = append(unknown, arg)
-		}
-	}
-	if len(unknown) == 1 {
-		logger.Println("Unknown target specified:", unknown[0])
-		os.Exit(2)
-	}
-	if len(unknown) > 1 {
-		logger.Println("Unknown targets specified:", strings.Join(unknown, ", "))
-		os.Exit(2)
-	}
-
 	if args.Help {
 		if len(args.Args) < 1 {
 			logger.Println("no target specified")
-			os.Exit(1)
+			os.Exit(2)
 		}
-		switch strings.ToLower(args.Args[0]) {
-			{{range .Funcs}}case "{{lower .TargetName}}":
-				fmt.Print("{{$.BinaryName}} {{lower .TargetName}}:\n\n")
+		switch _strings.ToLower(args.Args[0]) {
+			{{range .Funcs -}}
+			case "{{lower .TargetName}}":
 				{{if ne .Comment "" -}}
-				fmt.Println({{printf "%q" .Comment}})
-				fmt.Println()
+				_fmt.Println({{printf "%q" .Comment}})
+				_fmt.Println()
 				{{end}}
+				_fmt.Print("Usage:\n\n\t{{$.BinaryName}} {{lower .TargetName}}{{range .Args}} <{{.Name}}>{{end}}\n\n")
 				var aliases []string
 				{{- $name := .Name -}}
 				{{- $recv := .Receiver -}}
@@ -407,13 +379,33 @@ Options:
 				{{if and (eq $name $func.Name) (eq $recv $func.Receiver)}}aliases = append(aliases, "{{$alias}}"){{end -}}
 				{{- end}}
 				if len(aliases) > 0 {
-					fmt.Printf("Aliases: %s\n\n", strings.Join(aliases, ", "))
+					_fmt.Printf("Aliases: %s\n\n", _strings.Join(aliases, ", "))
 				}
 				return
-			{{end}}
+			{{end -}}
+			{{range .Imports -}}
+				{{range .Info.Funcs -}}
+			case "{{lower .TargetName}}":
+				{{if ne .Comment "" -}}
+				_fmt.Println({{printf "%q" .Comment}})
+				_fmt.Println()
+				{{end}}
+				_fmt.Print("Usage:\n\n\t{{$.BinaryName}} {{lower .TargetName}}{{range .Args}} <{{.Name}}>{{end}}\n\n")
+				var aliases []string
+				{{- $name := .Name -}}
+				{{- $recv := .Receiver -}}
+				{{range $alias, $func := $.Aliases}}
+				{{if and (eq $name $func.Name) (eq $recv $func.Receiver)}}aliases = append(aliases, "{{$alias}}"){{end -}}
+				{{- end}}
+				if len(aliases) > 0 {
+					_fmt.Printf("Aliases: %s\n\n", _strings.Join(aliases, ", "))
+				}
+				return
+				{{end -}}
+			{{end -}}
 			default:
 				logger.Printf("Unknown target: %q\n", args.Args[0])
-				os.Exit(1)
+				os.Exit(2)
 		}
 	}
 	if len(args.Args) < 1 {
@@ -427,7 +419,7 @@ Options:
 			return
 		}
 		{{.DefaultFunc.ExecCode}}
-		handleError(logger, err)
+		handleError(logger, ret)
 		return
 	{{- else}}
 		if err := list(); err != nil {
@@ -437,37 +429,55 @@ Options:
 		return
 	{{- end}}
 	}
-	for _, target := range args.Args {
-		switch strings.ToLower(target) {
+	for x := 0; x < len(args.Args); {
+		target := args.Args[x]
+		x++
+
+		// resolve aliases
+		switch _strings.ToLower(target) {
 		{{range $alias, $func := .Aliases}}
 			case "{{lower $alias}}":
 				target = "{{$func.TargetName}}"
 		{{- end}}
 		}
-		switch strings.ToLower(target) {
+
+		switch _strings.ToLower(target) {
 		{{range .Funcs }}
 			case "{{lower .TargetName}}":
+				expected := x + {{len .Args}}
+				if expected > len(args.Args) {
+					// note that expected and args at this point include the arg for the target itself
+					// so we subtract 1 here to show the number of args without the target.
+					logger.Printf("not enough arguments for target \"{{.TargetName}}\", expected %v, got %v\n", expected-1, len(args.Args)-1)
+					os.Exit(2)
+				}
 				if args.Verbose {
 					logger.Println("Running target:", "{{.TargetName}}")
 				}
 				{{.ExecCode}}
-				handleError(logger, err)
+				handleError(logger, ret)
 		{{- end}}
 		{{range .Imports}}
 		{{$imp := .}}
 			{{range .Info.Funcs }}
 				case "{{lower .TargetName}}":
+					expected := x + {{len .Args}}
+					if expected > len(args.Args) {
+						// note that expected and args at this point include the arg for the target itself
+						// so we subtract 1 here to show the number of args without the target.
+						logger.Printf("not enough arguments for target \"{{.TargetName}}\", expected %v, got %v\n", expected-1, len(args.Args)-1)
+						os.Exit(2)
+					}
 					if args.Verbose {
 						logger.Println("Running target:", "{{.TargetName}}")
 					}
 					{{.ExecCode}}
-					handleError(logger, err)
+					handleError(logger, ret)
 			{{- end}}
 		{{- end}}
 		default:
-			// should be impossible since we check this above.
-			logger.Printf("Unknown target: %q\n", args.Args[0])
-			os.Exit(1)
+			logger.Printf("Unknown target specified: %q\n", target)
+			os.Exit(2)
 		}
 	}
 }

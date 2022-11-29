@@ -8,7 +8,7 @@ A mage file is any regular go file marked with a build target of "mage" and in
 package main.
 
 ```go
-// +build mage
+//go:build mage
 
 package main
 ```
@@ -25,7 +25,7 @@ use any of Go's usual build constraints, so you can include and exclude
 magefiles based on OS, arch, etc, whether in the filename or in the +build line.
 
 ```go
-// +build mage
+//go:build mage
 
 // A comment on the package will be output when you list the targets of a
 // magefile.
@@ -89,3 +89,17 @@ mage target:
 The first sentence in the comment will be the short help text shown with mage -l.
 The rest of the comment is long help text that will be shown with mage -h <target>
 ```
+
+### Magefiles directory
+
+Some development IDEs might work erratically with magefiles sharing location with other go files which very well might
+have a different package name. 
+
+To simplify development, if you place your Magefiles inside a `magefiles` directory, and none remains in your
+main folder, the `mage` command will pick the directory as the source of your targets while keeping the current directory
+as the working one.
+
+The `magefiles` directory does not require for you to add build tags to the files in it, it is optional, however we 
+encourage you to keep it consistent, either all or none.
+
+Effectively this is the equivalent of running: `mage -d magefiles -w .`
