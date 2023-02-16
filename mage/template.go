@@ -237,6 +237,12 @@ Options:
 		{{- end}}
 		}
 
+		aliases := map[string]string{
+		{{- range $k, $v := .Aliases}}
+			"{{ lowerFirst $k }}": "-> {{lowerFirst $v.TargetName}}",
+		{{- end}}
+		}
+
 		keys := make([]string, 0, len(targets))
 		for name := range targets {
 			keys = append(keys, name)
@@ -248,6 +254,25 @@ Options:
 		for _, name := range keys {
 			_fmt.Fprintf(w, "  %v\t%v\n", printName(name), targets[name])
 		}
+
+		if len(aliases) != 0 {
+			err := w.Flush()
+			if err != nil {
+				return err
+			}
+		
+			aliasKeys := make([]string, 0, len(aliases))
+			for name := range aliases {
+				aliasKeys = append(aliasKeys, name)
+			}
+			_sort.Strings(aliasKeys)
+
+			_fmt.Println("\nAliases:")
+			for _, name := range aliasKeys {
+				_fmt.Fprintf(w, "  %v\t%v\n", printName(name), aliases[name])
+			}
+		}
+
 		err := w.Flush()
 		{{- if .DefaultFunc.Name}}
 			if err == nil {
