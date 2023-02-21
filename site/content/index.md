@@ -73,21 +73,6 @@ asdf install mage latest
 asdf global mage latest
 ```
 
-### Using Aqua
-
-aqua is a declarative CLI Version Manager written in Go.
-You can install CLI tools and manage their versions with YAML declaratively.
-
-To add to a project tool config:
-
-```shell
-aqua init
-aqua generate -i mage
-aqua install
-```
-
-To add to a global `aqua.yaml`, add to the [global configuration](https://aquaproj.github.io/docs/tutorial-basics/global-config) and finally run `aqua install --all` for Mage to be installed.
-
 ## Example Magefile
 
 ```go
@@ -148,7 +133,7 @@ Commands:
   -version  show version info for the mage binary
 
 Options:
-  -d <string>
+  -d <string> 
             directory to read magefiles from (default ".")
   -debug    turn on debug messages
   -f        force recreation of compiled magefile
