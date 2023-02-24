@@ -590,9 +590,7 @@ func Compile(goos, goarch, ldflags, magePath, goCmd, compileTo string, gofiles [
 	for i := range gofiles {
 		gofiles[i] = filepath.Base(gofiles[i])
 	}
-	buildArgs := []string{"build", "-o", compileTo}
-	buildArgs = append(buildArgs, "-trimpath")
-
+	buildArgs := []string{"build", "-o", compileTo, "-trimpath"}
 	if ldflags != "" {
 		buildArgs = append(buildArgs, "-ldflags", ldflags)
 	}
