@@ -127,7 +127,7 @@ const MagefilesDirName = "magefiles"
 
 // UsesMagefiles returns true if we are getting our mage files from a magefiles directory.
 func (i Invocation) UsesMagefiles() bool {
-	return i.Dir == MagefilesDirName
+	return filepath.Base(i.Dir) == MagefilesDirName
 }
 
 // ParseAndRun parses the command line, and then compiles and runs the mage
@@ -316,34 +316,29 @@ func Invoke(inv Invocation) int {
 	if inv.GoCmd == "" {
 		inv.GoCmd = "go"
 	}
-	var noDir bool
 	if inv.Dir == "" {
-		noDir = true
 		inv.Dir = dotDirectory
-		// . will be default unless we find a mage folder.
-		mfSt, err := os.Stat(MagefilesDirName)
-		if err == nil {
-			if mfSt.IsDir() {
-				stderrBuf := &bytes.Buffer{}
-				inv.Dir = MagefilesDirName // preemptive assignment
-				// TODO: Remove this fallback and the above Magefiles invocation when the bw compatibility is removed.
-				files, err := Magefiles(dotDirectory, inv.GOOS, inv.GOARCH, inv.GoCmd, stderrBuf, false, inv.Debug)
-				if err == nil {
-					if len(files) != 0 {
-						errlog.Println("[WARNING] You have both a magefiles directory and mage files in the " +
-							"current directory, in future versions the files will be ignored in favor of the directory")
-						inv.Dir = dotDirectory
-					}
+	}
+	if inv.WorkDir == "" {
+		inv.WorkDir = inv.Dir
+	}
+	magefilesDir := filepath.Join(inv.Dir, MagefilesDirName)
+	// . will be default unless we find a mage folder.
+	mfSt, err := os.Stat(magefilesDir)
+	if err == nil {
+		if mfSt.IsDir() {
+			stderrBuf := &bytes.Buffer{}
+			originalDir := inv.Dir
+			inv.Dir = magefilesDir // preemptive assignment
+			// TODO: Remove this fallback and the above Magefiles invocation when the bw compatibility is removed.
+			files, err := Magefiles(originalDir, inv.GOOS, inv.GOARCH, inv.GoCmd, stderrBuf, false, inv.Debug)
+			if err == nil {
+				if len(files) != 0 {
+					errlog.Println("[WARNING] You have both a magefiles directory and mage files in the " +
+						"current directory, in future versions the files will be ignored in favor of the directory")
+					inv.Dir = originalDir
 				}
 			}
-		}
-	}
-
-	if inv.WorkDir == "" {
-		if noDir {
-			inv.WorkDir = dotDirectory
-		} else {
-			inv.WorkDir = inv.Dir
 		}
 	}
 
