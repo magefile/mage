@@ -89,6 +89,19 @@ func OutputWith(env map[string]string, cmd string, args ...string) (string, erro
 	return strings.TrimSuffix(buf.String(), "\n"), err
 }
 
+// BothOutput runs the command and returns the text from stdout and stderr.
+func BothOutput(cmd string, args ...string) (string, string, error) {
+	return BothOutputWith(nil, cmd, args...)
+}
+
+// BothOutputWith is like RunWith, but returns what is written to stdout and stderr.
+func BothOutputWith(env map[string]string, cmd string, args ...string) (string, string, error) {
+	outBuf := &bytes.Buffer{}
+	errBuf := &bytes.Buffer{}
+	_, err := Exec(env, outBuf, errBuf, cmd, args...)
+	return strings.TrimSuffix(outBuf.String(), "\n"), strings.TrimSuffix(errBuf.String(), "\n"), err
+}
+
 // Exec executes the command, piping its stderr to mage's stderr and
 // piping its stdout to the given writer. If the command fails, it will return
 // an error that, if returned from a target or mg.Deps call, will cause mage to
