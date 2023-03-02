@@ -247,7 +247,7 @@ func Package(path string, files []string) (*PkgInfo, error) {
 	pi := &PkgInfo{
 		AstPkg:      pkg,
 		DocPkg:      p,
-		Description: p.Doc,
+		Description: string(p.Text(p.Doc)),
 	}
 
 	setNamespaces(pi)
