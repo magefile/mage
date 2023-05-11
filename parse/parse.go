@@ -40,16 +40,17 @@ type PkgInfo struct {
 
 // Function represented a job function from a mage file
 type Function struct {
-	PkgAlias   string
-	Package    string
-	ImportPath string
-	Name       string
-	Receiver   string
-	IsError    bool
-	IsContext  bool
-	Synopsis   string
-	Comment    string
-	Args       []Arg
+	PkgAlias        string
+	Package         string
+	ImportPath      string
+	Name            string
+	Receiver        string
+	ReceiverParents []string
+	IsError         bool
+	IsContext       bool
+	Synopsis        string
+	Comment         string
+	Args            []Arg
 }
 
 var _ sort.Interface = (Functions)(nil)
@@ -93,7 +94,11 @@ func (f Function) ID() string {
 func (f Function) TargetName() string {
 	var names []string
 
-	for _, s := range []string{f.PkgAlias, f.Receiver, f.Name} {
+	a := []string{f.PkgAlias}
+	a = append(a, f.ReceiverParents...)
+	a = append(a, f.Receiver, f.Name)
+
+	for _, s := range a {
 		if s != "" {
 			names = append(names, s)
 		}
@@ -372,6 +377,7 @@ func setNamespaces(pi *PkgInfo) {
 			continue
 		}
 		debug.Printf("found namespace %s %s", pi.DocPkg.ImportPath, t.Name)
+
 		for _, f := range t.Methods {
 			if !ast.IsExported(f.Name) {
 				continue
@@ -386,6 +392,10 @@ func setNamespaces(pi *PkgInfo) {
 			fn.Comment = toOneLine(f.Doc)
 			fn.Synopsis = sanitizeSynopsis(f)
 			fn.Receiver = t.Name
+
+			if n := buildFullNamespaceName(t); len(n) > 1 {
+				fn.ReceiverParents = n[:len(n)-1]
+			}
 
 			pi.Funcs = append(pi.Funcs, fn)
 		}
@@ -489,23 +499,67 @@ func getImportPath(imp *ast.ImportSpec) (path, alias string, ok bool) {
 	}
 }
 
-func isNamespace(t *doc.Type) bool {
-	if len(t.Decl.Specs) != 1 {
-		return false
+// getParentNamespaces will recurse through t, building a slice of all the parent declared type names
+// until a final type is reached.
+func getParentNamespaces(t *ast.Ident) ([]string, *ast.SelectorExpr) {
+	id, ok := t.Obj.Decl.(*ast.TypeSpec)
+	if !ok {
+		return nil, nil
 	}
+
+	var parents []string
+	var sel *ast.SelectorExpr
+	ident, ok := id.Type.(*ast.Ident)
+	if ok {
+		parents, sel = getParentNamespaces(ident)
+	} else {
+		sel, ok = id.Type.(*ast.SelectorExpr)
+		if !ok {
+			return nil, nil
+		}
+	}
+
+	return append(parents, id.Name.String()), sel
+}
+
+// buildFullNamespaceName builds the full name to a namespace, including parent names.
+// The last name in the slice will be t's name.
+func buildFullNamespaceName(t *doc.Type) []string {
+	if len(t.Decl.Specs) != 1 {
+		return nil
+	}
+
 	id, ok := t.Decl.Specs[0].(*ast.TypeSpec)
 	if !ok {
-		return false
+		return nil
 	}
-	sel, ok := id.Type.(*ast.SelectorExpr)
-	if !ok {
-		return false
+
+	var parents []string
+	var sel *ast.SelectorExpr
+
+	switch v := id.Type.(type) {
+	case *ast.SelectorExpr:
+		sel = v
+	case *ast.Ident:
+		parents, sel = getParentNamespaces(v)
+	default:
+		return nil
 	}
+
 	ident, ok := sel.X.(*ast.Ident)
 	if !ok {
-		return false
+		return nil
 	}
-	return ident.Name == "mg" && sel.Sel.Name == "Namespace"
+
+	if ident.Name != "mg" || sel.Sel.Name != "Namespace" {
+		return nil
+	}
+
+	return append(parents, id.Name.String())
+}
+
+func isNamespace(t *doc.Type) bool {
+	return len(buildFullNamespaceName(t)) > 0
 }
 
 // checkDupeTargets checks a package for duplicate target names.
