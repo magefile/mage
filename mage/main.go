@@ -319,44 +319,62 @@ func Invoke(inv Invocation) int {
 	if inv.Dir == "" {
 		inv.Dir = dotDirectory
 	}
+	inv.Dir, _ = filepath.Abs(inv.Dir)
 	if inv.WorkDir == "" {
 		inv.WorkDir = inv.Dir
 	}
-	magefilesDir := filepath.Join(inv.Dir, MagefilesDirName)
-	// . will be default unless we find a mage folder.
-	mfSt, err := os.Stat(magefilesDir)
-	if err == nil {
-		if mfSt.IsDir() {
-			stderrBuf := &bytes.Buffer{}
-			originalDir := inv.Dir
-			inv.Dir = magefilesDir // preemptive assignment
-			// TODO: Remove this fallback and the above Magefiles invocation when the bw compatibility is removed.
-			files, err := Magefiles(originalDir, inv.GOOS, inv.GOARCH, inv.GoCmd, stderrBuf, false, inv.Debug)
-			if err == nil {
-				if len(files) != 0 {
-					errlog.Println("[WARNING] You have both a magefiles directory and mage files in the " +
-						"current directory, in future versions the files will be ignored in favor of the directory")
-					inv.Dir = originalDir
+	var (
+		files  []string
+		err    error
+		errMsg string
+	)
+
+	for len(files) == 0 && len(inv.Dir) > 1 {
+		magefilesDir := filepath.Join(inv.Dir, MagefilesDirName)
+		// . will be default unless we find a mage folder.
+		mfSt, err := os.Stat(magefilesDir)
+		if err == nil {
+			if mfSt.IsDir() {
+				stderrBuf := &bytes.Buffer{}
+				originalDir := inv.Dir
+				inv.Dir = magefilesDir // preemptive assignment
+				// TODO: Remove this fallback and the above Magefiles invocation when the bw compatibility is removed.
+				files, err := Magefiles(originalDir, inv.GOOS, inv.GOARCH, inv.GoCmd, stderrBuf, false, inv.Debug)
+				if err == nil {
+					if len(files) != 0 {
+						errlog.Println("[WARNING] You have both a magefiles directory and mage files in the " +
+							"current directory, in future versions the files will be ignored in favor of the directory")
+						inv.Dir = originalDir
+					}
 				}
 			}
 		}
+
+		files, err = Magefiles(inv.Dir, inv.GOOS, inv.GOARCH, inv.GoCmd, inv.Stderr, inv.UsesMagefiles(), inv.Debug)
+		if err != nil {
+			errMsg = fmt.Sprintf("Error determining list of magefiles: %s", err)
+			inv.Dir = filepath.Dir(inv.Dir)
+			files = []string{}
+			continue
+		}
+
+		if len(files) == 0 {
+			errMsg = "No .go files marked with the mage build tag in this directory or any parent directory."
+			inv.Dir = filepath.Dir(inv.Dir)
+			files = []string{}
+			continue
+		}
 	}
+	if len(files) == 0 {
+		errlog.Println(errMsg)
+		return 1
+	}
+	debug.Printf("found magefiles: %s", strings.Join(files, ", "))
 
 	if inv.CacheDir == "" {
 		inv.CacheDir = mg.CacheDir()
 	}
 
-	files, err := Magefiles(inv.Dir, inv.GOOS, inv.GOARCH, inv.GoCmd, inv.Stderr, inv.UsesMagefiles(), inv.Debug)
-	if err != nil {
-		errlog.Println("Error determining list of magefiles:", err)
-		return 1
-	}
-
-	if len(files) == 0 {
-		errlog.Println("No .go files marked with the mage build tag in this directory.")
-		return 1
-	}
-	debug.Printf("found magefiles: %s", strings.Join(files, ", "))
 	exePath := inv.CompileOut
 	if inv.CompileOut == "" {
 		exePath, err = ExeName(inv.GoCmd, inv.CacheDir, files)
