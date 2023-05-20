@@ -13,6 +13,10 @@ and Mage automatically uses them as Makefile-like runnable targets.
 Mage has no dependencies outside the Go standard library, and builds with Go 1.7
 and above (possibly even lower versions, but they're not regularly tested).
 
+```
+go install github.com/magefile/mage@latest
+```
+
 **Using GOPATH**
 
 ```
