@@ -5,4 +5,4 @@
 
 package lib
 
-func Build() {]}
+func Build() {}
