@@ -32,3 +32,18 @@ jobs:
         go test -tags CI -race ./...
       env:
         GOPATH: /home/runner/go
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Set up Go ${{ matrix.go-version }}
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ matrix.go-version }}
+
+    - name: Lint
+      uses: Jerome1337/gofmt-action@v1.0.5
+      with:
+        gofmt-path: './'
+        gofmt-flags: '-l -d'
