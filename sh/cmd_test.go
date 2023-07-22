@@ -3,6 +3,8 @@ package sh
 import (
 	"bytes"
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -68,5 +70,24 @@ func TestAutoExpand(t *testing.T) {
 	if s != "baz" {
 		t.Fatalf(`Expected "baz" but got %q`, s)
 	}
+}
 
+func TestDirectory(t *testing.T) {
+	tmp := t.TempDir()
+	buf := &bytes.Buffer{}
+	err := RunSh("pwd", WithDir(tmp), WithStdout(buf))()
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir, err := filepath.EvalSymlinks(strings.TrimSpace(buf.String()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	tmpDir, err := filepath.EvalSymlinks(tmp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if dir != tmpDir {
+		t.Fatalf(`Expected %q but got %q`, tmpDir, dir)
+	}
 }
