@@ -14,6 +14,15 @@ and Mage automatically uses them as Makefile-like runnable targets.
 Mage has no dependencies outside the Go standard library, and builds with Go 1.7
 and above (possibly even lower versions, but they're not regularly tested).
 
+#### Using Go Install (Faster)
+
+```console
+$ go install github.com/magefile/mage@latest
+go: downloading github.com/magefile/mage v1.15.0
+```
+
+`mage` should now be in your `$GOBIN` (`go env | grep GOBIN` to check). Make sure it's in your `$PATH`
+
 #### Using Go Modules (Recommended)
 
 ```plain
