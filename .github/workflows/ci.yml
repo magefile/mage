@@ -10,6 +10,7 @@ jobs:
       matrix:
         go-version:
           - stable
+          - 1.21.x
           - 1.20.x
           - 1.19.x
           - 1.17.x
