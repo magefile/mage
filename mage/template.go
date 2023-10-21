@@ -16,10 +16,12 @@ import (
 	_ioutil "io/ioutil"
 	_log "log"
 	"os"
+	"os/signal"
 	_filepath "path/filepath"
 	_sort "sort"
 	"strconv"
 	_strings "strings"
+	"syscall"
 	_tabwriter "text/tabwriter"
 	"time"
 	{{range .Imports}}{{.UniqueName}} "{{.Path}}"
@@ -258,23 +260,27 @@ Options:
 	}
 
 	var ctx context.Context
-	var ctxCancel func()
+	ctxCancel := func(){}
+
+	// by deferring in a closure, we let the cancel function get replaced
+	// by the getContext function.
+	defer func() {
+		ctxCancel()
+	}()
 
 	getContext := func() (context.Context, func()) {
-		if ctx != nil {
-			return ctx, ctxCancel
+		if ctx == nil {
+			if args.Timeout != 0 {
+				ctx, ctxCancel = context.WithTimeout(context.Background(), args.Timeout)
+			} else {
+				ctx, ctxCancel = context.WithCancel(context.Background())
+			}
 		}
 
-		if args.Timeout != 0 {
-			ctx, ctxCancel = context.WithTimeout(context.Background(), args.Timeout)
-		} else {
-			ctx = context.Background()
-			ctxCancel = func() {}
-		}
 		return ctx, ctxCancel
 	}
 
-	runTarget := func(fn func(context.Context) error) interface{} {
+	runTarget := func(logger *_log.Logger, fn func(context.Context) error) interface{} {
 		var err interface{}
 		ctx, cancel := getContext()
 		d := make(chan interface{})
@@ -291,14 +297,34 @@ Options:
 			err := fn(ctx)
 			d <- err
 		}()
+		sigCh := make(chan os.Signal, 1)
+		signal.Notify(sigCh, syscall.SIGINT)
 		select {
+		case <-sigCh:
+			logger.Println("cancelling mage targets, waiting up to 5 seconds for cleanup...")
+			cancel()
+			cleanupCh := time.After(5 * time.Second)
+
+			select {
+			// target exited by itself
+			case err = <-d:
+				return err
+			// cleanup timeout exceeded
+			case <-cleanupCh:
+				return _fmt.Errorf("cleanup timeout exceeded")
+			// second SIGINT received
+			case <-sigCh:
+				logger.Println("exiting mage")
+				return _fmt.Errorf("exit forced")
+			}
 		case <-ctx.Done():
 			cancel()
 			e := ctx.Err()
 			_fmt.Printf("ctx err: %v\n", e)
 			return e
 		case err = <-d:
-			cancel()
+			// we intentionally don't cancel the context here, because
+			// the next target will need to run with the same context.
 			return err
 		}
 	}
