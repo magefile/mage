@@ -38,7 +38,7 @@ type PkgInfo struct {
 	Imports     Imports
 }
 
-// Function represented a job function from a mage file
+// Function represents a job function from a mage file
 type Function struct {
 	PkgAlias   string
 	Package    string
