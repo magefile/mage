@@ -869,6 +869,26 @@ func TestKeepFlag(t *testing.T) {
 	}
 }
 
+// Test if the -completion flag does generate a completion script
+func TestCompletionFlag(t *testing.T) {
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	code := ParseAndRun(stdout, stderr, nil, []string{"-completion", "zsh"})
+	if code != 0 {
+		t.Fatalf("expected code 0, but got %v, %s", code, stderr)
+	}
+	actual := stdout.String()
+	expectedData, err := ioutil.ReadFile("../completions/mage.zsh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected := string(expectedData)
+
+	if actual != expected {
+		t.Fatalf("expected %q\ngot %q", expected, actual)
+	}
+}
+
 type tLogWriter struct {
 	*testing.T
 }

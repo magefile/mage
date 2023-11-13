@@ -22,6 +22,7 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/magefile/mage/completions"
 	"github.com/magefile/mage/internal"
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/parse"
@@ -88,6 +89,7 @@ const (
 	Init                  // create a starting template for mage
 	Clean                 // clean out old compiled mage binaries from the cache
 	CompileStatic         // compile a static binary of the current directory
+	Completions           // generate a zsh completion file for mage
 )
 
 // Main is the entrypoint for running mage.  It exists external to mage's main
@@ -99,26 +101,27 @@ func Main() int {
 
 // Invocation contains the args for invoking a run of Mage.
 type Invocation struct {
-	Debug      bool          // turn on debug messages
-	Dir        string        // directory to read magefiles from
-	WorkDir    string        // directory where magefiles will run
-	Force      bool          // forces recreation of the compiled binary
-	Verbose    bool          // tells the magefile to print out log statements
-	List       bool          // tells the magefile to print out a list of targets
-	Help       bool          // tells the magefile to print out help for a specific target
-	Keep       bool          // tells mage to keep the generated main file after compiling
-	Timeout    time.Duration // tells mage to set a timeout to running the targets
-	CompileOut string        // tells mage to compile a static binary to this path, but not execute
-	GOOS       string        // sets the GOOS when producing a binary with -compileout
-	GOARCH     string        // sets the GOARCH when producing a binary with -compileout
-	Ldflags    string        // sets the ldflags when producing a binary with -compileout
-	Stdout     io.Writer     // writer to write stdout messages to
-	Stderr     io.Writer     // writer to write stderr messages to
-	Stdin      io.Reader     // reader to read stdin from
-	Args       []string      // args to pass to the compiled binary
-	GoCmd      string        // the go binary command to run
-	CacheDir   string        // the directory where we should store compiled binaries
-	HashFast   bool          // don't rely on GOCACHE, just hash the magefiles
+	Debug            bool          // turn on debug messages
+	Dir              string        // directory to read magefiles from
+	WorkDir          string        // directory where magefiles will run
+	Force            bool          // forces recreation of the compiled binary
+	Verbose          bool          // tells the magefile to print out log statements
+	List             bool          // tells the magefile to print out a list of targets
+	Help             bool          // tells the magefile to print out help for a specific target
+	Keep             bool          // tells mage to keep the generated main file after compiling
+	Timeout          time.Duration // tells mage to set a timeout to running the targets
+	CompileOut       string        // tells mage to compile a static binary to this path, but not execute
+	GOOS             string        // sets the GOOS when producing a binary with -compileout
+	GOARCH           string        // sets the GOARCH when producing a binary with -compileout
+	Ldflags          string        // sets the ldflags when producing a binary with -compileout
+	Stdout           io.Writer     // writer to write stdout messages to
+	Stderr           io.Writer     // writer to write stderr messages to
+	Stdin            io.Reader     // reader to read stdin from
+	Args             []string      // args to pass to the compiled binary
+	GoCmd            string        // the go binary command to run
+	CacheDir         string        // the directory where we should store compiled binaries
+	CompletionsShell string        // the shell to generate completions for
+	HashFast         bool          // don't rely on GOCACHE, just hash the magefiles
 }
 
 // MagefilesDirName is the name of the default folder to look for if no directory was specified,
@@ -170,6 +173,18 @@ func ParseAndRun(stdout, stderr io.Writer, stdin io.Reader, args []string) int {
 		return 0
 	case CompileStatic:
 		return Invoke(inv)
+	case Completions:
+		shell := inv.CompletionsShell
+		cmpl, err := completions.GetCompletions(shell)
+		if err != nil {
+			errlog.Println("error getting completions:", err)
+			return 1
+		}
+		if err := cmpl.GenerateCompletions(stdout); err != nil {
+			errlog.Println("error generating completions:", err)
+			return 1
+		}
+		return 0
 	case None:
 		return Invoke(inv)
 	default:
@@ -210,6 +225,8 @@ func Parse(stderr, stdout io.Writer, args []string) (inv Invocation, cmd Command
 	fs.BoolVar(&clean, "clean", false, "clean out old generated binaries from CACHE_DIR")
 	var compileOutPath string
 	fs.StringVar(&compileOutPath, "compile", "", "output a static binary to the given path")
+	var completionsShell string
+	fs.StringVar(&completionsShell, "completion", "", "generate a completion script for mage")
 
 	fs.Usage = func() {
 		fmt.Fprint(stdout, `
@@ -218,13 +235,16 @@ mage [options] [target]
 Mage is a make-like command runner.  See https://magefile.org for full docs.
 
 Commands:
-  -clean    clean out old generated binaries from CACHE_DIR
-  -compile <string>
-            output a static binary to the given path
-  -h        show this help
-  -init     create a starting template if no mage files exist
-  -l        list mage targets in this directory
-  -version  show version info for the mage binary
+  -clean    		clean out old generated binaries from CACHE_DIR
+  -compile 		<string>
+            		output a static binary to the given path
+  -h        		show this help
+  -init     		create a starting template if no mage files exist
+  -l        		list mage targets in this directory
+  -format 		format template to use when listing targets
+  -version  		show version info for the mage binary
+  -completion 		<string>
+  			generate a completion script for mage for given shell
 
 Options:
   -d <string> 
@@ -269,6 +289,10 @@ Options:
 	case showVersion:
 		numCommands++
 		cmd = Version
+	case completionsShell != "":
+		numCommands++
+		cmd = Completions
+		inv.CompletionsShell = completionsShell
 	case clean:
 		numCommands++
 		cmd = Clean
