@@ -1,4 +1,8 @@
-+++
+git clone https://github.com/magefile/mage
+cd mage
+go run bootstrap.gogo get -u -d github.com/magefile/mage
+cd $GOPATH/src/github.com/magefile/mage
+go run bootstrap.goHUGO_BUILD_TAGS=extended mage install+++
 title = "Mage"
 +++
 
