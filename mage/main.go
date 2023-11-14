@@ -89,7 +89,7 @@ const (
 	Init                  // create a starting template for mage
 	Clean                 // clean out old compiled mage binaries from the cache
 	CompileStatic         // compile a static binary of the current directory
-	Completions           // generate a zsh completion file for mage
+	Completions           // generate a completion file for mage for given shell
 )
 
 // Main is the entrypoint for running mage.  It exists external to mage's main
