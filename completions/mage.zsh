@@ -12,7 +12,7 @@ _arguments -C \
   '-init[create a starting template if no mage files exist]' \
   '-h[show help]' \
   '-l[list mage targets in this directory]' \
-  '-list-parsable[when used in conjunction with -l, will list targets in a machine-parseable format]' \
+  '-format[when used in conjunction with -l, will list targets in a specified golang template format (available vars: .Name, .Synopsis)]' \
   '-d[directory to read magefiles from (default "." or "magefiles" if exists)]:magepath:_path_files -/' \
   '-debug[turn on debug messages]' \
   '-f[force recreation of compiled magefile]' \

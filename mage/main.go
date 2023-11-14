@@ -107,6 +107,7 @@ type Invocation struct {
 	Force            bool          // forces recreation of the compiled binary
 	Verbose          bool          // tells the magefile to print out log statements
 	List             bool          // tells the magefile to print out a list of targets
+	Format           string        // tells the magefile to print out a list of targets in a specific format
 	Help             bool          // tells the magefile to print out help for a specific target
 	Keep             bool          // tells mage to keep the generated main file after compiling
 	Timeout          time.Duration // tells mage to set a timeout to running the targets
@@ -217,6 +218,7 @@ func Parse(stderr, stdout io.Writer, args []string) (inv Invocation, cmd Command
 	// commands below
 
 	fs.BoolVar(&inv.List, "l", false, "list mage targets in this directory")
+	fs.StringVar(&inv.Format, "format", "", "format template to use when listing targets")
 	var showVersion bool
 	fs.BoolVar(&showVersion, "version", false, "show version info for the mage binary")
 	var mageInit bool
@@ -252,7 +254,7 @@ Options:
   -debug    turn on debug messages
   -f        force recreation of compiled magefile
   -goarch   sets the GOARCH for the binary created by -compile (default: current arch)
-  -gocmd <string>
+  -gocmd 	<string>
 		    use the given go binary to compile the output (default: "go")
   -goos     sets the GOOS for the binary created by -compile (default: current OS)
   -ldflags  sets the ldflags for the binary created by -compile (default: "")
@@ -744,6 +746,9 @@ func RunCompiled(inv Invocation, exePath string, errlog *log.Logger) int {
 	}
 	if inv.List {
 		c.Env = append(c.Env, "MAGEFILE_LIST=1")
+	}
+	if inv.Format != "" {
+		c.Env = append(c.Env, fmt.Sprintf("MAGEFILE_FORMAT=%s", inv.Format))
 	}
 	if inv.Help {
 		c.Env = append(c.Env, "MAGEFILE_HELP=1")

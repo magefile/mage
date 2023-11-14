@@ -13,6 +13,7 @@ func TestMageImportsList(t *testing.T) {
 		Stdout: stdout,
 		Stderr: stderr,
 		List:   true,
+		Keep:   true,
 	}
 
 	code := Invoke(inv)
