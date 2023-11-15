@@ -26,6 +26,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/magefile/mage/completions"
 	"github.com/magefile/mage/internal"
 	"github.com/magefile/mage/mg"
 )
@@ -902,10 +903,7 @@ func TestCompletionFlag(t *testing.T) {
 		t.Fatalf("expected code 0, but got %v, %s", code, stderr)
 	}
 	actual := stdout.String()
-	expectedData, err := ioutil.ReadFile("../completions/mage.zsh")
-	if err != nil {
-		t.Fatal(err)
-	}
+	expectedData := completions.ZshCompletions
 	expected := string(expectedData)
 
 	if actual != expected {

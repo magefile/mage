@@ -1,4 +1,11 @@
-#compdef mage
+package completions
+
+import (
+	"fmt"
+	"io"
+)
+
+var ZshCompletions string = `#compdef mage
 
 local curcontext="$curcontext" state line ret=1
 typeset -A opt_args
@@ -65,3 +72,15 @@ return ret
 # sh-basic-offset: 2
 # End:
 # vim: ft=zsh sw=2 ts=2 et
+`
+
+type Zsh struct{}
+
+func (z *Zsh) GenerateCompletions(w io.Writer) error {
+	_, err := fmt.Fprint(w, string(ZshCompletions))
+
+	if err != nil {
+		return err
+	}
+	return nil
+}

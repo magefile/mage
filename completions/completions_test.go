@@ -3,7 +3,6 @@ package completions
 import (
 	"bytes"
 	"io"
-	"io/ioutil"
 	"testing"
 )
 
@@ -58,11 +57,6 @@ func TestGenerateCompletionsFails(t *testing.T) {
 }
 
 func TestGenerateCompletions(t *testing.T) {
-	zshTestData, err := ioutil.ReadFile("mage.zsh")
-	if err != nil {
-		t.Fatalf("expected to get test data, but got error: %v", err)
-	}
-
 	testCases := []struct {
 		name     string
 		cmpl     Completion
@@ -72,7 +66,7 @@ func TestGenerateCompletions(t *testing.T) {
 		{
 			name:     "zsh",
 			cmpl:     &Zsh{},
-			expected: string(zshTestData),
+			expected: string(ZshCompletions),
 			err:      false,
 		},
 	}
