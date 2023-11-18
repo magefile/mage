@@ -1745,10 +1745,8 @@ func TestGoModules(t *testing.T) {
 
 package main
 
-import "golang.org/x/text/unicode/norm"
-
 func Test() {
-	print("unicode version: " + norm.Version)
+	print("nothing is imported here for >1.17 compatibility")
 }
 `), 0600)
 	if err != nil {
