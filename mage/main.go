@@ -119,6 +119,10 @@ type Invocation struct {
 	GoCmd      string        // the go binary command to run
 	CacheDir   string        // the directory where we should store compiled binaries
 	HashFast   bool          // don't rely on GOCACHE, just hash the magefiles
+
+	// all the arguments that came after --, we do not do any kind of parsing on them as
+	// they are intended for a subprocess and we know nothing about them
+	ExtraArgs []string
 }
 
 // MagefilesDirName is the name of the default folder to look for if no directory was specified,
@@ -296,7 +300,23 @@ Options:
 		return inv, cmd, errors.New("-goos and -goarch only apply when running with -compile")
 	}
 
-	inv.Args = fs.Args()
+	var extraArgs []string
+	extraArgsFound := false
+	for _, arg := range fs.Args() {
+		// we do not really care about args before this point, this is where extra args begin
+		if arg == "--" {
+			extraArgsFound = true
+			continue
+		}
+		// all args before -- are the positional args that go to mage
+		if !extraArgsFound {
+			inv.Args = append(inv.Args, arg)
+			continue
+		}
+		// now we parse all that comes after --
+		extraArgs = append(extraArgs, arg)
+	}
+	inv.ExtraArgs = extraArgs
 	if inv.Help && len(inv.Args) > 1 {
 		return inv, cmd, errors.New("-h can only show help for a single target")
 	}

@@ -116,6 +116,10 @@ func (f Function) ExecCode() string {
 	var parseargs string
 	for x, arg := range f.Args {
 		switch arg.Type {
+		case "mg.ExtraArgs":
+			parseargs += fmt.Sprintf(`
+			arg%d := args.ExtraArgs
+			x++`, x)
 		case "string":
 			parseargs += fmt.Sprintf(`
 			arg%d := args.Args[x]
@@ -847,4 +851,5 @@ var argTypes = map[string]string{
 	"int":              "int",
 	"&{time Duration}": "time.Duration",
 	"bool":             "bool",
+	"mg.ExtraArgs":     "mg.ExtraArgs",
 }
