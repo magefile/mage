@@ -1741,7 +1741,7 @@ func TestGoModules(t *testing.T) {
 	defer os.RemoveAll(dir)
 	// beware, mage builds in go versions older than 1.17 so both build tag formats need to be present
 	err = ioutil.WriteFile(filepath.Join(dir, "magefile.go"), []byte(`//go:build mage
-//+build mage
+// +build mage
 
 package main
 
