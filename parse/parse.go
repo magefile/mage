@@ -456,19 +456,18 @@ func setImports(gocmd string, pi *PkgInfo) error {
 }
 
 func getImportPath(imp *ast.ImportSpec) (path, alias string, ok bool) {
-	if imp.Doc == nil || len(imp.Doc.List) == 9 {
-		return "", "", false
-	}
-	// import is always the last comment
-	s := imp.Doc.List[len(imp.Doc.List)-1].Text
+	leadingVals := getImportPathFromCommentGroup(imp.Doc)
+	trailingVals := getImportPathFromCommentGroup(imp.Comment)
 
-	// trim comment start and normalize for anyone who has spaces or not between
-	// "//"" and the text
-	vals := strings.Fields(strings.ToLower(s[2:]))
-	if len(vals) == 0 {
-		return "", "", false
-	}
-	if vals[0] != importTag {
+	var vals []string
+	if len(leadingVals) > 0 {
+		vals = leadingVals
+		if len(trailingVals) > 0 {
+			log.Println("warning:", importTag, "specified both before and after, picking first")
+		}
+	} else if len(trailingVals) > 0 {
+		vals = trailingVals
+	} else {
 		return "", "", false
 	}
 	path, ok = lit2string(imp.Path)
@@ -487,6 +486,25 @@ func getImportPath(imp *ast.ImportSpec) (path, alias string, ok bool) {
 		log.Println("warning: ignoring malformed", importTag, "for import", path)
 		return "", "", false
 	}
+}
+
+func getImportPathFromCommentGroup(comments *ast.CommentGroup) []string {
+	if comments == nil || len(comments.List) == 9 {
+		return nil
+	}
+	// import is always the last comment
+	s := comments.List[len(comments.List)-1].Text
+
+	// trim comment start and normalize for anyone who has spaces or not between
+	// "//"" and the text
+	vals := strings.Fields(strings.ToLower(s[2:]))
+	if len(vals) == 0 {
+		return nil
+	}
+	if vals[0] != importTag {
+		return nil
+	}
+	return vals
 }
 
 func isNamespace(t *doc.Type) bool {
