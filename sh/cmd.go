@@ -117,10 +117,14 @@ func Exec(env map[string]string, stdout, stderr io.Writer, cmd string, args ...s
 	if err == nil {
 		return true, nil
 	}
+
+	commandWithArguments := strings.Join(append(args, cmd), " ")
+
 	if ran {
-		return ran, mg.Fatalf(code, `running "%s %s" failed with exit code %d`, cmd, strings.Join(args, " "), code)
+		return ran, mg.Fatalf(code, "running %q failed with exit code %d", commandWithArguments, code)
 	}
-	return ran, fmt.Errorf(`failed to run "%s %s: %v"`, cmd, strings.Join(args, " "), err)
+
+	return ran, fmt.Errorf("failed to run %q: %v", commandWithArguments, err)
 }
 
 func run(env map[string]string, stdout, stderr io.Writer, cmd string, args ...string) (ran bool, code int, err error) {
@@ -133,9 +137,9 @@ func run(env map[string]string, stdout, stderr io.Writer, cmd string, args ...st
 	c.Stdout = stdout
 	c.Stdin = os.Stdin
 
-	var quoted []string 
+	var quoted []string
 	for i := range args {
-		quoted = append(quoted, fmt.Sprintf("%q", args[i]));
+		quoted = append(quoted, fmt.Sprintf("%q", args[i]))
 	}
 	// To protect against logging from doing exec in global variables
 	if mg.Verbose() {
@@ -144,6 +148,7 @@ func run(env map[string]string, stdout, stderr io.Writer, cmd string, args ...st
 	err = c.Run()
 	return CmdRan(err), ExitStatus(err), err
 }
+
 // CmdRan examines the error to determine if it was generated as a result of a
 // command running via os/exec.Command.  If the error is nil, or the command ran
 // (even if it exited with a non-zero exit code), CmdRan reports true.  If the
