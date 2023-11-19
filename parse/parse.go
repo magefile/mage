@@ -119,8 +119,7 @@ func (f Function) ExecCode() string {
 		switch arg.Type {
 		case "mg.ExtraArgs":
 			parseargs += fmt.Sprintf(`
-			arg%d := args.ExtraArgs
-			x++`, x)
+			arg%d := args.ExtraArgs`, x) // do not advance x index, this is not part of .Args
 		case "string":
 			parseargs += fmt.Sprintf(`
 			arg%d := args.Args[x]

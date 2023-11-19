@@ -1881,7 +1881,7 @@ func TestExtraArgs(t *testing.T) {
 	stdout := &bytes.Buffer{}
 	inv := Invocation{
 		Dir:       "./testdata/extra_args",
-		Stderr:    os.Stderr,
+		Stderr:    ioutil.Discard,
 		Stdout:    stdout,
 		Args:      []string{"targetOne"},
 		ExtraArgs: []string{"--", "-baz", "foo", "bar"},
@@ -1892,6 +1892,106 @@ func TestExtraArgs(t *testing.T) {
 		t.Fatalf("expected 0, but got %v", code)
 	}
 	expected := "mg.ExtraArgs{\"-baz\", \"foo\", \"bar\"}\n"
+	if stdout.String() != expected {
+		t.Fatalf("expected %q, but got %q", expected, stdout.String())
+	}
+}
+
+func TestExtraArgsWithContext(t *testing.T) {
+	stdout := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:       "./testdata/extra_args",
+		Stderr:    ioutil.Discard,
+		Stdout:    stdout,
+		Args:      []string{"targetTwo"},
+		ExtraArgs: []string{"--", "-baz", "foo", "bar"},
+	}
+
+	code := Invoke(inv)
+	if code != 0 {
+		t.Fatalf("expected 0, but got %v", code)
+	}
+	expected := "Context is nil: false\nmg.ExtraArgs{\"-baz\", \"foo\", \"bar\"}\n"
+	if stdout.String() != expected {
+		t.Fatalf("expected %q, but got %q", expected, stdout.String())
+	}
+}
+
+func TestExtraArgsWithContextAndString(t *testing.T) {
+	stdout := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:       "./testdata/extra_args",
+		Stderr:    ioutil.Discard,
+		Stdout:    stdout,
+		Args:      []string{"targetThree", "stringvalue"},
+		ExtraArgs: []string{"--", "-baz", "foo", "bar"},
+	}
+
+	code := Invoke(inv)
+	if code != 0 {
+		t.Fatalf("expected 0, but got %v", code)
+	}
+	expected := "Context is nil: false\nmg.ExtraArgs{\"-baz\", \"foo\", \"bar\"}\nstringvalue\n"
+	if stdout.String() != expected {
+		t.Fatalf("expected %q, but got %q", expected, stdout.String())
+	}
+}
+
+func TestExtraArgsWithContextAndStringAndInt(t *testing.T) {
+	stdout := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:       "./testdata/extra_args",
+		Stderr:    ioutil.Discard,
+		Stdout:    stdout,
+		Args:      []string{"targetFour", "stringvalue", "2"},
+		ExtraArgs: []string{"--", "-baz", "foo", "bar"},
+	}
+
+	code := Invoke(inv)
+	if code != 0 {
+		t.Fatalf("expected 0, but got %v", code)
+	}
+	expected := "Context is nil: false\nmg.ExtraArgs{\"-baz\", \"foo\", \"bar\"}\nstringvalue\n2\n"
+	if stdout.String() != expected {
+		t.Fatalf("expected %q, but got %q", expected, stdout.String())
+	}
+}
+
+func TestExtraArgsWithoutContextAndStringAndInt(t *testing.T) {
+	stdout := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:       "./testdata/extra_args",
+		Stderr:    ioutil.Discard,
+		Stdout:    stdout,
+		Args:      []string{"targetFive", "stringvalue", "2"},
+		ExtraArgs: []string{"--", "-baz", "foo", "bar"},
+	}
+
+	code := Invoke(inv)
+	if code != 0 {
+		t.Fatalf("expected 0, but got %v", code)
+	}
+	expected := "mg.ExtraArgs{\"-baz\", \"foo\", \"bar\"}\nstringvalue\n2\n"
+	if stdout.String() != expected {
+		t.Fatalf("expected %q, but got %q", expected, stdout.String())
+	}
+}
+
+func TestExtraArgsWithoutContextAndStringAndIntNonOrdered(t *testing.T) {
+	stdout := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:       "./testdata/extra_args",
+		Stderr:    ioutil.Discard,
+		Stdout:    stdout,
+		Args:      []string{"targetSix", "stringvalue", "2"},
+		ExtraArgs: []string{"--", "-baz", "foo", "bar"},
+	}
+
+	code := Invoke(inv)
+	if code != 0 {
+		t.Fatalf("expected 0, but got %v", code)
+	}
+	expected := "mg.ExtraArgs{\"-baz\", \"foo\", \"bar\"}\nstringvalue\n2\n"
 	if stdout.String() != expected {
 		t.Fatalf("expected %q, but got %q", expected, stdout.String())
 	}
