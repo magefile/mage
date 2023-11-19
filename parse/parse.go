@@ -40,16 +40,17 @@ type PkgInfo struct {
 
 // Function represents a job function from a mage file
 type Function struct {
-	PkgAlias   string
-	Package    string
-	ImportPath string
-	Name       string
-	Receiver   string
-	IsError    bool
-	IsContext  bool
-	Synopsis   string
-	Comment    string
-	Args       []Arg
+	PkgAlias         string
+	Package          string
+	ImportPath       string
+	Name             string
+	Receiver         string
+	IsError          bool
+	IsContext        bool
+	Synopsis         string
+	Comment          string
+	Args             []Arg
+	ExtraArgsPresent int
 }
 
 var _ sort.Interface = (Functions)(nil)
@@ -759,8 +760,27 @@ func getPackage(path string, files []string, fset *token.FileSet) (*ast.Package,
 	}
 }
 
-// hasContextParams returns whether or not the first parameter is a context.Context. If it
-// determines that hte first parameter makes this function invalid for mage, it'll return a non-nil
+func isExtraArgsField(field *ast.Field) bool {
+	sel, ok := field.Type.(*ast.SelectorExpr)
+	if !ok {
+		return false
+	}
+	pkg, ok := sel.X.(*ast.Ident)
+	if !ok {
+		return false
+	}
+
+	if pkg.Name != "mg" {
+		return false
+	}
+	if sel.Sel.Name == "ExtraArgs" {
+		return true
+	}
+	return false
+}
+
+// hasContextParams returns whether the first parameter is a context.Context. If it
+// determines that the first parameter makes this function invalid for mage, it'll return a non-nil
 // error.
 func hasContextParam(ft *ast.FuncType) (bool, error) {
 	if ft.Params.NumFields() < 1 {
@@ -775,12 +795,14 @@ func hasContextParam(ft *ast.FuncType) (bool, error) {
 	if !ok {
 		return false, nil
 	}
+
 	if pkg.Name != "context" {
 		return false, nil
 	}
 	if sel.Sel.Name != "Context" {
 		return false, nil
 	}
+
 	if len(param.Names) > 1 {
 		// something like foo, bar context.Context
 		return false, errors.New("ETOOMANYCONTEXTS")
@@ -836,6 +858,9 @@ func funcType(ft *ast.FuncType) (*Function, error) {
 		}
 		// support for foo, bar string
 		for _, name := range param.Names {
+			if isExtraArgsField(param) {
+				f.ExtraArgsPresent++
+			}
 			f.Args = append(f.Args, Arg{Name: name.Name, Type: typ})
 		}
 	}
@@ -851,5 +876,5 @@ var argTypes = map[string]string{
 	"int":              "int",
 	"&{time Duration}": "time.Duration",
 	"bool":             "bool",
-	"mg.ExtraArgs":     "mg.ExtraArgs",
+	"&{mg ExtraArgs}":  "mg.ExtraArgs",
 }

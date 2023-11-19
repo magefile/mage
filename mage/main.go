@@ -724,7 +724,14 @@ func generateInit(dir string) error {
 // RunCompiled runs an already-compiled mage command with the given args,
 func RunCompiled(inv Invocation, exePath string, errlog *log.Logger) int {
 	debug.Println("running binary", exePath)
-	c := exec.Command(exePath, inv.Args...)
+	args := make([]string, 0, len(inv.Args)+len(inv.ExtraArgs)+1)
+	copy(args, inv.Args)
+	if len(inv.ExtraArgs) > 0 {
+
+		args = append(append(inv.Args, "--"), inv.ExtraArgs...)
+	}
+
+	c := exec.Command(exePath, args...)
 	c.Stderr = inv.Stderr
 	c.Stdout = inv.Stdout
 	c.Stdin = inv.Stdin

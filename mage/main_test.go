@@ -1877,6 +1877,26 @@ func TestWrongDependency(t *testing.T) {
 	}
 }
 
+func TestExtraArgs(t *testing.T) {
+	stdout := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:       "./testdata/extra_args",
+		Stderr:    os.Stderr,
+		Stdout:    stdout,
+		Args:      []string{"targetOne"},
+		ExtraArgs: []string{"--", "-baz", "foo", "bar"},
+	}
+
+	code := Invoke(inv)
+	if code != 0 {
+		t.Fatalf("expected 0, but got %v", code)
+	}
+	expected := "mg.ExtraArgs{\"-baz\", \"foo\", \"bar\"}\n"
+	if stdout.String() != expected {
+		t.Fatalf("expected %q, but got %q", expected, stdout.String())
+	}
+}
+
 // / This code liberally borrowed from https://github.com/rsc/goversion/blob/master/version/exe.go
 
 type (
