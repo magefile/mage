@@ -8,6 +8,12 @@ import (
 	"time"
 )
 
+type StringFlag = string
+type BoolFlag = bool
+type IntFlag = int
+type DurationFlag = time.Duration
+type StringSliceFlag = []string
+
 // Fn represents a function that can be run with mg.Deps. Package, Name, and ID must combine to
 // uniquely identify a function, while ensuring the "same" function has identical values. These are
 // used as a map key to find and run (or not run) the function.
