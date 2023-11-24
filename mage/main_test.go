@@ -26,6 +26,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/magefile/mage/completions"
 	"github.com/magefile/mage/internal"
 	"github.com/magefile/mage/mg"
 )
@@ -579,20 +580,20 @@ func TestVerboseFalseEnv(t *testing.T) {
 }
 
 func TestList(t *testing.T) {
-	stdout := &bytes.Buffer{}
-	inv := Invocation{
-		Dir:    "./testdata/list",
-		Stdout: stdout,
-		Stderr: ioutil.Discard,
-		List:   true,
-	}
-
-	code := Invoke(inv)
-	if code != 0 {
-		t.Errorf("expected to exit with code 0, but got %v", code)
-	}
-	actual := stdout.String()
-	expected := `
+	testCases := []struct {
+		name     string
+		inv      Invocation
+		expected string
+	}{
+		{
+			name: "test default listing",
+			inv: Invocation{
+				Dir:    "./testdata/list",
+				Stdout: &bytes.Buffer{},
+				Stderr: io.Discard,
+				List:   true,
+			},
+			expected: `
 This is a comment on the package which should get turned into output with the list of targets.
 
 Targets:
@@ -600,12 +601,36 @@ Targets:
   testVerbose    
 
 * default target
-`[1:]
+`[1:],
+		},
+		{
+			name: "test listing with formatting",
+			inv: Invocation{
+				Dir:    "./testdata/list",
+				Stdout: &bytes.Buffer{},
+				Stderr: io.Discard,
+				List:   true,
+				Format: "{{.Name}}|{{.Synopsis}}",
+			},
+			expected: `
+somePig*|This is the synopsis for SomePig.
+testVerbose|
+`[1:],
+		},
+	}
 
-	if actual != expected {
-		t.Logf("expected: %q", expected)
-		t.Logf("  actual: %q", actual)
-		t.Fatalf("expected:\n%v\n\ngot:\n%v", expected, actual)
+	for _, tc := range testCases {
+		tc := tc
+		code := Invoke(tc.inv)
+		if code != 0 {
+			t.Errorf("expected to exit with code 0, but got %v", code)
+		}
+		actual := tc.inv.Stdout.(*bytes.Buffer).String()
+		if actual != tc.expected {
+			t.Logf("expected: %q", tc.expected)
+			t.Logf("  actual: %q", actual)
+			t.Fatalf("expected:\n%v\n\ngot:\n%v", tc.expected, actual)
+		}
 	}
 }
 
@@ -866,6 +891,23 @@ func TestKeepFlag(t *testing.T) {
 
 	if _, err := os.Stat(buildFile); err != nil {
 		t.Fatalf("expected file %q to exist but got err, %v", buildFile, err)
+	}
+}
+
+// Test if the -completion flag does generate a completion script
+func TestCompletionFlag(t *testing.T) {
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	code := ParseAndRun(stdout, stderr, nil, []string{"-completion", "zsh"})
+	if code != 0 {
+		t.Fatalf("expected code 0, but got %v, %s", code, stderr)
+	}
+	actual := stdout.String()
+	expectedData := completions.ZshCompletions
+	expected := string(expectedData)
+
+	if actual != expected {
+		t.Fatalf("expected %q\ngot %q", expected, actual)
 	}
 }
 
