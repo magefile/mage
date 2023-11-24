@@ -1,9 +1,14 @@
 project_name: mage
+
+env:
+  - COSIGN_EXPERIMENTAL=true
+
 release:
   github:
     owner: magefile
     name: mage
   draft: true
+
 build:
   binary: mage
   main: .
@@ -26,9 +31,9 @@ build:
       goarm: 6
   env:
     - CGO_ENABLED=0
+
 archives:
-- 
-  name_template: "{{.Binary}}_{{.Version}}_{{.Os}}-{{.Arch}}"
+- name_template: "{{.Binary}}_{{.Version}}_{{.Os}}-{{.Arch}}"
   replacements:
     amd64: 64bit
     386: 32bit
@@ -47,7 +52,17 @@ archives:
       format: zip
   files:
   - LICENSE
+
+signs:
+  - id: all
+    signature: "${artifact}.sig"
+    certificate: "${artifact}.pem"
+    cmd: cosign
+    args: ["sign-blob", "--output-signature", "${artifact}.sig", "--output-certificate", "${artifact}.pem", "${artifact}"]
+    artifacts: all
+
 snapshot:
   name_template: SNAPSHOT-{{ .Commit }}
+
 checksum:
   name_template: '{{ .ProjectName }}_{{ .Version }}_checksums.txt'
