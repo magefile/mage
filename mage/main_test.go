@@ -1877,7 +1877,36 @@ func TestWrongDependency(t *testing.T) {
 	}
 }
 
-// / This code liberally borrowed from https://github.com/rsc/goversion/blob/master/version/exe.go
+// See https://github.com/magefile/mage/issues/371
+func TestRacyDependency(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	inv := Invocation{
+		Dir:    "./testdata/racy_deps",
+		Args:   []string{"test4"},
+		Stderr: &stderr,
+		Stdout: &stdout,
+	}
+	code := Invoke(inv)
+	if code != 1 {
+		t.Fatalf("expected 1, but got %v", code)
+	}
+	expectedStderr := `Error: error test1
+error test1
+error test1
+`
+	actualStderr := stderr.String()
+	if actualStderr != expectedStderr {
+		t.Fatalf("expected %q, but got %q", expectedStderr, actualStderr)
+	}
+	expectedStdout := `execute test1
+`
+	actualStdout := stdout.String()
+	if actualStdout != expectedStdout {
+		t.Fatalf("expected %q, but got %q", expectedStdout, actualStdout)
+	}
+}
+
+// This code liberally borrowed from https://github.com/rsc/goversion/blob/master/version/exe.go
 
 type (
 	exeType  int
