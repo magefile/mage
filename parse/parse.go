@@ -26,7 +26,7 @@ func EnableDebug() {
 	debug.SetOutput(os.Stderr)
 }
 
-// PkgInfo contains inforamtion about a package of files according to mage's
+// PkgInfo contains information about a package of files according to mage's
 // parsing rules.
 type PkgInfo struct {
 	AstPkg      *ast.Package
