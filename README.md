@@ -21,6 +21,19 @@ cd $GOPATH/src/github.com/magefile/mage
 go run bootstrap.go
 ```
 
+**Using Go Install**
+
+```
+go install github.com/magefile/mage@latest
+mage -init
+```
+
+Instead of the @latest tag, you can specify the desired version, for example:
+
+```
+go install github.com/magefile/mage@v1.15.0
+```
+
 **Using Go Modules**
 
 ```
