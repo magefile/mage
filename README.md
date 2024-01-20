@@ -13,7 +13,7 @@ and Mage automatically uses them as Makefile-like runnable targets.
 Mage has no dependencies outside the Go standard library, and builds with Go 1.7
 and above (possibly even lower versions, but they're not regularly tested).
 
-**Using GOPATH**
+**Using GOPATH with go version < 1.17**
 
 ```
 go get -u -d github.com/magefile/mage
@@ -21,7 +21,7 @@ cd $GOPATH/src/github.com/magefile/mage
 go run bootstrap.go
 ```
 
-**Using Go Install**
+**Using Go Install with go version >= 1.18**
 
 ```
 go install github.com/magefile/mage@latest
