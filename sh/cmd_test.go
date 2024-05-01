@@ -68,5 +68,34 @@ func TestAutoExpand(t *testing.T) {
 	if s != "baz" {
 		t.Fatalf(`Expected "baz" but got %q`, s)
 	}
+}
 
+func TestAutoExpandPrecedent(t *testing.T) {
+	// Environment variables passed to OutputWith should take precedence
+	// over any variables set in the actual environment.
+	if err := os.Setenv("MAGE_FOO", "wrong"); err != nil {
+		t.Fatal(err)
+	}
+	s, err := OutputWith(map[string]string{
+		"MAGE_FOO": "right",
+	}, "echo", "$MAGE_FOO")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s != "right" {
+		t.Fatalf(`Expected "right" but got %q`, s)
+	}
+}
+
+func TestEscapeExpand(t *testing.T) {
+	s, err := OutputWith(map[string]string{
+		"MAGE_BAR": "bar",
+	}, os.Args[0], "-printArgs", "foo${MAGE_BAR}baz", Escape("foo${MAGE_BAR}baz"), `foo\$${MAGE_BAR}\\baz`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected := "[foobarbaz foo${MAGE_BAR}baz foo$bar\\baz]"
+	if s != expected {
+		t.Fatalf(`Expected %q but got %q`, expected, s)
+	}
 }
