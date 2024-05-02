@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/magefile/mage/internal"
+	"github.com/magefile/mage/mg"
 )
 
 const importTag = "mage:import"
@@ -735,7 +736,7 @@ func getPackage(path string, files []string, fset *token.FileSet) (*ast.Package,
 
 	pkgs, err := parser.ParseDir(fset, path, filter, parser.ParseComments)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse directory: %v", err)
+		return nil, mg.WrapError(err, fmt.Errorf("failed to parse directory: %v", err))
 	}
 
 	switch len(pkgs) {

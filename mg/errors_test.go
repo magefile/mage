@@ -1,6 +1,9 @@
 package mg
 
-import "testing"
+import (
+	"errors"
+	"testing"
+)
 
 func TestFatalExit(t *testing.T) {
 	expected := 99
@@ -15,5 +18,17 @@ func TestFatalfExit(t *testing.T) {
 	code := ExitStatus(Fatalf(expected, "boo!"))
 	if code != expected {
 		t.Fatalf("Expected code %v but got %v", expected, code)
+	}
+}
+
+// TestBasicWrappedError confirms that a wrappedError returns the same string
+// as its "str" error (not its "underlying" error).
+func TestBasicWrappedError(t *testing.T) {
+	strError := errors.New("main error")
+	underlyingError := errors.New("underlying error")
+	actual := WrapError(underlyingError, strError)
+
+	if actual.Error() != strError.Error() {
+		t.Fatalf("Expected outer error to have Error() = %q but got %q", strError.Error(), actual.Error())
 	}
 }

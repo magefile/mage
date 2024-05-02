@@ -120,7 +120,7 @@ func Exec(env map[string]string, stdout, stderr io.Writer, cmd string, args ...s
 	if ran {
 		return ran, mg.Fatalf(code, `running "%s %s" failed with exit code %d`, cmd, strings.Join(args, " "), code)
 	}
-	return ran, fmt.Errorf(`failed to run "%s %s: %v"`, cmd, strings.Join(args, " "), err)
+	return ran, mg.WrapError(err, fmt.Errorf(`failed to run "%s %s: %v"`, cmd, strings.Join(args, " "), err))
 }
 
 func run(env map[string]string, stdout, stderr io.Writer, cmd string, args ...string) (ran bool, code int, err error) {
