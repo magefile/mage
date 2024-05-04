@@ -9,8 +9,6 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
-
-	"github.com/magefile/mage/mg"
 )
 
 var debug *log.Logger = log.New(ioutil.Discard, "", 0)
@@ -54,7 +52,7 @@ func OutputDebug(cmd string, args ...string) (string, error) {
 	if err := c.Run(); err != nil {
 		errMsg := strings.TrimSpace(errbuf.String())
 		debug.Print("error running '", cmd, strings.Join(args, " "), "': ", err, ": ", errMsg)
-		return "", mg.WrapError(err, fmt.Errorf("error running \"%s %s\": %v\n%s", cmd, strings.Join(args, " "), err, errMsg))
+		return "", WrapError(err, fmt.Errorf("error running \"%s %s\": %v\n%s", cmd, strings.Join(args, " "), err, errMsg))
 	}
 	return strings.TrimSpace(buf.String()), nil
 }

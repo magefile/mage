@@ -473,14 +473,14 @@ func listGoFiles(magePath, goCmd, tag string, envStr []string) ([]string, error)
 	if !filepath.IsAbs(magePath) {
 		cwd, err := os.Getwd()
 		if err != nil {
-			return nil, mg.WrapError(err, fmt.Errorf("can't get current working directory: %v", err))
+			return nil, internal.WrapError(err, fmt.Errorf("can't get current working directory: %v", err))
 		}
 		magePath = filepath.Join(cwd, magePath)
 	}
 
 	env, err := internal.SplitEnv(envStr)
 	if err != nil {
-		return nil, mg.WrapError(err, fmt.Errorf("error parsing environment variables: %v", err))
+		return nil, internal.WrapError(err, fmt.Errorf("error parsing environment variables: %v", err))
 	}
 
 	bctx := build.Default
@@ -502,7 +502,7 @@ func listGoFiles(magePath, goCmd, tag string, envStr []string) ([]string, error)
 
 		// Allow multiple packages in the same directory
 		if _, ok := err.(*build.MultiplePackageError); !ok {
-			return nil, mg.WrapError(err, fmt.Errorf("failed to parse go source files: %v", err))
+			return nil, internal.WrapError(err, fmt.Errorf("failed to parse go source files: %v", err))
 		}
 	}
 
@@ -530,7 +530,7 @@ func Magefiles(magePath, goos, goarch, goCmd string, stderr io.Writer, isMagefil
 	debug.Println("getting all files including those with mage tag in", magePath)
 	mageFiles, err := listGoFiles(magePath, goCmd, "mage", env)
 	if err != nil {
-		return nil, mg.WrapError(err, fmt.Errorf("listing mage files: %v", err))
+		return nil, internal.WrapError(err, fmt.Errorf("listing mage files: %v", err))
 	}
 
 	if isMagefilesDirectory {
@@ -546,7 +546,7 @@ func Magefiles(magePath, goos, goarch, goCmd string, stderr io.Writer, isMagefil
 	debug.Println("getting all files without mage tag in", magePath)
 	nonMageFiles, err := listGoFiles(magePath, goCmd, "", env)
 	if err != nil {
-		return nil, mg.WrapError(err, fmt.Errorf("listing non-mage files: %v", err))
+		return nil, internal.WrapError(err, fmt.Errorf("listing non-mage files: %v", err))
 	}
 
 	// convert non-Mage list to a map of files to exclude.
@@ -612,7 +612,7 @@ func GenerateMainfile(binaryName, path string, info *parse.PkgInfo) error {
 
 	f, err := os.Create(path)
 	if err != nil {
-		return mg.WrapError(err, fmt.Errorf("error creating generated mainfile: %v", err))
+		return internal.WrapError(err, fmt.Errorf("error creating generated mainfile: %v", err))
 	}
 	defer f.Close()
 	data := mainfileTemplateData{
@@ -629,16 +629,16 @@ func GenerateMainfile(binaryName, path string, info *parse.PkgInfo) error {
 
 	debug.Println("writing new file at", path)
 	if err := mainfileTemplate.Execute(f, data); err != nil {
-		return mg.WrapError(err, fmt.Errorf("can't execute mainfile template: %v", err))
+		return internal.WrapError(err, fmt.Errorf("can't execute mainfile template: %v", err))
 	}
 	if err := f.Close(); err != nil {
-		return mg.WrapError(err, fmt.Errorf("error closing generated mainfile: %v", err))
+		return internal.WrapError(err, fmt.Errorf("error closing generated mainfile: %v", err))
 	}
 	// we set an old modtime on the generated mainfile so that the go tool
 	// won't think it has changed more recently than the compiled binary.
 	longAgo := time.Now().Add(-time.Hour * 24 * 365 * 10)
 	if err := os.Chtimes(path, longAgo, longAgo); err != nil {
-		return mg.WrapError(err, fmt.Errorf("error setting old modtime on generated mainfile: %v", err))
+		return internal.WrapError(err, fmt.Errorf("error setting old modtime on generated mainfile: %v", err))
 	}
 	return nil
 }
@@ -675,13 +675,13 @@ func ExeName(goCmd, cacheDir string, files []string) (string, error) {
 func hashFile(fn string) (string, error) {
 	f, err := os.Open(fn)
 	if err != nil {
-		return "", mg.WrapError(err, fmt.Errorf("can't open input file for hashing: %v", err))
+		return "", internal.WrapError(err, fmt.Errorf("can't open input file for hashing: %v", err))
 	}
 	defer f.Close()
 
 	h := sha1.New()
 	if _, err := io.Copy(h, f); err != nil {
-		return "", mg.WrapError(err, fmt.Errorf("can't write data to hash: %v", err))
+		return "", internal.WrapError(err, fmt.Errorf("can't write data to hash: %v", err))
 	}
 	return fmt.Sprintf("%x", h.Sum(nil)), nil
 }
@@ -690,12 +690,12 @@ func generateInit(dir string) error {
 	debug.Println("generating default magefile in", dir)
 	f, err := os.Create(filepath.Join(dir, initFile))
 	if err != nil {
-		return mg.WrapError(err, fmt.Errorf("could not create mage template: %v", err))
+		return internal.WrapError(err, fmt.Errorf("could not create mage template: %v", err))
 	}
 	defer f.Close()
 
 	if err := initOutput.Execute(f, nil); err != nil {
-		return mg.WrapError(err, fmt.Errorf("can't execute magefile template: %v", err))
+		return internal.WrapError(err, fmt.Errorf("can't execute magefile template: %v", err))
 	}
 
 	return nil
