@@ -735,7 +735,7 @@ func getPackage(path string, files []string, fset *token.FileSet) (*ast.Package,
 
 	pkgs, err := parser.ParseDir(fset, path, filter, parser.ParseComments)
 	if err != nil {
-		return nil, internal.WrapError(err, fmt.Errorf("failed to parse directory: %v", err))
+		return nil, internal.WrapErrorf(err, "failed to parse directory: %v", err)
 	}
 
 	switch len(pkgs) {

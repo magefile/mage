@@ -14,9 +14,8 @@ import (
 // TestErrorUnwrap checks that [errors.Is] can detect the underlying error in a
 // wrappedError.
 func TestErrorUnwrap(t *testing.T) {
-	strError := errors.New("main error")
 	underlyingError := errors.New("underlying error")
-	actual := WrapError(underlyingError, strError)
+	actual := WrapErrorf(underlyingError, "main message")
 
 	if !errors.Is(actual, underlyingError) {
 		t.Fatalf("Expected outer error %#v to include %#v", actual, underlyingError)

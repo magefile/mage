@@ -43,12 +43,12 @@ func Install() error {
 	// in GOPATH environment string
 	bin, err := sh.Output(gocmd, "env", "GOBIN")
 	if err != nil {
-		return internal.WrapError(err, fmt.Errorf("can't determine GOBIN: %v", err))
+		return internal.WrapErrorf(err, "can't determine GOBIN: %v", err)
 	}
 	if bin == "" {
 		gopath, err := sh.Output(gocmd, "env", "GOPATH")
 		if err != nil {
-			return internal.WrapError(err, fmt.Errorf("can't determine GOPATH: %v", err))
+			return internal.WrapErrorf(err, "can't determine GOPATH: %v", err)
 		}
 		paths := strings.Split(gopath, string([]rune{os.PathListSeparator}))
 		bin = filepath.Join(paths[0], "bin")
@@ -56,7 +56,7 @@ func Install() error {
 	// specifically don't mkdirall, if you have an invalid gopath in the first
 	// place, that's not on us to fix.
 	if err := os.Mkdir(bin, 0700); err != nil && !os.IsExist(err) {
-		return internal.WrapError(err, fmt.Errorf("failed to create %q: %v", bin, err))
+		return internal.WrapErrorf(err, "failed to create %q: %v", bin, err)
 	}
 	path := filepath.Join(bin, name)
 
@@ -72,7 +72,7 @@ var releaseTag = regexp.MustCompile(`^v1\.[0-9]+\.[0-9]+$`)
 // Generates a new release. Expects a version tag in v1.x.x format.
 func Release(tag string) (err error) {
 	if _, err := exec.LookPath("goreleaser"); err != nil {
-		return internal.WrapError(err, fmt.Errorf("can't find goreleaser: %v", err))
+		return internal.WrapErrorf(err, "can't find goreleaser: %v", err)
 	}
 	if !releaseTag.MatchString(tag) {
 		return errors.New("TAG environment variable must be in semver v1.x.x format, but was " + tag)
