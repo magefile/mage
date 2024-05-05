@@ -17,6 +17,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/magefile/mage/internal"
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
 )
