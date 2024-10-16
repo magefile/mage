@@ -99,26 +99,27 @@ func Main() int {
 
 // Invocation contains the args for invoking a run of Mage.
 type Invocation struct {
-	Debug      bool          // turn on debug messages
-	Dir        string        // directory to read magefiles from
-	WorkDir    string        // directory where magefiles will run
-	Force      bool          // forces recreation of the compiled binary
-	Verbose    bool          // tells the magefile to print out log statements
-	List       bool          // tells the magefile to print out a list of targets
-	Help       bool          // tells the magefile to print out help for a specific target
-	Keep       bool          // tells mage to keep the generated main file after compiling
-	Timeout    time.Duration // tells mage to set a timeout to running the targets
-	CompileOut string        // tells mage to compile a static binary to this path, but not execute
-	GOOS       string        // sets the GOOS when producing a binary with -compileout
-	GOARCH     string        // sets the GOARCH when producing a binary with -compileout
-	Ldflags    string        // sets the ldflags when producing a binary with -compileout
-	Stdout     io.Writer     // writer to write stdout messages to
-	Stderr     io.Writer     // writer to write stderr messages to
-	Stdin      io.Reader     // reader to read stdin from
-	Args       []string      // args to pass to the compiled binary
-	GoCmd      string        // the go binary command to run
-	CacheDir   string        // the directory where we should store compiled binaries
-	HashFast   bool          // don't rely on GOCACHE, just hash the magefiles
+	Debug            bool          // turn on debug messages
+	Dir              string        // directory to read magefiles from
+	WorkDir          string        // directory where magefiles will run
+	DisableTraversal bool          // disable walking up the tree from the current directory to find a magefiles directory
+	Force            bool          // forces recreation of the compiled binary
+	Verbose          bool          // tells the magefile to print out log statements
+	List             bool          // tells the magefile to print out a list of targets
+	Help             bool          // tells the magefile to print out help for a specific target
+	Keep             bool          // tells mage to keep the generated main file after compiling
+	Timeout          time.Duration // tells mage to set a timeout to running the targets
+	CompileOut       string        // tells mage to compile a static binary to this path, but not execute
+	GOOS             string        // sets the GOOS when producing a binary with -compileout
+	GOARCH           string        // sets the GOARCH when producing a binary with -compileout
+	Ldflags          string        // sets the ldflags when producing a binary with -compileout
+	Stdout           io.Writer     // writer to write stdout messages to
+	Stderr           io.Writer     // writer to write stderr messages to
+	Stdin            io.Reader     // reader to read stdin from
+	Args             []string      // args to pass to the compiled binary
+	GoCmd            string        // the go binary command to run
+	CacheDir         string        // the directory where we should store compiled binaries
+	HashFast         bool          // don't rely on GOCACHE, just hash the magefiles
 }
 
 // MagefilesDirName is the name of the default folder to look for if no directory was specified,
@@ -190,6 +191,7 @@ func Parse(stderr, stdout io.Writer, args []string) (inv Invocation, cmd Command
 	fs.BoolVar(&inv.Debug, "debug", mg.Debug(), "turn on debug messages")
 	fs.BoolVar(&inv.Verbose, "v", mg.Verbose(), "show verbose output when running mage targets")
 	fs.BoolVar(&inv.Help, "h", false, "show this help")
+	fs.BoolVar(&inv.DisableTraversal, "no-traverse", false, "disable traversing up the directory tree to find magefiles")
 	fs.DurationVar(&inv.Timeout, "t", 0, "timeout in duration parsable format (e.g. 5m30s)")
 	fs.BoolVar(&inv.Keep, "keep", false, "keep intermediate mage files around after running")
 	fs.StringVar(&inv.Dir, "d", "", "directory to read magefiles from")
@@ -240,6 +242,8 @@ Options:
   -keep     keep intermediate mage files around after running
   -t <string>
             timeout in duration parsable format (e.g. 5m30s)
+  -no-traverse
+			disable traversing up the directory tree to find magefiles
   -v        show verbose output when running mage targets
   -w <string>
             working directory where magefiles will run (default -d value)
@@ -344,7 +348,6 @@ func walkUpToMageFiles(dir string, log *log.Logger) (string, bool, error) {
 // checkHasMagefiles checks if the given directory contains a magefiles directory.
 func checkHasMagefiles(dir string) (string, bool) {
 	magefilesDir := filepath.Join(dir, MagefilesDirName)
-	fmt.Printf("checking if %s exists\n", magefilesDir)
 	mfSt, err := os.Stat(magefilesDir)
 	if err != nil {
 		return "", false
@@ -384,13 +387,16 @@ func Invoke(inv Invocation) int {
 	if inv.WorkDir == "" {
 		inv.WorkDir = inv.Dir
 	}
-	mageDir, found, err := walkUpToMageFiles(inv.Dir, errlog)
-	if err != nil {
-		errlog.Println("Error walking up to magefiles directory:", err)
-		return 1
-	}
-	if found {
-		inv = checkCollidingMagefiles(inv, mageDir)
+	enableTraverse := !inv.DisableTraversal && os.Getenv("MAGEFILE_NO_TRAVERSE") != "1"
+	if enableTraverse {
+		mageDir, found, err := walkUpToMageFiles(inv.Dir, errlog)
+		if err != nil {
+			errlog.Println("Error walking up to magefiles directory:", err)
+			return 1
+		}
+		if found {
+			inv = checkCollidingMagefiles(inv, mageDir)
+		}
 	}
 
 	if inv.CacheDir == "" {
@@ -404,7 +410,11 @@ func Invoke(inv Invocation) int {
 	}
 
 	if len(files) == 0 {
-		errlog.Println("No .go files marked with the mage build tag in this directory.")
+		if enableTraverse {
+			errlog.Println("No magefiles found in this directory or any parent. Run 'mage -init' to create one.")
+		} else {
+			errlog.Println("No magefiles found in this directory. Run 'mage -init' to create one.")
+		}
 		return 1
 	}
 	debug.Printf("found magefiles: %s", strings.Join(files, ", "))
