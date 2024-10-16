@@ -310,6 +310,68 @@ Options:
 
 const dotDirectory = "."
 
+// walkUpToMageFiles walks up the directory tree from the given directory until it finds a magefiles directory.
+// It stops:
+// 1. if a ./magefiles directory is found
+// 2. if a ./.git directory is found, but no magefiles directory exists
+// 3. if the root directory is reached and no magefiles directory exists
+func walkUpToMageFiles(dir string, log *log.Logger) (string, bool, error) {
+	if dir == "." {
+		// set dir to the current working directory
+		cwd, err := os.Getwd()
+		if err != nil {
+			return "", false, err
+		}
+		dir = cwd
+	}
+	magefilesDir, hasMagefiles := checkHasMagefiles(dir)
+	if !hasMagefiles && dir == "/" {
+		return "", false, nil
+	}
+	// check if the folder contains a .git folder, if so then also stop walking up the tree
+	_, err := os.Stat(filepath.Join(dir, ".git"))
+	if !hasMagefiles && err == nil {
+		return "", false, nil
+	}
+	if !hasMagefiles {
+		// walk up the tree and try again
+		newDir := filepath.Dir(dir)
+		return walkUpToMageFiles(newDir, log)
+	}
+	return magefilesDir, true, nil
+}
+
+// checkHasMagefiles checks if the given directory contains a magefiles directory.
+func checkHasMagefiles(dir string) (string, bool) {
+	magefilesDir := filepath.Join(dir, MagefilesDirName)
+	fmt.Printf("checking if %s exists\n", magefilesDir)
+	mfSt, err := os.Stat(magefilesDir)
+	if err != nil {
+		return "", false
+	}
+	return magefilesDir, mfSt.IsDir()
+}
+
+// checkCollidingMageFiles is used if we've found a magefiles folder, and then
+// determines if our current working directory contains magefiles as well. It defaults to the CWD
+// if both are found, and provides a warning.
+func checkCollidingMagefiles(inv Invocation, dir string) Invocation {
+	originalDir := inv.Dir
+	stderrBuf := &bytes.Buffer{}
+	inv.Dir = dir // preemptive assignment
+	// TODO: Remove this fallback and the above Magefiles invocation when the bw compatibility is removed.
+	files, err := Magefiles(originalDir, inv.GOOS, inv.GOARCH, inv.GoCmd, stderrBuf, false, inv.Debug)
+	if err == nil {
+		if len(files) != 0 {
+			log.Println("[WARNING] You have both a magefiles directory and mage files in the " +
+				"current directory, in future versions the files will be ignored in favor of the directory")
+			inv.Dir = originalDir
+			return inv
+		}
+	}
+	return inv
+}
+
 // Invoke runs Mage with the given arguments.
 func Invoke(inv Invocation) int {
 	errlog := log.New(inv.Stderr, "", 0)
@@ -322,24 +384,13 @@ func Invoke(inv Invocation) int {
 	if inv.WorkDir == "" {
 		inv.WorkDir = inv.Dir
 	}
-	magefilesDir := filepath.Join(inv.Dir, MagefilesDirName)
-	// . will be default unless we find a mage folder.
-	mfSt, err := os.Stat(magefilesDir)
-	if err == nil {
-		if mfSt.IsDir() {
-			stderrBuf := &bytes.Buffer{}
-			originalDir := inv.Dir
-			inv.Dir = magefilesDir // preemptive assignment
-			// TODO: Remove this fallback and the above Magefiles invocation when the bw compatibility is removed.
-			files, err := Magefiles(originalDir, inv.GOOS, inv.GOARCH, inv.GoCmd, stderrBuf, false, inv.Debug)
-			if err == nil {
-				if len(files) != 0 {
-					errlog.Println("[WARNING] You have both a magefiles directory and mage files in the " +
-						"current directory, in future versions the files will be ignored in favor of the directory")
-					inv.Dir = originalDir
-				}
-			}
-		}
+	mageDir, found, err := walkUpToMageFiles(inv.Dir, errlog)
+	if err != nil {
+		errlog.Println("Error walking up to magefiles directory:", err)
+		return 1
+	}
+	if found {
+		inv = checkCollidingMagefiles(inv, mageDir)
 	}
 
 	if inv.CacheDir == "" {
