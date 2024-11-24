@@ -16,6 +16,7 @@ Now you can `go run mage.go <target>` and it'll work just as if you ran
 `mage <target>`:
 
 ```go
+//go:build ignore
 // +build ignore
 
 package main

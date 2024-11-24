@@ -1,4 +1,5 @@
-//+build mage,go1.9
+//go:build mage && go1.9
+// +build mage,go1.9
 
 package main
 
