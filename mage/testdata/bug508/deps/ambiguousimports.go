@@ -1,4 +1,4 @@
-package bug508
+package deps
 
 import (
 	"fmt"
