@@ -140,6 +140,7 @@ var Default = bug508.Test
 		t.Fatalf("failed to get import: %v", err)
 	}
 	// Create PkgInfo
+
 	pi := &PkgInfo{
 		AstPkg: &ast.Package{
 			Name:  "magefile",
@@ -148,13 +149,8 @@ var Default = bug508.Test
 		Imports: Imports{
 			bug508,
 		},
-		Funcs: Functions{
-			&Function{Package: "bug508", Name: "Test", Receiver: "Docker"},
-			&Function{Package: "bug508", Name: "Test"},
-		},
 	}
 
-	// Create the ast.Expr for the Default variable
 	var expr ast.Expr
 	for _, decl := range node.Decls {
 		if genDecl, ok := decl.(*ast.GenDecl); ok && genDecl.Tok == token.VAR {
@@ -162,6 +158,7 @@ var Default = bug508.Test
 				if valueSpec, ok := spec.(*ast.ValueSpec); ok {
 					if valueSpec.Names[0].Name == "Default" {
 						expr = valueSpec.Values[0]
+						break
 					}
 				}
 			}
@@ -182,7 +179,4 @@ var Default = bug508.Test
 	if fn.Receiver != "" {
 		t.Errorf("expected receiver to be empty, got %q", fn.Receiver)
 	}
-
-	t.Logf("fn: %#v", fn)
-	t.FailNow()
 }
