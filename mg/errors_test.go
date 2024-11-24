@@ -1,6 +1,8 @@
 package mg
 
-import "testing"
+import (
+	"testing"
+)
 
 func TestFatalExit(t *testing.T) {
 	expected := 99
