@@ -107,14 +107,14 @@ func runDeps(ctx context.Context, fns []Fn) {
 					} else {
 						exit = changeExit(exit, 1)
 					}
-					errs = append(errs, fmt.Sprint(v))
+					errs = append(errs, fmt.Sprintf("%s: %v",fn.fn.Name(), v))
 					mu.Unlock()
 				}
 				wg.Done()
 			}()
 			if err := fn.run(ctx); err != nil {
 				mu.Lock()
-				errs = append(errs, fmt.Sprint(err))
+				errs = append(errs, fmt.Sprintf("%s: %v",fn.fn.Name(), err))
 				exit = changeExit(exit, ExitStatus(err))
 				mu.Unlock()
 			}
