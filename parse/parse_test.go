@@ -1,6 +1,9 @@
 package parse
 
 import (
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"log"
 	"os"
 	"reflect"
@@ -111,4 +114,75 @@ func TestGetImportSelf(t *testing.T) {
 	if imp.Info.AstPkg.Name != "importself" {
 		t.Fatalf("expected package importself, got %v", imp.Info.AstPkg.Name)
 	}
+}
+
+func TestGetFunction(t *testing.T) {
+	// This test issue #508 :Bug: using Default with imports selects first matching func by name
+	// Credit on the test case code goes to @na4ma4
+	// Setup the AST for the provided code
+	src := `
+package magefile
+
+import (
+	"github.com/magefile/mage/mage/testdata/bug508"
+)
+
+var Default = bug508.Test
+`
+	fset := token.NewFileSet()
+	node, err := parser.ParseFile(fset, "magefile.go", src, parser.AllErrors)
+	if err != nil {
+		t.Fatalf("failed to parse source: %v", err)
+	}
+
+	bug508, err := getImport("go", "github.com/magefile/mage/mage/testdata/bug508", "")
+	if err != nil {
+		t.Fatalf("failed to get import: %v", err)
+	}
+	// Create PkgInfo
+	pi := &PkgInfo{
+		AstPkg: &ast.Package{
+			Name:  "magefile",
+			Files: map[string]*ast.File{"magefile.go": node},
+		},
+		Imports: Imports{
+			bug508,
+		},
+		Funcs: Functions{
+			&Function{Package: "bug508", Name: "Test", Receiver: "Docker"},
+			&Function{Package: "bug508", Name: "Test"},
+		},
+	}
+
+	// Create the ast.Expr for the Default variable
+	var expr ast.Expr
+	for _, decl := range node.Decls {
+		if genDecl, ok := decl.(*ast.GenDecl); ok && genDecl.Tok == token.VAR {
+			for _, spec := range genDecl.Specs {
+				if valueSpec, ok := spec.(*ast.ValueSpec); ok {
+					if valueSpec.Names[0].Name == "Default" {
+						expr = valueSpec.Values[0]
+					}
+				}
+			}
+		}
+	}
+
+	// Call getFunction
+	fn, err := getFunction(expr, pi)
+	if err != nil {
+		t.Fatalf("getFunction() error = %v", err)
+	}
+
+	// Verify the result
+	expected := &Function{Name: "Test"}
+	if fn.Name != expected.Name {
+		t.Errorf("expected function name %q, got %q", expected.Name, fn.Name)
+	}
+	if fn.Receiver != "" {
+		t.Errorf("expected receiver to be empty, got %q", fn.Receiver)
+	}
+
+	t.Logf("fn: %#v", fn)
+	t.FailNow()
 }
