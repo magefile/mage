@@ -13,6 +13,7 @@ func Build()
 func Install(ctx context.Context) error
 func Run(what string) error
 func Exec(ctx context.Context, name string, count int, debug bool, timeout time.Duration) error
+func Greet(name string, loud mg.BoolFlag, count mg.IntFlag, debug mg.BoolFlag, every mg.DurationFlag)
 ```
 
 A target is effectively a subcommand of mage while running mage in
@@ -33,6 +34,56 @@ All arguments are mandatory and must be specified in the order they appear in th
 You can intersperse multiple targets with arguments as you'd expect:
 
 `mage run foo.exe exec somename 5 true 100ms`
+
+## Flags
+
+Flags are taken from the CLI arguments after the target name. They are
+converted into usable function parameters the same as other arguments. The name
+of the flag is the name of the parameter.
+
+Thus you could call Greet above by running:
+
+```
+mage greet Adam --loud
+mage greet Adam --count=3 --loud
+mage greet --every 5m --count=5 adam
+```
+
+All flags are optional and may be specified in any order. They can be combined
+with standard arguments and multiple targets as you'd expect.
+
+Available flag types are:
+
+```
+mg.StringFlag
+mg.IntFlag
+mg.BoolFlag
+mg.DurationFlag
+mg.StringSliceFlag
+```
+
+Each one, expect `mg.StringSliceFlag`, only allows a single usage, with the
+value of the last usage being the one that is used.
+
+The `mg.StringSliceFlag` allows the flag to be used multiple times.
+
+## Help/Usage Text
+
+If a help flag (-h, --help) is added after the target, usage information will
+be displayed.
+
+```plain
+$ mage say --help
+Usage:
+  mage say [options]  <animal>
+
+Options:
+  -h, --help    show this help
+  --loud        provide the loud argument (Bool)
+  --msgs        provide the msgs argument (StringSlice)
+
+```
+
 
 ## Errors
 

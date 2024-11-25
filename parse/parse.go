@@ -75,6 +75,34 @@ type Arg struct {
 	Name, Type string
 }
 
+// IsFlag detects if the argument is intended for use as a flag
+func (a Arg) IsFlag() bool {
+	return strings.HasPrefix(a.Type, "mg") && strings.HasSuffix(a.Type, "Flag")
+}
+
+// FlagType returns the underlying type for the flag (string, bool, etc)
+func (a Arg) FlagType() string {
+	return strings.TrimSuffix(strings.TrimPrefix(a.Type, "mg."), "Flag")
+}
+
+// ZeroValue returns code needed to set the default value for a flag when it is
+// undefined. It needs to be a value that can be converted to the correct tyoe
+// in ExecCode
+func (a Arg) ZeroValue() string {
+	var z string
+	switch a.Type {
+	case "string", "mg.StringFlag", "mg.StringSliceFlag":
+		z = `""`
+	case "int", "mg.IntFlag":
+		z = `"0"`
+	case "bool", "mg.BoolFlag":
+		z = `"false"`
+	case "time.Duration", "mg.DurationFlag":
+		z = `"0s"`
+	}
+	return z
+}
+
 // ID returns user-readable information about where this function is defined.
 func (f Function) ID() string {
 	path := "<current>"
@@ -99,6 +127,28 @@ func (f Function) TargetName() string {
 		}
 	}
 	return strings.Join(names, ":")
+}
+
+// Flags extracts the Args intended to be defined by flags
+func (f Function) Flags() []Arg {
+	out := []Arg{}
+	for _, arg := range f.Args {
+		if arg.IsFlag() {
+			out = append(out, arg)
+		}
+	}
+	return out
+}
+
+// Positional extracts the Args that are positional in nature
+func (f Function) Positional() []Arg {
+	out := []Arg{}
+	for _, arg := range f.Args {
+		if !arg.IsFlag() {
+			out = append(out, arg)
+		}
+	}
+	return out
 }
 
 // ExecCode returns code for the template switch to run the target.
@@ -144,6 +194,39 @@ func (f Function) ExecCode() string {
 					os.Exit(2)
 				}
 				x++`, x)
+		case "mg.StringFlag":
+			parseargs += fmt.Sprintf(`
+		  arg%d := args.Flags["%s"][len(args.Flags["%s"])-1]
+		  `, x, arg.Name, arg.Name)
+		case "mg.BoolFlag":
+			parseargs += fmt.Sprintf(`
+				arg%d, err := strconv.ParseBool(args.Flags["%s"][len(args.Flags["%s"])-1])
+				if err != nil {
+					logger.Printf("can't convert argument %%q to bool\n", args.Flags["%s"])
+					os.Exit(2)
+				}
+				`, x, arg.Name, arg.Name, arg.Name)
+		case "mg.StringSliceFlag":
+			parseargs += fmt.Sprintf(`
+		  arg%d := args.Flags["%s"]
+		  `, x, arg.Name)
+		case "mg.IntFlag":
+			parseargs += fmt.Sprintf(`
+				arg%d, err := strconv.Atoi(args.Flags["%s"][len(args.Flags["%s"])-1])
+				if err != nil {
+					logger.Printf("can't convert argument %%q to int\n", args.Flags["%s"])
+					os.Exit(2)
+				}
+				`, x, arg.Name, arg.Name, arg.Name)
+		case "mg.DurationFlag":
+			parseargs += fmt.Sprintf(`
+				arg%d, err := time.ParseDuration(args.Flags["%s"])
+				if err != nil {
+					logger.Printf("can't convert argument %%q to time.Duration\n", args.Flags["%s"])
+					os.Exit(2)
+				}
+				`, x, arg.Name, arg.Name)
+
 		}
 	}
 
@@ -843,8 +926,12 @@ func toOneLine(s string) string {
 }
 
 var argTypes = map[string]string{
-	"string":           "string",
-	"int":              "int",
-	"&{time Duration}": "time.Duration",
-	"bool":             "bool",
+	"string":                "string",
+	"int":                   "int",
+	"&{time Duration}":      "time.Duration",
+	"bool":                  "bool",
+	"&{mg StringFlag}":      "mg.StringFlag",
+	"&{mg BoolFlag}":        "mg.BoolFlag",
+	"&{mg DurationFlag}":    "mg.DurationFlag",
+	"&{mg StringSliceFlag}": "mg.StringSliceFlag",
 }
