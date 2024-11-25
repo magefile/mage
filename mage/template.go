@@ -35,6 +35,7 @@ func main() {
 		Help          bool          // print out help for a specific target
 		Timeout       time.Duration // set a timeout to running the targets
 		Args          []string      // args contain the non-flag command-line arguments
+        ExtraArgs     []string      // extraArgs contain the command-line arguments after the "--" separator
 	}
 
 	parseBool := func(env string) bool {
@@ -90,7 +91,23 @@ Options:
 		// flag will have printed out an error already.
 		return
 	}
-	args.Args = fs.Args()
+	var extraArgs []string
+	extraArgsFound := false
+	for _, arg := range fs.Args() {
+		// we do not really care about args before this point, this is where extra args begin
+		if arg == "--" {
+			extraArgsFound = true
+			continue
+		}
+		// all args before -- are the positional args that go to mage
+		if !extraArgsFound {
+			args.Args = append(args.Args, arg)
+			continue
+		}
+		// now we parse all that comes after --
+		extraArgs = append(extraArgs, arg)
+	}
+	args.ExtraArgs = extraArgs
 	if args.Help && len(args.Args) == 0 {
 		fs.Usage()
 		return
@@ -445,7 +462,7 @@ Options:
 		switch _strings.ToLower(target) {
 		{{range .Funcs }}
 			case "{{lower .TargetName}}":
-				expected := x + {{len .Args}}
+				expected := x + {{len .Args}} - {{.ExtraArgsPresent}}
 				if expected > len(args.Args) {
 					// note that expected and args at this point include the arg for the target itself
 					// so we subtract 1 here to show the number of args without the target.
@@ -462,7 +479,7 @@ Options:
 		{{$imp := .}}
 			{{range .Info.Funcs }}
 				case "{{lower .TargetName}}":
-					expected := x + {{len .Args}}
+					expected := x + {{len .Args}} - {{.ExtraArgsPresent}}
 					if expected > len(args.Args) {
 						// note that expected and args at this point include the arg for the target itself
 						// so we subtract 1 here to show the number of args without the target.
