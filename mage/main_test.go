@@ -2066,7 +2066,7 @@ func TestExtraArgsWithoutContextAndStringAndInt(t *testing.T) {
 		t.Fatalf("expected 0, but got %v", code)
 	}
 	expected := "mg.ExtraArgs{\"-baz\", \"foo\", \"bar\"}\nstringvalue\n2\n"
-	if stdout.String() != expected {
+  if stdout.String() != expected {
 		t.Fatalf("expected %q, but got %q", expected, stdout.String())
 	}
 }
@@ -2136,6 +2136,29 @@ stringvalue
 `
 	if stderr.String() != targetOneExpectedErr {
 		t.Fatalf("expected stderr output %q, but got %q", targetOneExpectedErr, stderr.String())
+	}
+}
+
+// Regression tests, add tests to ensure we do not regress on known issues.
+
+// TestBug508 is a regression test for: Bug: using Default with imports selects first matching func by name
+func TestBug508(t *testing.T) {
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:    "./testdata/bug508",
+		Stderr: stderr,
+		Stdout: stdout,
+	}
+	code := Invoke(inv)
+	if code != 0 {
+		t.Log(stderr.String())
+		t.Fatalf("expected 0, but got %v", code)
+	}
+	expected := "test\n"
+
+	if stdout.String() != expected {
+		t.Fatalf("expected %q, but got %q", expected, stdout.String())
 	}
 }
 
