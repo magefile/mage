@@ -606,6 +606,38 @@ func Compile(goos, goarch, ldflags, magePath, goCmd, compileTo string, gofiles [
 	return nil
 }
 
+var (
+	matchFirstCap = regexp.MustCompile("(.)([A-Z][a-z]+)")
+	matchAllCap   = regexp.MustCompile("([a-z0-9])([A-Z])")
+)
+
+// camelToKebab turns a camelcase string into a kebab case one.
+func camelToKebab(s string) string {
+	ks := matchFirstCap.ReplaceAllString(s, "${1}-${2}")
+	ks = matchAllCap.ReplaceAllString(ks, "${1}-${2}")
+	return strings.ToLower(ks)
+}
+
+// backfillKebabAliases backfill the existing alias with those infered from camelcase targets.
+func backfillKebabAliases(aliases map[string]*parse.Function, funcs []*parse.Function) map[string]*parse.Function {
+	newAliases := aliases
+	if newAliases == nil {
+		newAliases = make(map[string]*parse.Function)
+	}
+	for _, f := range funcs {
+		kebabAlias := camelToKebab(f.Name)
+		if kebabAlias == f.Name {
+			continue
+		}
+
+		if _, ok := newAliases[f.Name]; !ok {
+			newAliases[kebabAlias] = f
+		}
+	}
+
+	return newAliases
+}
+
 // GenerateMainfile generates the mage mainfile at path.
 func GenerateMainfile(binaryName, path string, info *parse.PkgInfo) error {
 	debug.Println("Creating mainfile at", path)
@@ -618,7 +650,7 @@ func GenerateMainfile(binaryName, path string, info *parse.PkgInfo) error {
 	data := mainfileTemplateData{
 		Description: info.Description,
 		Funcs:       info.Funcs,
-		Aliases:     info.Aliases,
+		Aliases:     backfillKebabAliases(info.Aliases, info.Funcs),
 		Imports:     info.Imports,
 		BinaryName:  binaryName,
 	}
