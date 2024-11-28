@@ -206,6 +206,13 @@ func (o *onceFun) run(ctx context.Context) error {
 			logger.Println("Running dependency:", displayName(o.fn.Name()))
 		}
 		o.err = o.fn.Run(ctx)
+		if Verbose() {
+			if o.err == nil {
+				logger.Printf("Finished dependency: %s\n", displayName(o.fn.Name()))
+			} else {
+				logger.Printf("Finished dependency: %s (err: %v)\n", displayName(o.fn.Name()), o.err)
+			}
+		}
 	})
 	return o.err
 }
