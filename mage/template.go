@@ -9,6 +9,7 @@ var mageMainfileTplString = `//go:build ignore
 package main
 
 import (
+	"bytes"
 	"context"
 	_flag "flag"
 	_fmt "fmt"
@@ -23,6 +24,7 @@ import (
 	"syscall"
 	_tabwriter "text/tabwriter"
 	"time"
+	_template "text/template"
 	{{range .Imports}}{{.UniqueName}} "{{.Path}}"
 	{{end}}
 )
@@ -32,6 +34,7 @@ func main() {
 	type arguments struct {
 		Verbose       bool          // print out log statements
 		List          bool          // print out a list of targets
+		Format 		  string        // print out a list of targets in a golang template string specified format
 		Help          bool          // print out help for a specific target
 		Timeout       time.Duration // set a timeout to running the targets
 		Args          []string      // args contain the non-flag command-line arguments
@@ -62,6 +65,7 @@ func main() {
 		}
 		return d
 	}
+	
 	args := arguments{}
 	fs := _flag.FlagSet{}
 	fs.SetOutput(os.Stdout)
@@ -69,6 +73,7 @@ func main() {
 	// default flag set with ExitOnError and auto generated PrintDefaults should be sufficient
 	fs.BoolVar(&args.Verbose, "v", parseBool("MAGEFILE_VERBOSE"), "show verbose output when running targets")
 	fs.BoolVar(&args.List, "l", parseBool("MAGEFILE_LIST"), "list targets for this binary")
+	fs.StringVar(&args.Format, "format", os.Getenv("MAGEFILE_FORMAT"), "when used with -l, list targets in a golang template string specified format")
 	fs.BoolVar(&args.Help, "h", parseBool("MAGEFILE_HELP"), "print out help for a specific target")
 	fs.DurationVar(&args.Timeout, "t", parseDuration("MAGEFILE_TIMEOUT"), "timeout in duration parsable format (e.g. 5m30s)")
 	fs.Usage = func() {
@@ -76,8 +81,9 @@ func main() {
 %s [options] [target]
 
 Commands:
-  -l    list targets in this binary
-  -h    show this help
+  -l    	list targets in this binary
+  -format 	when used with -l, list targets in a golang template string specified format
+  -h    	show this help
 
 Options:
   -h    show description of a target
@@ -223,9 +229,47 @@ Options:
 		}
 	}
 
-	list := func() error {
-		{{with .Description}}_fmt.Println(` + "`{{.}}\n`" + `)
+	format := func(tmplStr string) error {
+		if tmplStr == "" {
+			return _fmt.Errorf("template string is empty")
+		}
+
+		type Targets struct {
+			Name string
+			Synopsis string
+		}
+
+		{{- $default := .DefaultFunc}}
+		targets := []Targets{
+		{{- range .Funcs}}
+			{Name: "{{lowerFirst .TargetName}}{{if and (eq .Name $default.Name) (eq .Receiver $default.Receiver)}}*{{end}}", Synopsis: {{printf "%q" .Synopsis}}},
 		{{- end}}
+		{{- range .Imports}}{{$imp := .}}
+			{{- range .Info.Funcs}}
+			{Name: "{{lowerFirst .TargetName}}{{if and (eq .Name $default.Name) (eq .Receiver $default.Receiver)}}*{{end}}", Synopsis: {{printf "%q" .Synopsis}}},
+			{{- end}}
+		{{- end}}
+		}
+
+		_sort.Slice(targets, func(i, j int) bool {
+			return targets[i].Name < targets[j].Name
+		})
+		
+		tmpl := _template.Must(_template.New("format").Parse(tmplStr))	
+	
+		for _, t := range targets {
+			var buf bytes.Buffer
+			if err := tmpl.Execute(&buf, t); err != nil {
+				return err
+			}
+			_fmt.Println(buf.String())
+		}
+		
+		return nil
+	}
+
+	list := func() error {
+		{{with .Description}}_fmt.Println(` + "`{{.}}\n`" + `){{- end}}
 		{{- $default := .DefaultFunc}}
 		targets := map[string]string{
 		{{- range .Funcs}}
@@ -255,6 +299,7 @@ Options:
 				_fmt.Println("\n* default target")
 			}
 		{{- end}}
+		
 		return err
 	}
 
@@ -352,7 +397,14 @@ Options:
 		_log.SetOutput(_ioutil.Discard)
 	}
 	logger := _log.New(os.Stderr, "", 0)
-	if args.List {
+
+	if args.List && args.Format != "" {
+		if err := format(args.Format); err != nil {
+			_log.Println(err)
+			os.Exit(1)
+		}
+		return
+	} else if args.List {	
 		if err := list(); err != nil {
 			_log.Println(err)
 			os.Exit(1)
