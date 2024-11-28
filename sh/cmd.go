@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 
 	"github.com/magefile/mage/mg"
@@ -95,8 +96,9 @@ func OutputWith(env map[string]string, cmd string, args ...string) (string, erro
 // the command failed with. Env is a list of environment variables to set when
 // running the command, these override the current environment variables set
 // (which are also passed to the command). cmd and args may include references
-// to environment variables in $FOO format, in which case these will be
-// expanded before the command is run.
+// to environment variables in $FOO or ${FOO} format, in which case these will
+// be expanded before the command is run; use a backslash before the dollar
+// sign to avoid this behavior.
 //
 // Ran reports if the command ran (rather than was not found or not executable).
 // Code reports the exit code the command returned if it ran. If err == nil, ran
@@ -109,9 +111,9 @@ func Exec(env map[string]string, stdout, stderr io.Writer, cmd string, args ...s
 		}
 		return os.Getenv(s)
 	}
-	cmd = os.Expand(cmd, expand)
+	cmd = Expand(cmd, expand)
 	for i := range args {
-		args[i] = os.Expand(args[i], expand)
+		args[i] = Expand(args[i], expand)
 	}
 	ran, code, err := run(env, stdout, stderr, cmd, args...)
 	if err == nil {
@@ -181,4 +183,52 @@ func ExitStatus(err error) int {
 		}
 	}
 	return 1
+}
+
+// Escape returns an escaped version of the argument such that when environment
+// expansion occurs in the command-running functions of this module, the result
+// will be the original argument.
+func Escape(arg string) string {
+	arg = strings.Replace(arg, `\`, `\\`, -1)
+	arg = strings.Replace(arg, "$", `\$`, -1)
+	return arg
+}
+
+var varExpr = regexp.MustCompile(`\\.|\$(\w+|[-*#$@!?0-9])|\$\{(\w+|[-*#$@!?0-9])\}|\$\{\}?`)
+
+// Expand searches the input for segments of the form $var or ${var} and
+// replaces them with the value returned by the given callback function, such
+// as `os.Getenv]. It works just like [os.Expand], except that a backslash
+// preceeding the dollar sign will escape it, allowing a literal dollar sign to
+// appear in the output. Escape a backslash with another backslash. A backslash
+// followed by any other character is reserved for future use; it may be
+// omitted from the output or replaced by some other value determined in the
+// future.
+func Expand(s string, mapping func(string) string) string {
+	return varExpr.ReplaceAllStringFunc(s, func(match string) string {
+		switch match[0] {
+		case '\\':
+			// Escaped backslash or dollar expands to itself.
+			// Escaped anything else is reserved and gets removed.
+			if match[1] == '\\' || match[1] == '$' {
+				return match[1:2]
+			}
+		case '$':
+			if match[1] != '{' {
+				// We got an ordinary word. Omit the dollar and
+				// do the replacement.
+				return mapping(match[1:])
+			}
+			if len(match) > 3 {
+				// Omit the leading "${" and trailing "}" to
+				// get the name.
+				return mapping(match[2:len(match)-1])
+			}
+			// We got either "${" or "${}". They're both syntax
+			// errors.
+		default:
+			// Should never get here.
+		}
+		return ""
+	})
 }
