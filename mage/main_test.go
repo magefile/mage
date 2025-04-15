@@ -1739,14 +1739,14 @@ func TestGoModules(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(dir)
-	err = ioutil.WriteFile(filepath.Join(dir, "magefile.go"), []byte(`//+build mage
+	// beware, mage builds in go versions older than 1.17 so both build tag formats need to be present
+	err = ioutil.WriteFile(filepath.Join(dir, "magefile.go"), []byte(`//go:build mage
+// +build mage
 
 package main
 
-import "golang.org/x/text/unicode/norm"
-
 func Test() {
-	print("unicode version: " + norm.Version)
+	print("nothing is imported here for >1.17 compatibility")
 }
 `), 0600)
 	if err != nil {
@@ -1874,6 +1874,28 @@ func TestWrongDependency(t *testing.T) {
 	actual := stderr.String()
 	if actual != expected {
 		t.Fatalf("expected %q, but got %q", expected, actual)
+	}
+}
+
+// Regression tests, add tests to ensure we do not regress on known issues.
+
+// TestBug508 is a regression test for: Bug: using Default with imports selects first matching func by name
+func TestBug508(t *testing.T) {
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:    "./testdata/bug508",
+		Stderr: stderr,
+		Stdout: stdout,
+	}
+	code := Invoke(inv)
+	if code != 0 {
+		t.Log(stderr.String())
+		t.Fatalf("expected 0, but got %v", code)
+	}
+	expected := "test\n"
+	if stdout.String() != expected {
+		t.Fatalf("expected %q, but got %q", expected, stdout.String())
 	}
 }
 

@@ -3,7 +3,8 @@ package mage
 // this template uses the "data"
 
 // var only for tests
-var mageMainfileTplString = `// +build ignore
+var mageMainfileTplString = `//go:build ignore
+// +build ignore
 
 package main
 

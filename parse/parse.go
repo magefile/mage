@@ -38,7 +38,7 @@ type PkgInfo struct {
 	Imports     Imports
 }
 
-// Function represented a job function from a mage file
+// Function represents a job function from a mage file
 type Function struct {
 	PkgAlias   string
 	Package    string
@@ -671,7 +671,7 @@ func getFunction(exp ast.Expr, pi *PkgInfo) (*Function, error) {
 			for _, imp := range pi.Imports {
 				if firstname == imp.Name {
 					for _, f := range imp.Info.Funcs {
-						if funcname == f.Name {
+						if funcname == f.Name && f.Receiver == "" {
 							return f, nil
 						}
 					}
