@@ -3,6 +3,7 @@ package sh
 import (
 	"bytes"
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -57,7 +58,7 @@ func TestNotRun(t *testing.T) {
 	}
 }
 
-func TestAutoExpand(t *testing.T) {
+func TestAutoEnvExpand(t *testing.T) {
 	if err := os.Setenv("MAGE_FOOBAR", "baz"); err != nil {
 		t.Fatal(err)
 	}
@@ -68,5 +69,26 @@ func TestAutoExpand(t *testing.T) {
 	if s != "baz" {
 		t.Fatalf(`Expected "baz" but got %q`, s)
 	}
+}
 
+func TestAutoGlobExpand(t *testing.T) {
+	// these deliberately specify a set of files that should be stable over the longer term
+	// (i.e. avoiding the names of source code files)
+	t.Run("* ? and [] glob", func(t *testing.T) {
+		s, err := Output("ls", "../R*.md", "../go.??[dm]", "../*/config.toml")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if s != "../go.mod\n../go.sum\n../README.md\n../site/config.toml" {
+			t.Errorf(`Expected "../go.mod\n../go.sum\n../README.md\n../site/config.toml" but got %q`, s)
+		}
+	})
+	t.Run("glob syntax error", func(t *testing.T) {
+		_, err := Output("ls", "../go.\\")
+		if err == nil {
+			t.Fatalf("expected error, but got nil")
+		} else if !strings.Contains(err.Error(), `failed to run "ls ../go.\:`) {
+			t.Errorf("Actual error was %q", err.Error())
+		}
+	})
 }
