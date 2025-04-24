@@ -173,7 +173,6 @@ func expandGlob(value []string) (result []string, err error) {
 		}
 	}
 	return result, nil
-	//return value, nil
 }
 
 // CmdRan examines the error to determine if it was generated as a result of a
