@@ -103,8 +103,8 @@ func OutputWith(env map[string]string, cmd string, args ...string) (string, erro
 // in which case these will be expanded before the command is run.
 //
 // Also, any file glob patterns in args are expanded. For example, "*.go" will be
-// expanded to the list of Go files in the current directory. There is no glob
-// expansion of cmd, however.
+// expanded to the list of Go files in the current directory. See [filepath.Match]
+// for the syntax. There is no glob expansion of cmd, however.
 //
 // ran reports if the command ran (rather than was not found or not executable).
 // If err == nil, ran is always true.
