@@ -128,6 +128,14 @@ func (f Function) ExecCode() string {
 					os.Exit(2)
 				}
 				x++`, x)
+		case "float64":
+			parseargs += fmt.Sprintf(`
+				arg%d, err := strconv.ParseFloat(args.Args[x], 64)
+				if err != nil {
+					logger.Printf("can't convert argument %%q to float64\n", args.Args[x])
+					os.Exit(2)
+				}
+				x++`, x)
 		case "bool":
 			parseargs += fmt.Sprintf(`
 				arg%d, err := strconv.ParseBool(args.Args[x])
@@ -845,6 +853,7 @@ func toOneLine(s string) string {
 var argTypes = map[string]string{
 	"string":           "string",
 	"int":              "int",
+	"float64":          "float64",
 	"&{time Duration}": "time.Duration",
 	"bool":             "bool",
 }
