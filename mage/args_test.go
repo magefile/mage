@@ -12,7 +12,7 @@ func TestArgs(t *testing.T) {
 		Dir:    "./testdata/args",
 		Stderr: stderr,
 		Stdout: stdout,
-		Args:   []string{"status", "say", "hi", "bob", "count", "5", "status", "wait", "5ms", "cough", "false", "doubleIt", "3.14"},
+		Args:   []string{"status", "say", "hi", "bob", "count", "5", "status", "wait", "5ms", "cough", "false", "doubleIt", "3.1"},
 	}
 	code := Invoke(inv)
 	if code != 0 {
@@ -26,7 +26,7 @@ saying hi bob
 status
 waiting 5ms
 not coughing
-3.1 * 2 = 6.3
+3.1 * 2 = 6.2
 `
 	if actual != expected {
 		t.Fatalf("output is not expected:\n%q", actual)
