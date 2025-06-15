@@ -1877,6 +1877,268 @@ func TestWrongDependency(t *testing.T) {
 	}
 }
 
+func TestExtraArgs(t *testing.T) {
+	stdout := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:       "./testdata/extra_args",
+		Stderr:    ioutil.Discard,
+		Stdout:    stdout,
+		Args:      []string{"targetOne"},
+		ExtraArgs: []string{"--", "-baz", "foo", "bar"},
+	}
+
+	code := Invoke(inv)
+	if code != 0 {
+		t.Fatalf("expected 0, but got %v", code)
+	}
+	expected := "mg.ExtraArgs{\"-baz\", \"foo\", \"bar\"}\n"
+	if stdout.String() != expected {
+		t.Fatalf("expected %q, but got %q", expected, stdout.String())
+	}
+}
+
+func TestExtraArgsParsing(t *testing.T) {
+	os.Setenv("MAGEFILE_VERBOSE", "1")
+	defer os.Unsetenv("MAGEFILE_VERBOSE")
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	code := ParseAndRun(stderr, stdout, nil,
+		[]string{"-d", "./testdata/extra_args", "targetOne", "--", "-baz", "foo", "bar"})
+	if code != 0 {
+		t.Fatal("unexpected code", code)
+	}
+
+	targetOneExpectedOut := "Running target: TargetOne\n"
+	if stdout.String() != targetOneExpectedOut {
+		t.Fatalf("expected output %q, but got %q", targetOneExpectedOut, stdout.String())
+	}
+	targetOneExpectedErr := `mg.ExtraArgs{"-baz", "foo", "bar"}
+`
+	if stderr.String() != targetOneExpectedErr {
+		t.Fatalf("expected stderr output %q, but got %q", targetOneExpectedErr, stderr.String())
+	}
+}
+
+func TestExtraArgsWithContext(t *testing.T) {
+	stdout := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:       "./testdata/extra_args",
+		Stderr:    ioutil.Discard,
+		Stdout:    stdout,
+		Args:      []string{"targetTwo"},
+		ExtraArgs: []string{"--", "-baz", "foo", "bar"},
+	}
+
+	code := Invoke(inv)
+	if code != 0 {
+		t.Fatalf("expected 0, but got %v", code)
+	}
+	expected := "Context is nil: false\nmg.ExtraArgs{\"-baz\", \"foo\", \"bar\"}\n"
+	if stdout.String() != expected {
+		t.Fatalf("expected %q, but got %q", expected, stdout.String())
+	}
+}
+
+func TestExtraArgsWithContextParsing(t *testing.T) {
+	os.Setenv("MAGEFILE_VERBOSE", "1")
+	defer os.Unsetenv("MAGEFILE_VERBOSE")
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	code := ParseAndRun(stderr, stdout, nil,
+		[]string{"-d", "./testdata/extra_args", "targetTwo", "--", "-baz", "foo", "bar"})
+	if code != 0 {
+		t.Fatal("unexpected code", code)
+	}
+
+	targetOneExpectedOut := "Running target: TargetTwo\n"
+	if stdout.String() != targetOneExpectedOut {
+		t.Fatalf("expected output %q, but got %q", targetOneExpectedOut, stdout.String())
+	}
+	targetOneExpectedErr := `Context is nil: false
+mg.ExtraArgs{"-baz", "foo", "bar"}
+`
+	if stderr.String() != targetOneExpectedErr {
+		t.Fatalf("expected stderr output %q, but got %q", targetOneExpectedErr, stderr.String())
+	}
+}
+
+func TestExtraArgsWithContextAndString(t *testing.T) {
+	stdout := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:       "./testdata/extra_args",
+		Stderr:    ioutil.Discard,
+		Stdout:    stdout,
+		Args:      []string{"targetThree", "stringvalue"},
+		ExtraArgs: []string{"--", "-baz", "foo", "bar"},
+	}
+
+	code := Invoke(inv)
+	if code != 0 {
+		t.Fatalf("expected 0, but got %v", code)
+	}
+	expected := "Context is nil: false\nmg.ExtraArgs{\"-baz\", \"foo\", \"bar\"}\nstringvalue\n"
+	if stdout.String() != expected {
+		t.Fatalf("expected %q, but got %q", expected, stdout.String())
+	}
+}
+
+func TestExtraArgsWithContextAndStringParsing(t *testing.T) {
+	os.Setenv("MAGEFILE_VERBOSE", "1")
+	defer os.Unsetenv("MAGEFILE_VERBOSE")
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	code := ParseAndRun(stderr, stdout, nil,
+		[]string{"-d", "./testdata/extra_args", "targetThree", "stringvalue", "--", "-baz", "foo", "bar"})
+	if code != 0 {
+		t.Fatal("unexpected code", code)
+	}
+
+	targetOneExpectedOut := "Running target: TargetThree\n"
+	if stdout.String() != targetOneExpectedOut {
+		t.Fatalf("expected output %q, but got %q", targetOneExpectedOut, stdout.String())
+	}
+	targetOneExpectedErr := `Context is nil: false
+mg.ExtraArgs{"-baz", "foo", "bar"}
+stringvalue
+`
+	if stderr.String() != targetOneExpectedErr {
+		t.Fatalf("expected stderr output %q, but got %q", targetOneExpectedErr, stderr.String())
+	}
+}
+
+func TestExtraArgsWithContextAndStringAndInt(t *testing.T) {
+	stdout := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:       "./testdata/extra_args",
+		Stderr:    ioutil.Discard,
+		Stdout:    stdout,
+		Args:      []string{"targetFour", "stringvalue", "2"},
+		ExtraArgs: []string{"--", "-baz", "foo", "bar"},
+	}
+
+	code := Invoke(inv)
+	if code != 0 {
+		t.Fatalf("expected 0, but got %v", code)
+	}
+	expected := "Context is nil: false\nmg.ExtraArgs{\"-baz\", \"foo\", \"bar\"}\nstringvalue\n2\n"
+	if stdout.String() != expected {
+		t.Fatalf("expected %q, but got %q", expected, stdout.String())
+	}
+}
+
+func TestExtraArgsWithContextAndStringAndIntParsing(t *testing.T) {
+	os.Setenv("MAGEFILE_VERBOSE", "1")
+	defer os.Unsetenv("MAGEFILE_VERBOSE")
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	code := ParseAndRun(stderr, stdout, nil,
+		[]string{"-d", "./testdata/extra_args", "targetFour", "stringvalue", "2", "--", "-baz", "foo", "bar"})
+	if code != 0 {
+		t.Fatal("unexpected code", code)
+	}
+
+	targetOneExpectedOut := "Running target: TargetFour\n"
+	if stdout.String() != targetOneExpectedOut {
+		t.Fatalf("expected output %q, but got %q", targetOneExpectedOut, stdout.String())
+	}
+	targetOneExpectedErr := `Context is nil: false
+mg.ExtraArgs{"-baz", "foo", "bar"}
+stringvalue
+2
+`
+	if stderr.String() != targetOneExpectedErr {
+		t.Fatalf("expected stderr output %q, but got %q", targetOneExpectedErr, stderr.String())
+	}
+}
+
+func TestExtraArgsWithoutContextAndStringAndInt(t *testing.T) {
+	stdout := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:       "./testdata/extra_args",
+		Stderr:    ioutil.Discard,
+		Stdout:    stdout,
+		Args:      []string{"targetFive", "stringvalue", "2"},
+		ExtraArgs: []string{"--", "-baz", "foo", "bar"},
+	}
+
+	code := Invoke(inv)
+	if code != 0 {
+		t.Fatalf("expected 0, but got %v", code)
+	}
+	expected := "mg.ExtraArgs{\"-baz\", \"foo\", \"bar\"}\nstringvalue\n2\n"
+  if stdout.String() != expected {
+		t.Fatalf("expected %q, but got %q", expected, stdout.String())
+	}
+}
+
+func TestExtraArgsWithoutContextAndStringAndIntParsing(t *testing.T) {
+	os.Setenv("MAGEFILE_VERBOSE", "1")
+	defer os.Unsetenv("MAGEFILE_VERBOSE")
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	code := ParseAndRun(stderr, stdout, nil,
+		[]string{"-d", "./testdata/extra_args", "targetFive", "stringvalue", "2", "--", "-baz", "foo", "bar"})
+	if code != 0 {
+		t.Fatal("unexpected code", code)
+	}
+
+	targetOneExpectedOut := "Running target: TargetFive\n"
+	if stdout.String() != targetOneExpectedOut {
+		t.Fatalf("expected output %q, but got %q", targetOneExpectedOut, stdout.String())
+	}
+	targetOneExpectedErr := `mg.ExtraArgs{"-baz", "foo", "bar"}
+stringvalue
+2
+`
+	if stderr.String() != targetOneExpectedErr {
+		t.Fatalf("expected stderr output %q, but got %q", targetOneExpectedErr, stderr.String())
+	}
+}
+
+func TestExtraArgsWithoutContextAndStringAndIntNonOrdered(t *testing.T) {
+	stdout := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:       "./testdata/extra_args",
+		Stderr:    ioutil.Discard,
+		Stdout:    stdout,
+		Args:      []string{"targetSix", "stringvalue", "2"},
+		ExtraArgs: []string{"--", "-baz", "foo", "bar"},
+	}
+
+	code := Invoke(inv)
+	if code != 0 {
+		t.Fatalf("expected 0, but got %v", code)
+	}
+	expected := "mg.ExtraArgs{\"-baz\", \"foo\", \"bar\"}\nstringvalue\n2\n"
+	if stdout.String() != expected {
+		t.Fatalf("expected %q, but got %q", expected, stdout.String())
+	}
+}
+
+func TestExtraArgsWithoutContextAndStringAndIntNonOrderedParsing(t *testing.T) {
+	os.Setenv("MAGEFILE_VERBOSE", "1")
+	defer os.Unsetenv("MAGEFILE_VERBOSE")
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	code := ParseAndRun(stderr, stdout, nil,
+		[]string{"-d", "./testdata/extra_args", "targetSix", "stringvalue", "2", "--", "-baz", "foo", "bar"})
+	if code != 0 {
+		t.Fatal("unexpected code", code)
+	}
+
+	targetOneExpectedOut := "Running target: TargetSix\n"
+	if stdout.String() != targetOneExpectedOut {
+		t.Fatalf("expected output %q, but got %q", targetOneExpectedOut, stdout.String())
+	}
+	targetOneExpectedErr := `mg.ExtraArgs{"-baz", "foo", "bar"}
+stringvalue
+2
+`
+	if stderr.String() != targetOneExpectedErr {
+		t.Fatalf("expected stderr output %q, but got %q", targetOneExpectedErr, stderr.String())
+	}
+}
+
 // Regression tests, add tests to ensure we do not regress on known issues.
 
 // TestBug508 is a regression test for: Bug: using Default with imports selects first matching func by name
@@ -1894,6 +2156,7 @@ func TestBug508(t *testing.T) {
 		t.Fatalf("expected 0, but got %v", code)
 	}
 	expected := "test\n"
+
 	if stdout.String() != expected {
 		t.Fatalf("expected %q, but got %q", expected, stdout.String())
 	}
