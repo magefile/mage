@@ -12,12 +12,12 @@ func TestArgs(t *testing.T) {
 		Dir:    "./testdata/args",
 		Stderr: stderr,
 		Stdout: stdout,
-		Args:   []string{"status", "say", "hi", "bob", "count", "5", "status", "wait", "5ms", "cough", "false"},
+		Args:   []string{"status", "say", "hi", "bob", "count", "5", "status", "wait", "5ms", "cough", "false", "doubleIt", "3.1"},
 	}
 	code := Invoke(inv)
 	if code != 0 {
 		t.Log(stderr.String())
-		t.Fatalf("expected 1, but got %v", code)
+		t.Fatalf("expected 0, but got %v", code)
 	}
 	actual := stdout.String()
 	expected := `status
@@ -26,6 +26,7 @@ saying hi bob
 status
 waiting 5ms
 not coughing
+3.1 * 2 = 6.2
 `
 	if actual != expected {
 		t.Fatalf("output is not expected:\n%q", actual)
@@ -95,6 +96,29 @@ func TestBadDurationArg(t *testing.T) {
 	}
 	actual := stderr.String()
 	expected := "can't convert argument \"abc123\" to time.Duration\n"
+
+	if actual != expected {
+		t.Fatalf("output is not expected:\n%q", actual)
+	}
+}
+
+func TestBadFloat64Arg(t *testing.T) {
+	stderr := &bytes.Buffer{}
+	stdout := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:    "./testdata/args",
+		Stderr: stderr,
+		Stdout: stdout,
+		Args:   []string{"doubleIt", "abc123"},
+	}
+	code := Invoke(inv)
+	if code != 2 {
+		t.Log("stderr:", stderr)
+		t.Log("stdout:", stdout)
+		t.Fatalf("expected code 2, but got %v", code)
+	}
+	actual := stderr.String()
+	expected := "can't convert argument \"abc123\" to float64\n"
 
 	if actual != expected {
 		t.Fatalf("output is not expected:\n%q", actual)

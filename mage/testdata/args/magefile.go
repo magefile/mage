@@ -50,3 +50,7 @@ func Cough(ctx context.Context, b bool) error {
 func HasDep() {
 	mg.Deps(mg.F(Say, "hi", "Susan"))
 }
+
+func DoubleIt(f float64) {
+	fmt.Printf("%.1f * 2 = %.1f\n", f, f*2)
+}
