@@ -99,26 +99,27 @@ func Main() int {
 
 // Invocation contains the args for invoking a run of Mage.
 type Invocation struct {
-	Debug      bool          // turn on debug messages
-	Dir        string        // directory to read magefiles from
-	WorkDir    string        // directory where magefiles will run
-	Force      bool          // forces recreation of the compiled binary
-	Verbose    bool          // tells the magefile to print out log statements
-	List       bool          // tells the magefile to print out a list of targets
-	Help       bool          // tells the magefile to print out help for a specific target
-	Keep       bool          // tells mage to keep the generated main file after compiling
-	Timeout    time.Duration // tells mage to set a timeout to running the targets
-	CompileOut string        // tells mage to compile a static binary to this path, but not execute
-	GOOS       string        // sets the GOOS when producing a binary with -compileout
-	GOARCH     string        // sets the GOARCH when producing a binary with -compileout
-	Ldflags    string        // sets the ldflags when producing a binary with -compileout
-	Stdout     io.Writer     // writer to write stdout messages to
-	Stderr     io.Writer     // writer to write stderr messages to
-	Stdin      io.Reader     // reader to read stdin from
-	Args       []string      // args to pass to the compiled binary
-	GoCmd      string        // the go binary command to run
-	CacheDir   string        // the directory where we should store compiled binaries
-	HashFast   bool          // don't rely on GOCACHE, just hash the magefiles
+	Debug            bool          // turn on debug messages
+	Dir              string        // directory to read magefiles from
+	WorkDir          string        // directory where magefiles will run
+	DisableTraversal bool          // disable walking up the tree from the current directory to find a magefiles directory
+	Force            bool          // forces recreation of the compiled binary
+	Verbose          bool          // tells the magefile to print out log statements
+	List             bool          // tells the magefile to print out a list of targets
+	Help             bool          // tells the magefile to print out help for a specific target
+	Keep             bool          // tells mage to keep the generated main file after compiling
+	Timeout          time.Duration // tells mage to set a timeout to running the targets
+	CompileOut       string        // tells mage to compile a static binary to this path, but not execute
+	GOOS             string        // sets the GOOS when producing a binary with -compileout
+	GOARCH           string        // sets the GOARCH when producing a binary with -compileout
+	Ldflags          string        // sets the ldflags when producing a binary with -compileout
+	Stdout           io.Writer     // writer to write stdout messages to
+	Stderr           io.Writer     // writer to write stderr messages to
+	Stdin            io.Reader     // reader to read stdin from
+	Args             []string      // args to pass to the compiled binary
+	GoCmd            string        // the go binary command to run
+	CacheDir         string        // the directory where we should store compiled binaries
+	HashFast         bool          // don't rely on GOCACHE, just hash the magefiles
 }
 
 // MagefilesDirName is the name of the default folder to look for if no directory was specified,
@@ -190,6 +191,7 @@ func Parse(stderr, stdout io.Writer, args []string) (inv Invocation, cmd Command
 	fs.BoolVar(&inv.Debug, "debug", mg.Debug(), "turn on debug messages")
 	fs.BoolVar(&inv.Verbose, "v", mg.Verbose(), "show verbose output when running mage targets")
 	fs.BoolVar(&inv.Help, "h", false, "show this help")
+	fs.BoolVar(&inv.DisableTraversal, "no-traverse", false, "disable traversing up the directory tree to find magefiles")
 	fs.DurationVar(&inv.Timeout, "t", 0, "timeout in duration parsable format (e.g. 5m30s)")
 	fs.BoolVar(&inv.Keep, "keep", false, "keep intermediate mage files around after running")
 	fs.StringVar(&inv.Dir, "d", "", "directory to read magefiles from")
@@ -240,6 +242,8 @@ Options:
   -keep     keep intermediate mage files around after running
   -t <string>
             timeout in duration parsable format (e.g. 5m30s)
+  -no-traverse
+			disable traversing up the directory tree to find magefiles
   -v        show verbose output when running mage targets
   -w <string>
             working directory where magefiles will run (default -d value)
@@ -310,6 +314,67 @@ Options:
 
 const dotDirectory = "."
 
+// walkUpToMageFiles walks up the directory tree from the given directory until it finds a magefiles directory.
+// It stops:
+// 1. if a ./magefiles directory is found
+// 2. if a ./.git directory is found, but no magefiles directory exists
+// 3. if the root directory is reached and no magefiles directory exists
+func walkUpToMageFiles(dir string, log *log.Logger) (string, bool, error) {
+	if dir == "." {
+		// set dir to the current working directory
+		cwd, err := os.Getwd()
+		if err != nil {
+			return "", false, err
+		}
+		dir = cwd
+	}
+	magefilesDir, hasMagefiles := checkHasMagefiles(dir)
+	if !hasMagefiles && dir == "/" {
+		return "", false, nil
+	}
+	// check if the folder contains a .git folder, if so then also stop walking up the tree
+	_, err := os.Stat(filepath.Join(dir, ".git"))
+	if !hasMagefiles && err == nil {
+		return "", false, nil
+	}
+	if !hasMagefiles {
+		// walk up the tree and try again
+		newDir := filepath.Dir(dir)
+		return walkUpToMageFiles(newDir, log)
+	}
+	return magefilesDir, true, nil
+}
+
+// checkHasMagefiles checks if the given directory contains a magefiles directory.
+func checkHasMagefiles(dir string) (string, bool) {
+	magefilesDir := filepath.Join(dir, MagefilesDirName)
+	mfSt, err := os.Stat(magefilesDir)
+	if err != nil {
+		return "", false
+	}
+	return magefilesDir, mfSt.IsDir()
+}
+
+// checkCollidingMageFiles is used if we've found a magefiles folder, and then
+// determines if our current working directory contains magefiles as well. It defaults to the CWD
+// if both are found, and provides a warning.
+func checkCollidingMagefiles(inv Invocation, dir string) Invocation {
+	originalDir := inv.Dir
+	stderrBuf := &bytes.Buffer{}
+	inv.Dir = dir // preemptive assignment
+	// TODO: Remove this fallback and the above Magefiles invocation when the bw compatibility is removed.
+	files, err := Magefiles(originalDir, inv.GOOS, inv.GOARCH, inv.GoCmd, stderrBuf, false, inv.Debug)
+	if err == nil {
+		if len(files) != 0 {
+			log.Println("[WARNING] You have both a magefiles directory and mage files in the " +
+				"current directory, in future versions the files will be ignored in favor of the directory")
+			inv.Dir = originalDir
+			return inv
+		}
+	}
+	return inv
+}
+
 // Invoke runs Mage with the given arguments.
 func Invoke(inv Invocation) int {
 	errlog := log.New(inv.Stderr, "", 0)
@@ -322,23 +387,15 @@ func Invoke(inv Invocation) int {
 	if inv.WorkDir == "" {
 		inv.WorkDir = inv.Dir
 	}
-	magefilesDir := filepath.Join(inv.Dir, MagefilesDirName)
-	// . will be default unless we find a mage folder.
-	mfSt, err := os.Stat(magefilesDir)
-	if err == nil {
-		if mfSt.IsDir() {
-			stderrBuf := &bytes.Buffer{}
-			originalDir := inv.Dir
-			inv.Dir = magefilesDir // preemptive assignment
-			// TODO: Remove this fallback and the above Magefiles invocation when the bw compatibility is removed.
-			files, err := Magefiles(originalDir, inv.GOOS, inv.GOARCH, inv.GoCmd, stderrBuf, false, inv.Debug)
-			if err == nil {
-				if len(files) != 0 {
-					errlog.Println("[WARNING] You have both a magefiles directory and mage files in the " +
-						"current directory, in future versions the files will be ignored in favor of the directory")
-					inv.Dir = originalDir
-				}
-			}
+	enableTraverse := !inv.DisableTraversal && os.Getenv("MAGEFILE_NO_TRAVERSE") != "1"
+	if enableTraverse {
+		mageDir, found, err := walkUpToMageFiles(inv.Dir, errlog)
+		if err != nil {
+			errlog.Println("Error walking up to magefiles directory:", err)
+			return 1
+		}
+		if found {
+			inv = checkCollidingMagefiles(inv, mageDir)
 		}
 	}
 
@@ -353,7 +410,11 @@ func Invoke(inv Invocation) int {
 	}
 
 	if len(files) == 0 {
-		errlog.Println("No .go files marked with the mage build tag in this directory.")
+		if enableTraverse {
+			errlog.Println("No magefiles found in this directory or any parent. Run 'mage -init' to create one.")
+		} else {
+			errlog.Println("No magefiles found in this directory. Run 'mage -init' to create one.")
+		}
 		return 1
 	}
 	debug.Printf("found magefiles: %s", strings.Join(files, ", "))
