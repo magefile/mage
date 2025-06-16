@@ -1,0 +1,42 @@
+name: Cut Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        required: true
+        type: string
+        description: 'Release tag'
+
+jobs:
+  cut-release:
+    runs-on: ubuntu-latest
+
+    permissions:
+      id-token: write
+      contents: write
+
+    steps:
+    - uses: actions/setup-go@v2.2.0
+      with:
+        go-version: 1.17.x
+
+    - name: Install cosign
+      uses: sigstore/cosign-installer@v2.1.0
+
+    - name: Install GoReleaser
+      uses: goreleaser/goreleaser-action@v2.9.1
+      with:
+        install-only: true
+
+    - uses: actions/checkout@v2
+
+    - name: Config git
+      run: |
+        git config user.name "$GITHUB_ACTOR"
+        git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
+
+    - name: Mage Release
+      run: go run main.go release ${{ github.event.inputs.release_tag }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
