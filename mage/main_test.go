@@ -1270,7 +1270,7 @@ func TestCompiledFlags(t *testing.T) {
 		cmd.Stderr = stderr
 		cmd.Stdout = stdout
 		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("running '%s %s' failed with: %v\nstdout: %s\nstderr: %s",
+			return internal.WrapErrorf(err, "running '%s %s' failed with: %v\nstdout: %s\nstderr: %s",
 				filename, strings.Join(args, " "), err, stdout, stderr)
 		}
 		return nil
@@ -1357,7 +1357,7 @@ func TestCompiledEnvironmentVars(t *testing.T) {
 		cmd.Stderr = stderr
 		cmd.Stdout = stdout
 		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("running '%s %s' failed with: %v\nstdout: %s\nstderr: %s",
+			return internal.WrapErrorf(err, "running '%s %s' failed with: %v\nstdout: %s\nstderr: %s",
 				filename, strings.Join(args, " "), err, stdout, stderr)
 		}
 		return nil
@@ -1511,7 +1511,7 @@ func TestSignals(t *testing.T) {
 		cmd.Stderr = stderr
 		cmd.Stdout = stdout
 		if err := cmd.Start(); err != nil {
-			return fmt.Errorf("running '%s %s' failed with: %v\nstdout: %s\nstderr: %s",
+			return internal.WrapErrorf(err, "running '%s %s' failed with: %v\nstdout: %s\nstderr: %s",
 				filename, target, err, stdout, stderr)
 		}
 		pid := cmd.Process.Pid
@@ -1523,7 +1523,7 @@ func TestSignals(t *testing.T) {
 			}
 		}()
 		if err := cmd.Wait(); err != nil {
-			return fmt.Errorf("running '%s %s' failed with: %v\nstdout: %s\nstderr: %s",
+			return internal.WrapErrorf(err, "running '%s %s' failed with: %v\nstdout: %s\nstderr: %s",
 				filename, target, err, stdout, stderr)
 		}
 		return nil
