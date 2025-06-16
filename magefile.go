@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -100,6 +101,14 @@ func Clean() error {
 
 func flags() string {
 	timestamp := time.Now().Format(time.RFC3339)
+	source_date_epoch := os.Getenv("SOURCE_DATE_EPOCH")
+	if source_date_epoch != "" {
+		sde, err := strconv.ParseInt(source_date_epoch, 10, 64)
+		if err != nil {
+			panic(fmt.Sprintf("Invalid SOURCE_DATE_EPOCH: %s", err))
+		}
+		timestamp = time.Unix(sde, 0).UTC().Format(time.RFC3339)
+	}
 	hash := hash()
 	tag := tag()
 	if tag == "" {
