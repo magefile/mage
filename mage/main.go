@@ -3,7 +3,7 @@ package mage
 
 import (
 	"context"
-	"crypto/sha256"
+	"crypto/sha3"
 	"errors"
 	"flag"
 	"fmt"
@@ -682,13 +682,13 @@ func ExeName(goCmd, cacheDir string, files []string) (string, error) {
 	}
 	// hash the mainfile template to ensure if it gets updated, we make a new
 	// binary.
-	hashes = append(hashes, fmt.Sprintf("%x", sha256.Sum256([]byte(mageMainfileTplString))))
+	hashes = append(hashes, fmt.Sprintf("%x", sha3.Sum256([]byte(mageMainfileTplString))))
 	sort.Strings(hashes)
 	ver, err := internal.OutputDebug(goCmd, "version")
 	if err != nil {
 		return "", err
 	}
-	hash := sha256.Sum256([]byte(strings.Join(hashes, "") + magicRebuildKey + ver))
+	hash := sha3.Sum256([]byte(strings.Join(hashes, "") + magicRebuildKey + ver))
 	filename := fmt.Sprintf("%x", hash)
 
 	out := filepath.Join(cacheDir, filename)
@@ -705,7 +705,7 @@ func hashFile(fn string) (string, error) {
 	}
 	defer f.Close()
 
-	h := sha256.New()
+	h := sha3.New256()
 	if _, err := io.Copy(h, f); err != nil {
 		return "", fmt.Errorf("can't write data to hash: %w", err)
 	}
