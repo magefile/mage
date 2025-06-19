@@ -920,7 +920,7 @@ func TestOnlyStdLib(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !filepath.HasPrefix(pkg.Dir, build.Default.GOROOT) {
+		if !strings.HasPrefix(pkg.Dir, build.Default.GOROOT) {
 			t.Errorf("import of non-stdlib package: %s", s.Path.Value)
 		}
 	}
