@@ -75,6 +75,13 @@ See [port page](https://ports.macports.org/port/mage/)
 
 See [scoop](https://scoop.sh/).
 
+
+### With winget (Windows)
+
+`winget install Magefile.mage`
+
+See [winget](https://learn.microsoft.com/en-us/windows/package-manager/winget/).
+
 ### Using asdf
 
 The [asdf version manager](https://asdf-vm.com/) is a tool for installing release binaries from Github. With asdf installed, the [asdf plugin for mage](https://github.com/mathew-fleisch/asdf-mage) can be used to install any released version of mage.
