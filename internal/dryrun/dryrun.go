@@ -1,3 +1,15 @@
+// Package dryrun implements the conditional checks for Mage's dryrun mode.
+//
+// For IsDryRun() to be true, two things have to be true:
+// 1. IsPossible() must be true
+//   - This can only happen if the env var `MAGEFILE_DRYRUN_POSSIBLE` was set at the point of the first call to IsPossible()
+//
+// 2. IsRequested() must be true
+//   - This can happen under one of two conditions:
+//     i.  The env var `MAGEFILE_DRYRUN` was set at the point of the first call to IsRequested()
+//     ii. SetRequested(true) was called at some point prior to the IsPossible() call.
+//
+// This enables the "top-level" Mage run, which compiles the magefile into a binary, to always be carried out regardless of `-dryrun` (because `MAGEFILE_DRYRUN_POSSIBLE` will not be set in that situation), while still enabling true dryrun functionality for "inner" Mage runs (i.e., runs of the compiled magefile binary).
 package dryrun
 
 import (
