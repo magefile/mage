@@ -3,6 +3,8 @@ package sh
 import (
 	"bytes"
 	"os"
+	"os/exec"
+	"strings"
 	"testing"
 )
 
@@ -69,4 +71,18 @@ func TestAutoExpand(t *testing.T) {
 		t.Fatalf(`Expected "baz" but got %q`, s)
 	}
 
+}
+
+func TestDryRunOutput(t *testing.T) {
+	// Invoke test binary with helper flag to exercise dry-run Output path.
+	cmd := exec.Command(os.Args[0], "-dryRunOutput")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("dry-run helper failed: %v, out=%s", err, string(out))
+	}
+	got := strings.TrimSpace(string(out))
+	want := "DRYRUN: somecmd arg1 arg two"
+	if got != want {
+		t.Fatalf("expected %q, got %q", want, got)
+	}
 }

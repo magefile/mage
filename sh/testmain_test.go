@@ -8,12 +8,13 @@ import (
 )
 
 var (
-	helperCmd bool
-	printArgs bool
-	stderr    string
-	stdout    string
-	exitCode  int
-	printVar  string
+	helperCmd    bool
+	printArgs    bool
+	stderr       string
+	stdout       string
+	exitCode     int
+	printVar     string
+	dryRunOutput bool
 )
 
 func init() {
@@ -23,6 +24,7 @@ func init() {
 	flag.StringVar(&stdout, "stdout", "", "")
 	flag.IntVar(&exitCode, "exit", 0, "")
 	flag.StringVar(&printVar, "printVar", "", "")
+	flag.BoolVar(&dryRunOutput, "dryRunOutput", false, "")
 }
 
 func TestMain(m *testing.M) {
@@ -34,6 +36,20 @@ func TestMain(m *testing.M) {
 	}
 	if printVar != "" {
 		fmt.Println(os.Getenv(printVar))
+		return
+	}
+
+	if dryRunOutput {
+		// Simulate dry-run mode and print the output of a command that would have been run.
+		// We use a non-echo command to make the "DRYRUN: " prefix deterministic.
+		_ = os.Setenv("MAGEFILE_DRYRUN_POSSIBLE", "1")
+		_ = os.Setenv("MAGEFILE_DRYRUN", "1")
+		s, err := Output("somecmd", "arg1", "arg two")
+		if err != nil {
+			fmt.Println("ERR:", err)
+			return
+		}
+		fmt.Println(s)
 		return
 	}
 
