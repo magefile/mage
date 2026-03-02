@@ -32,7 +32,7 @@ func TestOutAtCmd(t *testing.T) {
 }
 
 func TestExitCode(t *testing.T) {
-	ran, err := Exec(nil, nil, nil, "", os.Args[0], "-helper", "-exit", "99")
+	ran, err := Exec(nil, nil, nil, os.Args[0], "-helper", "-exit", "99")
 	if err == nil {
 		t.Fatal("unexpected nil error from run")
 	}
@@ -48,7 +48,7 @@ func TestExitCode(t *testing.T) {
 func TestEnv(t *testing.T) {
 	env := "SOME_REALLY_LONG_MAGEFILE_SPECIFIC_THING"
 	out := &bytes.Buffer{}
-	ran, err := Exec(map[string]string{env: "foobar"}, out, nil, "", os.Args[0], "-printVar", env)
+	ran, err := Exec(map[string]string{env: "foobar"}, out, nil, os.Args[0], "-printVar", env)
 	if err != nil {
 		t.Fatalf("unexpected error from runner: %#v", err)
 	}
@@ -61,7 +61,7 @@ func TestEnv(t *testing.T) {
 }
 
 func TestNotRun(t *testing.T) {
-	ran, err := Exec(nil, nil, nil, "", "thiswontwork")
+	ran, err := Exec(nil, nil, nil, "thiswontwork")
 	if err == nil {
 		t.Fatal("unexpected nil error")
 	}
@@ -86,7 +86,7 @@ func TestAutoExpand(t *testing.T) {
 func TestSettingPwd(t *testing.T) {
 	pwd := "/"
 	out := &bytes.Buffer{}
-	ran, err := Exec(nil, out, nil, pwd, "pwd")
+	ran, err := ExecAt(nil, out, nil, pwd, "pwd")
 	if err != nil {
 		t.Fatalf("unexpected error from runner: %#v", err)
 	}
@@ -104,7 +104,7 @@ func TestSettingNoPwd(t *testing.T) {
 		t.Errorf("Failed getting current working directory")
 	}
 	out := &bytes.Buffer{}
-	ran, err := Exec(nil, out, nil, "", "pwd")
+	ran, err := ExecAt(nil, out, nil, "", "pwd")
 	if err != nil {
 		t.Fatalf("unexpected error from runner: %#v", err)
 	}
@@ -119,7 +119,7 @@ func TestSettingNoPwd(t *testing.T) {
 func TestSettingInvalidPwd(t *testing.T) {
 	pwd := "/i-am-expected-to-not-exist"
 	out := &bytes.Buffer{}
-	_, err := Exec(nil, out, nil, pwd, "pwd")
+	_, err := ExecAt(nil, out, nil, pwd, "pwd")
 	if err == nil {
 		t.Fatalf("I am expected to fail because path %s does not exist", pwd)
 	}

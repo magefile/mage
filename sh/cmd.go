@@ -95,7 +95,7 @@ func RunV(cmd string, args ...string) error {
 
 // RunAtV is like RunAt, but always sends the command's stdout to os.Stdout.
 func RunAtV(pwd string, cmd string, args ...string) error {
-	_, err := Exec(nil, os.Stdout, os.Stderr, pwd, cmd, args...)
+	_, err := ExecAt(nil, os.Stdout, os.Stderr, pwd, cmd, args...)
 	return err
 }
 
@@ -116,7 +116,7 @@ func RunAtWith(env map[string]string, pwd string, cmd string, args ...string) er
 	if mg.Verbose() {
 		output = os.Stdout
 	}
-	_, err := Exec(env, output, os.Stderr, pwd, cmd, args...)
+	_, err := ExecAt(env, output, os.Stderr, pwd, cmd, args...)
 	return err
 }
 
@@ -127,7 +127,7 @@ func RunWithV(env map[string]string, cmd string, args ...string) error {
 
 // RunAtWithV is like RunAtWith, but always sends the command's stdout to os.Stdout.
 func RunAtWithV(env map[string]string, pwd string, cmd string, args ...string) error {
-	_, err := Exec(env, os.Stdout, os.Stderr, pwd, cmd, args...)
+	_, err := ExecAt(env, os.Stdout, os.Stderr, pwd, cmd, args...)
 	return err
 }
 
@@ -139,7 +139,7 @@ func Output(cmd string, args ...string) (string, error) {
 // OutputAt runs the command at a certain path and returns the text from stdout.
 func OutputAt(pwd string, cmd string, args ...string) (string, error) {
 	buf := &bytes.Buffer{}
-	_, err := Exec(nil, buf, os.Stderr, pwd, cmd, args...)
+	_, err := ExecAt(nil, buf, os.Stderr, pwd, cmd, args...)
 	return strings.TrimSuffix(buf.String(), "\n"), err
 }
 
@@ -151,11 +151,16 @@ func OutputWith(env map[string]string, cmd string, args ...string) (string, erro
 // OutputAt	With is like RunAtWith, but returns what is written to stdout.
 func OutputAtWith(env map[string]string, pwd string, cmd string, args ...string) (string, error) {
 	buf := &bytes.Buffer{}
-	_, err := Exec(env, buf, os.Stderr, pwd, cmd, args...)
+	_, err := ExecAt(env, buf, os.Stderr, pwd, cmd, args...)
 	return strings.TrimSuffix(buf.String(), "\n"), err
 }
 
-// Exec executes the command, piping its stdout and stderr to the given
+// Exec is like execAt but always runs in the current workdir.
+func Exec(env map[string]string, stdout, stderr io.Writer, cmd string, args ...string) (ran bool, err error) {
+	return ExecAt(env, stdout, stderr, "", cmd, args...)
+}
+
+// ExecAt executes the command, piping its stdout and stderr to the given
 // writers. If the command fails, it will return an error that, if returned
 // from a target or mg.Deps call, will cause mage to exit with the same code as
 // the command failed with. Env is a list of environment variables to set when
@@ -167,7 +172,8 @@ func OutputAtWith(env map[string]string, pwd string, cmd string, args ...string)
 // Ran reports if the command ran (rather than was not found or not executable).
 // Code reports the exit code the command returned if it ran. If err == nil, ran
 // is always true and code is always 0.
-func Exec(env map[string]string, stdout, stderr io.Writer, pwd string, cmd string, args ...string) (ran bool, err error) {
+
+func ExecAt(env map[string]string, stdout, stderr io.Writer, pwd string, cmd string, args ...string) (ran bool, err error) {
 	expand := func(s string) string {
 		s2, ok := env[s]
 		if ok {
