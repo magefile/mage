@@ -3,8 +3,9 @@ title = "Targets"
 weight = 10
 +++
 A target is any exported function that has an optional first argument of context.Context, has either
-no return or just an error return, and where the arguments are all of type string, int, bool, or
-time.Duration.
+no return or just an error return, and where the arguments are all of type string, int, float64, bool, or
+time.Duration. Pointer types of these (`*string`, `*int`, `*float64`, `*bool`, `*time.Duration`) are
+also accepted and treated as optional arguments (see [Optional Arguments](#optional-arguments) below).
 
 e.g. these are all acceptable targets
 
@@ -13,6 +14,7 @@ func Build()
 func Install(ctx context.Context) error
 func Run(what string) error
 func Exec(ctx context.Context, name string, count int, debug bool, timeout time.Duration) error
+func Greet(name string, greeting *string)
 ```
 
 A target is effectively a subcommand of mage while running mage in
@@ -33,6 +35,78 @@ All arguments are mandatory and must be specified in the order they appear in th
 You can intersperse multiple targets with arguments as you'd expect:
 
 `mage run foo.exe exec somename 5 true 100ms`
+
+### Optional Arguments
+
+You can define optional arguments by using pointer types for any of the
+supported argument types (`*string`, `*int`, `*float64`, `*bool`,
+`*time.Duration`). Optional arguments are passed on the command line using
+`-name=value` syntax, where `name` is the Go parameter name (case-insensitive).
+If an optional argument is not provided, the pointer will be `nil`.
+
+```go
+func Greet(name string, greeting *string) {
+    if greeting != nil {
+        fmt.Printf("%s, %s!\n", *greeting, name)
+    } else {
+        fmt.Printf("Hello, %s!\n", name)
+    }
+}
+```
+
+You can call this target with or without the optional argument:
+
+```plain
+$ mage greet World
+Hello, World!
+
+$ mage greet World -greeting=Hi
+Hi, World!
+```
+
+Optional arguments can be mixed freely with required arguments in the function
+signature. Required arguments are always positional, while optional arguments use
+the `-name=value` flag syntax and can appear in any order after the required
+arguments.
+
+```go
+func Deploy(ctx context.Context, env string, version *string, dryRun *bool) error {
+    // env is required, version and dryRun are optional
+}
+```
+
+```plain
+$ mage deploy production -version=1.2.3 -dryrun=true
+```
+
+A function may also have only optional arguments:
+
+```go
+func Lint(verbose *bool, fix *bool) {
+    // both arguments are optional
+}
+```
+
+```plain
+$ mage lint
+$ mage lint -verbose=true -fix=true
+```
+
+The help output shows optional arguments in brackets:
+
+```plain
+$ mage -h greet
+Greet greets someone with an optional greeting.
+
+Usage:
+
+	mage greet <name> [-greeting=<string>]
+```
+
+Optional arguments work with multiple chained targets just like required
+arguments:
+
+`mage greet World -greeting=Hi deploy production -version=1.2.3`
 
 ## Errors
 

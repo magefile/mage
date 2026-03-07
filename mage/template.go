@@ -372,7 +372,7 @@ Options:
 				_fmt.Println({{printf "%q" .Comment}})
 				_fmt.Println()
 				{{end}}
-				_fmt.Print("Usage:\n\n\t{{$.BinaryName}} {{lower .TargetName}}{{range .Args}} <{{.Name}}>{{end}}\n\n")
+				_fmt.Print("Usage:\n\n\t{{$.BinaryName}} {{lower .TargetName}}{{range .RequiredArgs}} <{{.Name}}>{{end}}{{range .OptionalArgs}} [-{{.Name}}=<{{.Type}}>]{{end}}\n\n")
 				var aliases []string
 				{{- $name := .Name -}}
 				{{- $recv := .Receiver -}}
@@ -391,7 +391,7 @@ Options:
 				_fmt.Println({{printf "%q" .Comment}})
 				_fmt.Println()
 				{{end}}
-				_fmt.Print("Usage:\n\n\t{{$.BinaryName}} {{lower .TargetName}}{{range .Args}} <{{.Name}}>{{end}}\n\n")
+				_fmt.Print("Usage:\n\n\t{{$.BinaryName}} {{lower .TargetName}}{{range .RequiredArgs}} <{{.Name}}>{{end}}{{range .OptionalArgs}} [-{{.Name}}=<{{.Type}}>]{{end}}\n\n")
 				var aliases []string
 				{{- $name := .Name -}}
 				{{- $recv := .Receiver -}}
@@ -445,7 +445,7 @@ Options:
 		switch _strings.ToLower(target) {
 		{{range .Funcs }}
 			case "{{lower .TargetName}}":
-				expected := x + {{len .Args}}
+				expected := x + {{.NumRequiredArgs}}
 				if expected > len(args.Args) {
 					// note that expected and args at this point include the arg for the target itself
 					// so we subtract 1 here to show the number of args without the target.
@@ -462,7 +462,7 @@ Options:
 		{{$imp := .}}
 			{{range .Info.Funcs }}
 				case "{{lower .TargetName}}":
-					expected := x + {{len .Args}}
+					expected := x + {{.NumRequiredArgs}}
 					if expected > len(args.Args) {
 						// note that expected and args at this point include the arg for the target itself
 						// so we subtract 1 here to show the number of args without the target.
