@@ -364,7 +364,7 @@ func checkDupes(info *PkgInfo, imports []*Import) error {
 			for _, f := range funcs[alias] {
 				ids = append(ids, f.ID())
 			}
-			return fmt.Errorf("alias %q duplicates existing target(s): %s\n", alias, strings.Join(ids, ", "))
+			return fmt.Errorf("alias %q duplicates existing target(s): %s", alias, strings.Join(ids, ", "))
 		}
 		funcs[alias] = append(funcs[alias], f)
 	}
@@ -561,7 +561,10 @@ func setImports(gocmd string, pi *PkgInfo) error {
 			}
 			for j := 0; j < len(gen.Specs); j++ {
 				spec := gen.Specs[j]
-				impspec := spec.(*ast.ImportSpec)
+				impspec, ok := spec.(*ast.ImportSpec)
+				if !ok {
+					continue
+				}
 				if len(gen.Specs) == 1 && gen.Lparen == token.NoPos && impspec.Doc == nil {
 					impspec.Doc = gen.Doc
 				}
@@ -898,10 +901,10 @@ func getPackage(path string, files []string, fset *token.FileSet) (*ast.Package,
 
 	switch len(pkgs) {
 	case 1:
-		var pkg *ast.Package
-		for _, pkg = range pkgs {
+		for _, pkg := range pkgs {
+			return pkg, nil
 		}
-		return pkg, nil
+		return nil, fmt.Errorf("should be impossible while parsing %s", path)
 	case 0:
 		return nil, fmt.Errorf("no importable packages found in %s", path)
 	default:

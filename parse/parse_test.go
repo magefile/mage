@@ -62,17 +62,17 @@ func TestParse(t *testing.T) {
 	}
 
 	// DefaultIsError
-	if info.DefaultFunc.IsError != true {
-		t.Fatalf("expected DefaultIsError to be true")
+	if !info.DefaultFunc.IsError {
+		t.Fatal("expected DefaultIsError to be true")
 	}
 
 	// DefaultName
 	if info.DefaultFunc.Name != "ReturnsNilError" {
-		t.Fatalf("expected DefaultName to be ReturnsNilError")
+		t.Fatal("expected DefaultName to be ReturnsNilError")
 	}
 
 	if info.Aliases["void"].Name != "ReturnsVoid" {
-		t.Fatalf("expected alias of void to be ReturnsVoid")
+		t.Fatal("expected alias of void to be ReturnsVoid")
 	}
 
 	f, ok := info.Aliases["baz"]
@@ -80,7 +80,7 @@ func TestParse(t *testing.T) {
 		t.Fatal("missing alias baz")
 	}
 	if f.Name != "Baz" || f.Receiver != "Build" {
-		t.Fatalf("expected alias of void to be Build.Baz")
+		t.Fatal("expected alias of void to be Build.Baz")
 	}
 
 	if len(info.Aliases) != 2 {
@@ -93,9 +93,8 @@ func TestParse(t *testing.T) {
 			if reflect.DeepEqual(fn, *infoFn) {
 				found = true
 				break
-			} else {
-				t.Logf("%#v", infoFn)
 			}
+			t.Logf("%#v", infoFn)
 		}
 		if !found {
 			t.Fatalf("expected:\n%#v\n\nto be in:\n%#v", fn, info.Funcs)

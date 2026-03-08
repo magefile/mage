@@ -38,8 +38,8 @@ func TestMain(m *testing.M) {
 	}
 
 	if helperCmd {
-		fmt.Fprintln(os.Stderr, stderr)
-		fmt.Fprintln(os.Stdout, stdout)
+		_, _ = fmt.Fprintln(os.Stderr, stderr)
+		_, _ = fmt.Fprintln(os.Stdout, stdout)
 		os.Exit(exitCode)
 	}
 	os.Exit(m.Run())

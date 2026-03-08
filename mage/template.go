@@ -203,8 +203,8 @@ Options:
 	// targetColor returns the ANSI color which should be used to colorize targets.
 	targetColor := func() string {
 		s, exists := os.LookupEnv("MAGEFILE_TARGET_COLOR")
-		if exists == true {
-			if c, ok := getAnsiColor(s); ok == true {
+		if exists {
+			if c, ok := getAnsiColor(s); ok {
 				return c
 			}
 		}

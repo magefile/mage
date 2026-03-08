@@ -25,6 +25,7 @@ disable = [
   'depguard',
   'dogsled',
   'dupl',
+  'dupword',
   'err113',
   'errcheck',
   'exhaustive',
@@ -35,7 +36,7 @@ disable = [
   'gocognit',
   'goconst',
   'gocyclo',
-  'godot',
+#  'godot',
   'godox',
   'goheader',
   'gomoddirectives',
@@ -80,7 +81,7 @@ pattern = 'time.After\.*(# use of time After can create memory allocation issues
 [linters.settings.gocritic]
 disabled-checks = [
   'importShadow',
-  'unnamedResult'
+#  'unnamedResult'
 ]
 enabled-tags = [
   'diagnostic',
@@ -97,14 +98,14 @@ sizeThreshold = 256
 
 [linters.settings.gosec]
 excludes = [
-  'G204',
-  'G304',
-  'G307'
+#  'G204',
+#  'G304',
+#  'G307'
 ]
 
 [linters.settings.gosec.config]
 [linters.settings.gosec.config.G104]
-os = ['Setenv']
+# os = ['Setenv']
 
 [linters.settings.govet]
 disable = [
@@ -119,10 +120,10 @@ min-complexity = 9
 [linters.settings.nolintlint]
 require-explanation = true
 require-specific = true
-allow-unused = true
+allow-unused = false
 
-[linters.settings.recvcheck]
-exclusions = ['*.UnmarshalJSON']
+# [linters.settings.recvcheck]
+# exclusions = ['*.UnmarshalJSON']
 
 [linters.settings.revive]
 confidence = 0.8
@@ -141,7 +142,7 @@ name = 'unchecked-type-assertion'
 disabled = false
 
 [[linters.settings.revive.rules.arguments]]
-acceptIgnoredAssertionResult = true
+acceptIgnoredAssertionResult = false
 
 [[linters.settings.revive.rules]]
 name = 'unhandled-error'
@@ -159,52 +160,28 @@ name = 'add-constant'
 disabled = true
 
 [[linters.settings.revive.rules]]
-name = 'argument-limit'
-disabled = true
-
-[[linters.settings.revive.rules]]
 name = 'banned-characters'
-disabled = true
+disabled = false
 
 [[linters.settings.revive.rules]]
 name = 'blank-imports'
-disabled = true
+disabled = false
 
 [[linters.settings.revive.rules]]
 name = 'cognitive-complexity'
 disabled = true
 
 [[linters.settings.revive.rules]]
-name = 'confusing-naming'
-disabled = true
-
-[[linters.settings.revive.rules]]
 name = 'constant-logical-expr'
-disabled = true
+disabled = false
 
 [[linters.settings.revive.rules]]
 name = 'cyclomatic'
 disabled = true
 
 [[linters.settings.revive.rules]]
-name = 'empty-block'
-disabled = true
-
-[[linters.settings.revive.rules]]
-name = 'error-naming'
-disabled = true
-
-[[linters.settings.revive.rules]]
 name = 'file-header'
-disabled = true
-
-[[linters.settings.revive.rules]]
-name = 'flag-parameter'
-disabled = true
-
-[[linters.settings.revive.rules]]
-name = 'function-result-limit'
-disabled = true
+disabled = false
 
 [[linters.settings.revive.rules]]
 name = 'function-length'
@@ -212,95 +189,19 @@ disabled = true
 
 [[linters.settings.revive.rules]]
 name = 'get-return'
-disabled = true
-
-[[linters.settings.revive.rules]]
-name = 'imports-blocklist'
-disabled = true
-
-[[linters.settings.revive.rules]]
-name = 'import-alias-naming'
-disabled = true
+disabled = false
 
 [[linters.settings.revive.rules]]
 name = 'line-length-limit'
 disabled = true
 
 [[linters.settings.revive.rules]]
-name = 'max-public-structs'
-disabled = true
-
-[[linters.settings.revive.rules]]
-name = 'nested-structs'
-disabled = true
-
-[[linters.settings.revive.rules]]
 name = 'optimize-operands-order'
-disabled = true
-
-[[linters.settings.revive.rules]]
-name = 'redundant-import-alias'
-disabled = true
-
-[[linters.settings.revive.rules]]
-name = 'string-format'
-disabled = true
-
-[[linters.settings.revive.rules]]
-name = 'unused-parameter'
-disabled = true
-
-[[linters.settings.revive.rules]]
-name = 'unused-receiver'
-disabled = true
+disabled = false
 
 [[linters.settings.revive.rules]]
 name = 'use-any'
 disabled = true
-
-[linters.settings.testifylint]
-enable-all = true
-disable = [
-  'bool-compare',
-  'empty',
-  'error-is-as',
-  'len',
-  'negative-positive',
-  'go-require'
-]
-
-[linters.exclusions]
-generated = 'lax'
-paths = [
-  'third_party$',
-  'builtin$',
-  'examples$'
-]
-
-[[linters.exclusions.rules]]
-linters = [
-  'bodyclose',
-  'errcheck',
-  'forcetypeassert',
-  'gosec',
-  'maintidx',
-  'noctx'
-]
-path = '_test.go'
-
-[[linters.exclusions.rules]]
-linters = [
-  'revive'
-]
-path = '_test.go'
-text = 'unchecked-type-assertion:'
-
-[[linters.exclusions.rules]]
-linters = [
-  'govet'
-]
-path = '_test.go'
-text = 'unusedwrite:'
 
 [issues]
 max-issues-per-linter = 0
@@ -315,12 +216,4 @@ default = 'error'
 [formatters]
 enable = [
   'goimports'
-]
-
-[formatters.exclusions]
-generated = 'lax'
-paths = [
-  'third_party$',
-  'builtin$',
-  'examples$'
 ]

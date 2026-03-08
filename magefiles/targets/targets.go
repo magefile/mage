@@ -1,10 +1,4 @@
-//go:build mage
-// +build mage
-
-// This is the build script for Mage. The install target is all you really need.
-// The release target is for generating official releases and is really only
-// useful to project admins.
-package main
+package targets
 
 import (
 	"errors"
@@ -21,7 +15,7 @@ import (
 	"github.com/magefile/mage/sh"
 )
 
-// Runs "go install" for mage.  This generates the version info the binary.
+// Install runs "go install" for mage. This generates the version info the binary.
 func Install() error {
 	name := "mage"
 	if runtime.GOOS == "windows" {
@@ -57,9 +51,9 @@ func Install() error {
 	return sh.RunV(gocmd, "build", "-o", path, "-ldflags="+flags(), "github.com/magefile/mage")
 }
 
-var releaseTag = regexp.MustCompile(`^v1\.[0-9]+\.[0-9]+$`)
+var releaseTag = regexp.MustCompile(`^v1\.\d+\.\d+$`)
 
-// Generates a new release. Expects a version tag in v1.x.x format.
+// Release generates a new release. Expects a version tag in v1.x.x format.
 func Release(tag string) (err error) {
 	if _, err := exec.LookPath("goreleaser"); err != nil {
 		return fmt.Errorf("can't find goreleaser: %w", err)
@@ -76,14 +70,14 @@ func Release(tag string) (err error) {
 	}
 	defer func() {
 		if err != nil {
-			sh.RunV("git", "tag", "--delete", tag)
-			sh.RunV("git", "push", "--delete", "origin", tag)
+			_ = sh.RunV("git", "tag", "--delete", tag)
+			_ = sh.RunV("git", "push", "--delete", "origin", tag)
 		}
 	}()
 	return sh.RunV("goreleaser")
 }
 
-// Remove the temporarily generated files from Release.
+// Clean removes the temporarily generated files from Release.
 func Clean() error {
 	return sh.Rm("dist")
 }
@@ -108,4 +102,24 @@ func tag() string {
 func hash() string {
 	hash, _ := sh.Output("git", "rev-parse", "--short", "HEAD")
 	return hash
+}
+
+var goTools = []string{
+	"github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.11.2",
+}
+
+// Tools installs the dev tools used by mage, such as golangci-lint.
+func Tools() error {
+	for _, tool := range goTools {
+		if err := sh.Run("go", "install", tool); err != nil {
+			return fmt.Errorf("failed to install %s: %w", tool, err)
+		}
+	}
+	return nil
+}
+
+// Lint runs golangci-lint on the codebase.
+func Lint() error {
+	mg.Deps(Tools)
+	return sh.RunV("golangci-lint", "run")
 }

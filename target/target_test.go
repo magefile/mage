@@ -32,13 +32,9 @@ func TestPathMissingDest(t *testing.T) {
 
 func TestPathMissingSource(t *testing.T) {
 	t.Parallel()
-	dir, err := ioutil.TempDir("", "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(dir)
+	dir := t.TempDir()
 	dst := filepath.Join(dir, "dst")
-	err = ioutil.WriteFile(dst, []byte("hi!"), 0644)
+	err := os.WriteFile(dst, []byte("hi!"), 0600)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -51,13 +47,9 @@ func TestPathMissingSource(t *testing.T) {
 
 func TestGlobEmptyGlob(t *testing.T) {
 	t.Parallel()
-	dir, err := ioutil.TempDir("", "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(dir)
+	dir := t.TempDir()
 	dst := filepath.Join(dir, "dst")
-	err = ioutil.WriteFile(dst, []byte("hi!"), 0644)
+	err := os.WriteFile(dst, []byte("hi!"), 0600)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -70,13 +62,9 @@ func TestGlobEmptyGlob(t *testing.T) {
 
 func TestDirMissingSrc(t *testing.T) {
 	t.Parallel()
-	dir, err := ioutil.TempDir("", "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(dir)
+	dir := t.TempDir()
 	dst := filepath.Join(dir, "dst")
-	err = ioutil.WriteFile(dst, []byte("hi!"), 0644)
+	err := os.WriteFile(dst, []byte("hi!"), 0600)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,18 +77,14 @@ func TestDirMissingSrc(t *testing.T) {
 
 func TestDirMissingDest(t *testing.T) {
 	t.Parallel()
-	dir, err := ioutil.TempDir("", "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(dir)
+	dir := t.TempDir()
 	src := filepath.Join(dir, "source")
-	err = os.Mkdir(src, 0755)
+	err := os.Mkdir(src, 0750)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = ioutil.WriteFile(filepath.Join(src, "somefile"), []byte("hi!"), 0644)
+	err = os.WriteFile(filepath.Join(src, "somefile"), []byte("hi!"), 0600)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -116,13 +100,9 @@ func TestDirMissingDest(t *testing.T) {
 
 func TestGlob(t *testing.T) {
 	t.Parallel()
-	dir, err := ioutil.TempDir("", "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(dir)
+	dir := t.TempDir()
 
-	err = os.MkdirAll(filepath.Join(dir, filepath.FromSlash("dir/dir2")), 0777)
+	err := os.MkdirAll(filepath.Join(dir, "dir", "dir2"), 0750)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -139,15 +119,15 @@ func TestGlob(t *testing.T) {
 	for _, v := range files {
 		time.Sleep(10 * time.Millisecond)
 		f := filepath.Join(dir, filepath.FromSlash(v))
-		err := ioutil.WriteFile(f, []byte(v), 0644)
+		err := os.WriteFile(f, []byte(v), 0600)
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
 
 	// force an environment variable for testing
-	os.Setenv("MYVAR", "file")
-	os.Setenv("THREE", "three")
+	t.Setenv("MYVAR", "file")
+	t.Setenv("THREE", "three")
 
 	table := []struct {
 		desc    string
@@ -194,7 +174,9 @@ func TestGlob(t *testing.T) {
 	}
 
 	for _, c := range table {
+		c := c
 		t.Run(c.desc, func(t *testing.T) {
+			t.Parallel()
 			for i := range c.sources {
 				c.sources[i] = filepath.Join(dir, c.sources[i])
 			}
@@ -212,13 +194,9 @@ func TestGlob(t *testing.T) {
 
 func TestPath(t *testing.T) {
 	t.Parallel()
-	dir, err := ioutil.TempDir("", "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(dir)
+	dir := t.TempDir()
 
-	err = os.MkdirAll(filepath.Join(dir, filepath.FromSlash("dir/dir2")), 0777)
+	err := os.MkdirAll(filepath.Join(dir, "dir", "dir2"), 0750)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -232,15 +210,15 @@ func TestPath(t *testing.T) {
 	for _, v := range files {
 		time.Sleep(10 * time.Millisecond)
 		f := filepath.Join(dir, filepath.FromSlash(v))
-		err := ioutil.WriteFile(f, []byte(v), 0644)
+		err := os.WriteFile(f, []byte(v), 0600)
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
 
 	// force an environment variable for testing
-	os.Setenv("MYVAR", "file")
-	os.Setenv("THREE", "three")
+	t.Setenv("MYVAR", "file")
+	t.Setenv("THREE", "three")
 
 	table := []struct {
 		desc    string
@@ -302,7 +280,9 @@ func TestPath(t *testing.T) {
 	}
 
 	for _, c := range table {
+		c := c
 		t.Run(c.desc, func(t *testing.T) {
+			t.Parallel()
 			for i := range c.sources {
 				c.sources[i] = filepath.Join(dir, c.sources[i])
 			}
@@ -320,13 +300,9 @@ func TestPath(t *testing.T) {
 
 func TestDir(t *testing.T) {
 	t.Parallel()
-	dir, err := ioutil.TempDir("", "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(dir)
+	dir := t.TempDir()
 
-	err = os.MkdirAll(filepath.Join(dir, filepath.FromSlash("dir/dir2")), 0777)
+	err := os.MkdirAll(filepath.Join(dir, "dir", "dir2"), 0750)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -341,16 +317,16 @@ func TestDir(t *testing.T) {
 	for _, v := range files {
 		time.Sleep(10 * time.Millisecond)
 		f := filepath.Join(dir, filepath.FromSlash(v))
-		err := ioutil.WriteFile(f, []byte(v), 0644)
+		err := os.WriteFile(f, []byte(v), 0600)
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
 
 	// force environment variables for testing
-	os.Setenv("MYFILE", "file")
-	os.Setenv("MYDIR", "dir")
-	os.Setenv("X1", "one")
+	t.Setenv("MYFILE", "file")
+	t.Setenv("MYDIR", "dir")
+	t.Setenv("X1", "one")
 
 	table := []struct {
 		desc    string
@@ -437,7 +413,9 @@ func TestDir(t *testing.T) {
 	}
 
 	for _, c := range table {
+		c := c
 		t.Run(c.desc, func(t *testing.T) {
+			t.Parallel()
 			sources := make([]string, len(c.sources))
 			for i := range c.sources {
 				sources[i] = filepath.Join(dir, c.sources[i])

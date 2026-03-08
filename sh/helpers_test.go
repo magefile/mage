@@ -44,7 +44,6 @@ func compareFiles(file1 string, file2 string) error {
 }
 
 func TestHelpers(t *testing.T) {
-
 	mytmpdir, err := ioutil.TempDir("", "mage")
 	if err != nil {
 		t.Fatalf("can't create test directory: %v", err)

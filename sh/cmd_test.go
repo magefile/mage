@@ -24,7 +24,7 @@ func TestExitCode(t *testing.T) {
 		t.Fatal("unexpected nil error from run")
 	}
 	if !ran {
-		t.Errorf("ran returned as false, but should have been true")
+		t.Error("ran returned as false, but should have been true")
 	}
 	code := ExitStatus(err)
 	if code != 99 {
@@ -40,7 +40,7 @@ func TestEnv(t *testing.T) {
 		t.Fatalf("unexpected error from runner: %#v", err)
 	}
 	if !ran {
-		t.Errorf("expected ran to be true but was false.")
+		t.Error("expected ran to be true but was false.")
 	}
 	if out.String() != "foobar\n" {
 		t.Errorf("expected foobar, got %q", out)
@@ -58,9 +58,7 @@ func TestNotRun(t *testing.T) {
 }
 
 func TestAutoExpand(t *testing.T) {
-	if err := os.Setenv("MAGE_FOOBAR", "baz"); err != nil {
-		t.Fatal(err)
-	}
+	t.Setenv("MAGE_FOOBAR", "baz")
 	s, err := Output("echo", "$MAGE_FOOBAR")
 	if err != nil {
 		t.Fatal(err)
@@ -68,5 +66,4 @@ func TestAutoExpand(t *testing.T) {
 	if s != "baz" {
 		t.Fatalf(`Expected "baz" but got %q`, s)
 	}
-
 }

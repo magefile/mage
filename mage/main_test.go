@@ -34,43 +34,47 @@ const testExeEnv = "MAGE_TEST_STRING"
 
 func TestMain(m *testing.M) {
 	if s := os.Getenv(testExeEnv); s != "" {
-		fmt.Fprint(os.Stdout, s)
+		_, _ = fmt.Fprint(os.Stdout, s)
 		os.Exit(0)
 	}
-	os.Exit(testmain(m))
-}
-
-func testmain(m *testing.M) int {
-	// ensure we write our temporary binaries to a directory that we'll delete
-	// after running tests.
-	dir, err := ioutil.TempDir("", "")
+	code, err := runmain(m)
 	if err != nil {
 		log.Fatal(err)
 	}
+	os.Exit(code)
+}
+
+func runmain(m *testing.M) (int, error) {
+	// ensure we write our temporary binaries to a directory that we'll delete
+	// after running tests.
+	dir, err := os.MkdirTemp("", "tempmage")
+	if err != nil {
+		return 0, err
+	}
 	defer os.RemoveAll(dir)
 	if err := os.Setenv(mg.CacheEnv, dir); err != nil {
-		log.Fatal(err)
+		return 0, err
 	}
 	if err := os.Unsetenv(mg.VerboseEnv); err != nil {
-		log.Fatal(err)
+		return 0, err
 	}
 	if err := os.Unsetenv(mg.DebugEnv); err != nil {
-		log.Fatal(err)
+		return 0, err
 	}
 	if err := os.Unsetenv(mg.IgnoreDefaultEnv); err != nil {
-		log.Fatal(err)
+		return 0, err
 	}
 	if err := os.Setenv(mg.CacheEnv, dir); err != nil {
-		log.Fatal(err)
+		return 0, err
 	}
 	if err := os.Unsetenv(mg.EnableColorEnv); err != nil {
-		log.Fatal(err)
+		return 0, err
 	}
 	if err := os.Unsetenv(mg.TargetColorEnv); err != nil {
-		log.Fatal(err)
+		return 0, err
 	}
 	resetTerm()
-	return m.Run()
+	return m.Run(), nil
 }
 
 func resetTerm() {
@@ -206,11 +210,11 @@ func TestListMagefilesMain(t *testing.T) {
 func TestListMagefilesIgnoresGOOS(t *testing.T) {
 	buf := &bytes.Buffer{}
 	if runtime.GOOS == "windows" {
-		os.Setenv("GOOS", "linux")
+		t.Setenv("GOOS", "linux")
 	} else {
-		os.Setenv("GOOS", "windows")
+		t.Setenv("GOOS", "windows")
 	}
-	defer os.Setenv("GOOS", runtime.GOOS)
+	defer t.Setenv("GOOS", runtime.GOOS)
 	files, err := Magefiles("testdata/goos_magefiles", "", "", "go", buf, false, false)
 	if err != nil {
 		t.Errorf("error from magefile list: %v: %s", err, buf)
@@ -878,11 +882,11 @@ func (t tLogWriter) Write(b []byte) (n int, err error) {
 	return len(b), nil
 }
 
-// Test if generated mainfile references anything other than the stdlib
+// TestOnlyStdLib tests if generated mainfile references anything other than the stdlib.
 func TestOnlyStdLib(t *testing.T) {
 	buildFile := fmt.Sprintf("./testdata/onlyStdLib/%s", mainfile)
-	os.Remove(buildFile)
-	defer os.Remove(buildFile)
+	_ = os.Remove(buildFile)
+	defer func() { _ = os.Remove(buildFile) }()
 
 	w := tLogWriter{t}
 
@@ -920,7 +924,7 @@ func TestOnlyStdLib(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !filepath.HasPrefix(pkg.Dir, build.Default.GOROOT) {
+		if !strings.HasPrefix(pkg.Dir, build.Default.GOROOT) {
 			t.Errorf("import of non-stdlib package: %s", s.Path.Value)
 		}
 	}
@@ -1292,7 +1296,7 @@ func TestCompiledFlags(t *testing.T) {
 	}
 	got = stderr.String()
 	want = "hi!"
-	if strings.Contains(got, want) == false {
+	if !strings.Contains(got, want) {
 		t.Errorf("got %q, does not contain %q", got, want)
 	}
 
@@ -1302,11 +1306,11 @@ func TestCompiledFlags(t *testing.T) {
 	}
 	got = stdout.String()
 	want = "This is the synopsis for Deploy"
-	if strings.Contains(got, want) == false {
+	if !strings.Contains(got, want) {
 		t.Errorf("got %q, does not contain %q", got, want)
 	}
 	want = "This is very verbose"
-	if strings.Contains(got, want) == false {
+	if !strings.Contains(got, want) {
 		t.Errorf("got %q, does not contain %q", got, want)
 	}
 
@@ -1317,7 +1321,7 @@ func TestCompiledFlags(t *testing.T) {
 	}
 	got = stderr.String()
 	want = "context deadline exceeded"
-	if strings.Contains(got, want) == false {
+	if !strings.Contains(got, want) {
 		t.Errorf("got %q, does not contain %q", got, want)
 	}
 }
@@ -1377,7 +1381,7 @@ func TestCompiledEnvironmentVars(t *testing.T) {
 	}
 	got = stderr.String()
 	want = "hi!"
-	if strings.Contains(got, want) == false {
+	if !strings.Contains(got, want) {
 		t.Errorf("got %q, does not contain %q", got, want)
 	}
 
@@ -1386,11 +1390,11 @@ func TestCompiledEnvironmentVars(t *testing.T) {
 	}
 	got = stdout.String()
 	want = "This is the synopsis for Deploy"
-	if strings.Contains(got, want) == false {
+	if !strings.Contains(got, want) {
 		t.Errorf("got %q, does not contain %q", got, want)
 	}
 	want = "This is very verbose"
-	if strings.Contains(got, want) == false {
+	if !strings.Contains(got, want) {
 		t.Errorf("got %q, does not contain %q", got, want)
 	}
 
@@ -1399,7 +1403,7 @@ func TestCompiledEnvironmentVars(t *testing.T) {
 	}
 	got = stdout.String()
 	want = "Compiled package description."
-	if strings.Contains(got, want) == false {
+	if !strings.Contains(got, want) {
 		t.Errorf("got %q, does not contain %q", got, want)
 	}
 
@@ -1409,7 +1413,7 @@ func TestCompiledEnvironmentVars(t *testing.T) {
 	}
 	got = stderr.String()
 	want = "context deadline exceeded"
-	if strings.Contains(got, want) == false {
+	if !strings.Contains(got, want) {
 		t.Errorf("got %q, does not contain %q", got, want)
 	}
 }
@@ -1534,7 +1538,7 @@ func TestSignals(t *testing.T) {
 	}
 	got := stdout.String()
 	want := "received sighup\n"
-	if strings.Contains(got, want) == false {
+	if !strings.Contains(got, want) {
 		t.Errorf("got %q, does not contain %q", got, want)
 	}
 
@@ -1543,12 +1547,12 @@ func TestSignals(t *testing.T) {
 	}
 	got = stdout.String()
 	want = "exiting...done\n"
-	if strings.Contains(got, want) == false {
+	if !strings.Contains(got, want) {
 		t.Errorf("got %q, does not contain %q", got, want)
 	}
 	got = stderr.String()
 	want = "cancelling mage targets, waiting up to 5 seconds for cleanup...\n"
-	if strings.Contains(got, want) == false {
+	if !strings.Contains(got, want) {
 		t.Errorf("got %q, does not contain %q", got, want)
 	}
 
@@ -1557,12 +1561,12 @@ func TestSignals(t *testing.T) {
 	}
 	got = stdout.String()
 	want = "exiting...done\ndeferred cleanup\n"
-	if strings.Contains(got, want) == false {
+	if !strings.Contains(got, want) {
 		t.Errorf("got %q, does not contain %q", got, want)
 	}
 	got = stderr.String()
 	want = "cancelling mage targets, waiting up to 5 seconds for cleanup...\n"
-	if strings.Contains(got, want) == false {
+	if !strings.Contains(got, want) {
 		t.Errorf("got %q, does not contain %q", got, want)
 	}
 
@@ -1571,7 +1575,7 @@ func TestSignals(t *testing.T) {
 	}
 	got = stderr.String()
 	want = "cancelling mage targets, waiting up to 5 seconds for cleanup...\nexiting mage\nError: exit forced\n"
-	if strings.Contains(got, want) == false {
+	if !strings.Contains(got, want) {
 		t.Errorf("got %q, does not contain %q", got, want)
 	}
 
@@ -1580,7 +1584,7 @@ func TestSignals(t *testing.T) {
 	}
 	got = stderr.String()
 	want = "cancelling mage targets, waiting up to 5 seconds for cleanup...\nError: cleanup timeout exceeded\n"
-	if strings.Contains(got, want) == false {
+	if !strings.Contains(got, want) {
 		t.Errorf("got %q, does not contain %q", got, want)
 	}
 }
@@ -1700,10 +1704,7 @@ func TestClean(t *testing.T) {
 
 func TestGoCmd(t *testing.T) {
 	textOutput := "TestGoCmd"
-	defer os.Unsetenv(testExeEnv)
-	if err := os.Setenv(testExeEnv, textOutput); err != nil {
-		t.Fatal(err)
-	}
+	t.Setenv(testExeEnv, textOutput)
 
 	// fake out the compiled file, since the code checks for it.
 	f, err := ioutil.TempFile("", "")

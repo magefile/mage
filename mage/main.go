@@ -139,7 +139,7 @@ func ParseAndRun(stdout, stderr io.Writer, stdin io.Reader, args []string) int {
 	inv, cmd, err := Parse(stderr, stdout, args)
 	inv.Stderr = stderr
 	inv.Stdin = stdin
-	if err == flag.ErrHelp {
+	if errors.Is(err, flag.ErrHelp) {
 		return 0
 	}
 	if err != nil {
@@ -212,7 +212,7 @@ func Parse(stderr, stdout io.Writer, args []string) (inv Invocation, cmd Command
 	fs.StringVar(&compileOutPath, "compile", "", "output a static binary to the given path")
 
 	fs.Usage = func() {
-		fmt.Fprint(stdout, `
+		_, _ = fmt.Fprint(stdout, `
 mage [options] [target]
 
 Mage is a make-like command runner.  See https://magefile.org for full docs.
@@ -246,7 +246,7 @@ Options:
 `[1:])
 	}
 	err = fs.Parse(args)
-	if err == flag.ErrHelp {
+	if errors.Is(err, flag.ErrHelp) {
 		// parse will have already called fs.Usage()
 		return inv, cmd, err
 	}
@@ -389,12 +389,11 @@ func Invoke(inv Invocation) int {
 		_, err = os.Stat(exePath)
 		switch {
 		case err == nil:
-			if inv.Force {
-				debug.Println("ignoring existing executable")
-			} else {
+			if !inv.Force {
 				debug.Println("Running existing exe")
 				return RunCompiled(inv, exePath, errlog)
 			}
+			debug.Println("ignoring existing executable")
 		case os.IsNotExist(err):
 			debug.Println("no existing exe, creating new")
 		default:
@@ -468,19 +467,19 @@ type mainfileTemplateData struct {
 
 // listGoFiles returns a list of all .go files in a given directory,
 // matching the provided tag
-func listGoFiles(magePath, goCmd, tag string, envStr []string) ([]string, error) {
+func listGoFiles(magePath, tag string, envStr []string) ([]string, error) {
 	origMagePath := magePath
 	if !filepath.IsAbs(magePath) {
 		cwd, err := os.Getwd()
 		if err != nil {
-			return nil, fmt.Errorf("can't get current working directory: %v", err)
+			return nil, fmt.Errorf("can't get current working directory: %w", err)
 		}
 		magePath = filepath.Join(cwd, magePath)
 	}
 
 	env, err := internal.SplitEnv(envStr)
 	if err != nil {
-		return nil, fmt.Errorf("error parsing environment variables: %v", err)
+		return nil, fmt.Errorf("error parsing environment variables: %w", err)
 	}
 
 	bctx := build.Default
@@ -496,13 +495,15 @@ func listGoFiles(magePath, goCmd, tag string, envStr []string) ([]string, error)
 
 	pkg, err := bctx.Import(".", magePath, 0)
 	if err != nil {
-		if _, ok := err.(*build.NoGoError); ok {
+		var noGoErr *build.NoGoError
+		if errors.As(err, &noGoErr) {
 			return []string{}, nil
 		}
 
-		// Allow multiple packages in the same directory
-		if _, ok := err.(*build.MultiplePackageError); !ok {
-			return nil, fmt.Errorf("failed to parse go source files: %v", err)
+		// Allow multiple packages in the same directory.
+		var multiplePkgErr *build.MultiplePackageError
+		if errors.As(err, &multiplePkgErr) {
+			return nil, fmt.Errorf("failed to parse go source files: %w", err)
 		}
 	}
 
@@ -528,7 +529,7 @@ func Magefiles(magePath, goos, goarch, goCmd string, stderr io.Writer, isMagefil
 	}
 
 	debug.Println("getting all files including those with mage tag in", magePath)
-	mageFiles, err := listGoFiles(magePath, goCmd, "mage", env)
+	mageFiles, err := listGoFiles(magePath, "mage", env)
 	if err != nil {
 		return nil, fmt.Errorf("listing mage files: %v", err)
 	}
@@ -544,9 +545,9 @@ func Magefiles(magePath, goos, goarch, goCmd string, stderr io.Writer, isMagefil
 	// that have the mage build tag and ignore those that don't.
 
 	debug.Println("getting all files without mage tag in", magePath)
-	nonMageFiles, err := listGoFiles(magePath, goCmd, "", env)
+	nonMageFiles, err := listGoFiles(magePath, "", env)
 	if err != nil {
-		return nil, fmt.Errorf("listing non-mage files: %v", err)
+		return nil, fmt.Errorf("listing non-mage files: %w", err)
 	}
 
 	// convert non-Mage list to a map of files to exclude.
@@ -612,7 +613,7 @@ func GenerateMainfile(binaryName, path string, info *parse.PkgInfo) error {
 
 	f, err := os.Create(path)
 	if err != nil {
-		return fmt.Errorf("error creating generated mainfile: %v", err)
+		return fmt.Errorf("error creating generated mainfile: %w", err)
 	}
 	defer f.Close()
 	data := mainfileTemplateData{
@@ -629,16 +630,16 @@ func GenerateMainfile(binaryName, path string, info *parse.PkgInfo) error {
 
 	debug.Println("writing new file at", path)
 	if err := mainfileTemplate.Execute(f, data); err != nil {
-		return fmt.Errorf("can't execute mainfile template: %v", err)
+		return fmt.Errorf("can't execute mainfile template: %w", err)
 	}
 	if err := f.Close(); err != nil {
-		return fmt.Errorf("error closing generated mainfile: %v", err)
+		return fmt.Errorf("error closing generated mainfile: %w", err)
 	}
 	// we set an old modtime on the generated mainfile so that the go tool
 	// won't think it has changed more recently than the compiled binary.
 	longAgo := time.Now().Add(-time.Hour * 24 * 365 * 10)
 	if err := os.Chtimes(path, longAgo, longAgo); err != nil {
-		return fmt.Errorf("error setting old modtime on generated mainfile: %v", err)
+		return fmt.Errorf("error setting old modtime on generated mainfile: %w", err)
 	}
 	return nil
 }
@@ -690,18 +691,18 @@ func generateInit(dir string) error {
 	debug.Println("generating default magefile in", dir)
 	f, err := os.Create(filepath.Join(dir, initFile))
 	if err != nil {
-		return fmt.Errorf("could not create mage template: %v", err)
+		return fmt.Errorf("could not create mage template: %w", err)
 	}
 	defer f.Close()
 
 	if err := initOutput.Execute(f, nil); err != nil {
-		return fmt.Errorf("can't execute magefile template: %v", err)
+		return fmt.Errorf("can't execute magefile template: %w", err)
 	}
 
 	return nil
 }
 
-// RunCompiled runs an already-compiled mage command with the given args,
+// RunCompiled runs an already-compiled mage command with the given args.
 func RunCompiled(inv Invocation, exePath string, errlog *log.Logger) int {
 	debug.Println("running binary", exePath)
 	c := exec.Command(exePath, inv.Args...)
