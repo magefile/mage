@@ -109,3 +109,23 @@ func hash() string {
 	hash, _ := sh.Output("git", "rev-parse", "--short", "HEAD")
 	return hash
 }
+
+
+// Say says the message. If cap is set, the string will be uppercased. If count
+// is set, the message will be repeated that many times. 
+func Say(cap *bool, msg string, count *int) {
+	if cap != nil && *cap {
+		msg = strings.ToUpper(msg)
+	}
+	repeat := 1
+	if count != nil {
+		repeat = *count
+	}
+	for i := 0; i < repeat; i++ {
+		fmt.Println(msg)
+	}
+}
+
+func Announce(msg string) {
+	fmt.Printf("Announcement: %s\n", msg)
+}

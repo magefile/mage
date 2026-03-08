@@ -44,6 +44,9 @@ supported argument types (`*string`, `*int`, `*float64`, `*bool`,
 `-name=value` syntax, where `name` is the Go parameter name (case-insensitive).
 If an optional argument is not provided, the pointer will be `nil`.
 
+For `*bool` parameters, you can use the shorthand `-name` without a value,
+which is equivalent to `-name=true`.
+
 ```go
 func Greet(name string, greeting *string) {
     if greeting != nil {

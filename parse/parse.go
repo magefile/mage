@@ -215,16 +215,37 @@ func (f Function) ExecCode() string {
 
 	// Phase 3: Parse optional arguments from -name=value flags
 	if f.HasOptionalArgs() {
+		// Collect lowercase names of bool optional args for bare-flag support
+		var boolOptNames []string
+		for _, arg := range f.Args {
+			if arg.Optional && arg.Type == "bool" {
+				boolOptNames = append(boolOptNames, strings.ToLower(arg.Name))
+			}
+		}
+
 		parseargs += fmt.Sprintf(`
 				for x < len(args.Args) && _strings.HasPrefix(args.Args[x], "-") {
 					_optArg := args.Args[x]
 					_eqIdx := _strings.Index(_optArg, "=")
+					var _optName, _optVal string
 					if _eqIdx < 0 {
-						logger.Printf("invalid option %%q for target \"%s\", expected -name=value format\n", _optArg)
-						os.Exit(2)
+						_optName = _strings.ToLower(_optArg[1:])
+						switch _optName {`)
+		// Generate cases for each bool optional arg
+		for _, bname := range boolOptNames {
+			parseargs += fmt.Sprintf(`
+						case %q:
+							_optVal = "true"`, bname)
+		}
+		parseargs += fmt.Sprintf(`
+						default:
+							logger.Printf("invalid option %%q for target \"%s\", expected -name=value format\n", _optArg)
+							os.Exit(2)
+						}
+					} else {
+						_optName = _strings.ToLower(_optArg[1:_eqIdx])
+						_optVal = _optArg[_eqIdx+1:]
 					}
-					_optName := _strings.ToLower(_optArg[1:_eqIdx])
-					_optVal := _optArg[_eqIdx+1:]
 					switch _optName {`, f.TargetName())
 		for x, arg := range f.Args {
 			if !arg.Optional {

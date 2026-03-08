@@ -476,6 +476,69 @@ func TestOptionalArgsCaseInsensitive(t *testing.T) {
 	}
 }
 
+func TestOptionalBoolBareFlag(t *testing.T) {
+	stderr := &bytes.Buffer{}
+	stdout := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:    "./testdata/optargs",
+		Stderr: stderr,
+		Stdout: stdout,
+		Args:   []string{"run", "-verbose"},
+	}
+	code := Invoke(inv)
+	if code != 0 {
+		t.Log("stderr:", stderr)
+		t.Fatalf("expected 0, but got %v", code)
+	}
+	actual := stdout.String()
+	expected2 := "running verbose\n"
+	if actual != expected2 {
+		t.Fatalf("output is not expected:\n%q", actual)
+	}
+}
+
+func TestOptionalBoolBareFlagChained(t *testing.T) {
+	stderr := &bytes.Buffer{}
+	stdout := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:    "./testdata/optargs",
+		Stderr: stderr,
+		Stdout: stdout,
+		Args:   []string{"say", "hello", "-cap", "announce", "world"},
+	}
+	code := Invoke(inv)
+	if code != 0 {
+		t.Log("stderr:", stderr)
+		t.Fatalf("expected 0, but got %v", code)
+	}
+	actual := stdout.String()
+	expected2 := "HELLO\nAnnouncement: world\n"
+	if actual != expected2 {
+		t.Fatalf("output is not expected:\n%q", actual)
+	}
+}
+
+func TestOptionalBoolBareFlagMultiple(t *testing.T) {
+	stderr := &bytes.Buffer{}
+	stdout := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:    "./testdata/optargs",
+		Stderr: stderr,
+		Stdout: stdout,
+		Args:   []string{"say", "hi", "-cap", "-count=3"},
+	}
+	code := Invoke(inv)
+	if code != 0 {
+		t.Log("stderr:", stderr)
+		t.Fatalf("expected 0, but got %v", code)
+	}
+	actual := stdout.String()
+	expected2 := "HI\nHI\nHI\n"
+	if actual != expected2 {
+		t.Fatalf("output is not expected:\n%q", actual)
+	}
+}
+
 func TestOptionalAllOptionalWithValues(t *testing.T) {
 	stderr := &bytes.Buffer{}
 	stdout := &bytes.Buffer{}
