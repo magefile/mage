@@ -23,8 +23,8 @@ this directory.  i.e. you can run a target by running `mage <target>`
 ## Arguments
 
 Arguments aside from context are taken from the CLI arguments after the target name.
-Strings are passed as-is, ints are converted with strconv.Atoi, bools are converted with
-strconv.ParseBool, and time.Durations are converted with time.ParseDuration.
+`string` is passed as-is, `int` are converted with `strconv.Atoi`, `bool` are converted with
+`strconv.ParseBool`, and `time.Duration` are converted with `time.ParseDuration`.
 
 Thus you could call Exec above by running
 
