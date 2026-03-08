@@ -82,19 +82,6 @@ func Deploy(ctx context.Context, env string, version *string, dryRun *bool) erro
 $ mage deploy production -version=1.2.3 -dryrun=true
 ```
 
-A function may also have only optional arguments:
-
-```go
-func Lint(verbose *bool, fix *bool) {
-    // both arguments are optional
-}
-```
-
-```plain
-$ mage lint
-$ mage lint -verbose=true -fix=true
-```
-
 The help output shows optional arguments in brackets:
 
 ```plain
@@ -105,11 +92,6 @@ Usage:
 
 	mage greet <name> [-greeting=<string>]
 ```
-
-Optional arguments work with multiple chained targets just like required
-arguments:
-
-`mage greet World -greeting=Hi deploy production -version=1.2.3`
 
 ## Errors
 
