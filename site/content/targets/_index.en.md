@@ -3,8 +3,8 @@ title = "Targets"
 weight = 10
 +++
 A target is any exported function that has an optional first argument of context.Context, has either
-no return or just an error return, and where the arguments are all of type string, int, float64, bool, or
-time.Duration. Pointer types of these (`*string`, `*int`, `*float64`, `*bool`, `*time.Duration`) are
+no return or just an error return, and where the arguments are all of type `string`, `int`, `float64`, `bool`, or
+`time.Duration`. Pointer types of these (`*string`, `*int`, `*float64`, `*bool`, `*time.Duration`) are
 also accepted and treated as optional arguments (see [Optional Arguments](#optional-arguments) below).
 
 e.g. these are all acceptable targets
