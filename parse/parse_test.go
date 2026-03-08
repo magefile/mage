@@ -112,3 +112,74 @@ func TestGetImportSelf(t *testing.T) {
 		t.Fatalf("expected package importself, got %v", imp.Info.AstPkg.Name)
 	}
 }
+
+func TestOptionalArgs(t *testing.T) {
+	info, err := PrimaryPackage("go", "./testdata", []string{"optargs.go"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	expected := []Function{
+		{
+			Name: "AllOptional",
+			Args: []Arg{
+				{Name: "a", Type: "string", Optional: true},
+				{Name: "b", Type: "int", Optional: true},
+			},
+		},
+		{
+			Name: "OptionalBool",
+			Args: []Arg{
+				{Name: "verbose", Type: "bool", Optional: true},
+			},
+		},
+		{
+			Name: "OptionalDuration",
+			Args: []Arg{
+				{Name: "base", Type: "time.Duration"},
+				{Name: "extra", Type: "time.Duration", Optional: true},
+			},
+		},
+		{
+			Name: "OptionalFloat64",
+			Args: []Arg{
+				{Name: "value", Type: "float64"},
+				{Name: "factor", Type: "float64", Optional: true},
+			},
+		},
+		{
+			Name: "OptionalInt",
+			Args: []Arg{
+				{Name: "a", Type: "int"},
+				{Name: "b", Type: "int", Optional: true},
+			},
+		},
+		{
+			Name: "OptionalString",
+			Args: []Arg{
+				{Name: "name", Type: "string"},
+				{Name: "greeting", Type: "string", Optional: true},
+			},
+		},
+	}
+
+	if len(info.Funcs) != len(expected) {
+		t.Fatalf("expected %d funcs, got %d", len(expected), len(info.Funcs))
+	}
+
+	for _, fn := range expected {
+		found := false
+		for _, infoFn := range info.Funcs {
+			if reflect.DeepEqual(fn, *infoFn) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("expected:\n%#v\n\nto be in parsed funcs", fn)
+			for _, infoFn := range info.Funcs {
+				t.Logf("  got: %#v", *infoFn)
+			}
+		}
+	}
+}
