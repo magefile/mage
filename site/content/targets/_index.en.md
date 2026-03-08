@@ -36,7 +36,7 @@ You can intersperse multiple targets with arguments as you'd expect:
 
 `mage run foo.exe exec somename 5 true 100ms`
 
-### Optional Arguments
+### Optional Arguments (v1.16.0+)
 
 You can define optional arguments by using pointer types for any of the
 supported argument types (`*string`, `*int`, `*float64`, `*bool`,
