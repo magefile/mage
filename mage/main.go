@@ -173,7 +173,7 @@ func ParseAndRun(stdout, stderr io.Writer, stdin io.Reader, args []string) int {
 	case None:
 		return Invoke(inv)
 	default:
-		panic(fmt.Errorf("Unknown command type: %v", cmd))
+		panic(fmt.Errorf("unknown command type: %v", cmd))
 	}
 }
 

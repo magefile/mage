@@ -51,7 +51,7 @@ func TestFuncCheck(t *testing.T) {
 		t.Error("func is not on a namespace")
 	}
 
-	hasContext, isNamespace, err = checkF(Foo.Bare, nil)
+	_, _, err = checkF(Foo.Bare, nil)
 	if err != nil {
 		t.Error(err)
 	}
@@ -117,11 +117,11 @@ func TestFuncCheck(t *testing.T) {
 	}
 
 	defer func() {
-		if r := recover(); r !=nil {
+		if r := recover(); r != nil {
 			t.Error("expected a nil function argument to be handled gracefully")
 		}
 	}()
-	_, _, err = checkF(nil, []interface{}{1,2})
+	_, _, err = checkF(nil, []interface{}{1, 2})
 	if err == nil {
 		t.Error("expected a nil function argument to be invalid")
 	}
