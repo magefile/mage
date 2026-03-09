@@ -3,6 +3,11 @@ package mage
 // this template uses the "data"
 
 // var only for tests
+//
+// NOTE: This template generates code that uses io/ioutil which was deprecated
+// in Go 1.16. When mage's minimum Go version is raised to 1.16+, update
+// _ioutil "io/ioutil" to _io "io" and _ioutil.Discard to _io.Discard.
+// See: https://go.dev/doc/go1.16#ioutil
 var mageMainfileTplString = `//go:build ignore
 // +build ignore
 

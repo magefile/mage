@@ -4,12 +4,17 @@
 package main
 
 import (
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
+
+	// DEPRECATED: The ioutil package was deprecated in Go 1.16.
+	// TODO: Replace ioutil.TempDir with os.MkdirTemp when minimum Go version
+	// is raised to 1.16+. See: https://go.dev/doc/go1.16#ioutil
+	"io/ioutil"
 )
 
 func TestBootstrap(t *testing.T) {
@@ -27,7 +32,19 @@ func TestBootstrap(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		name += ".exe"
 	}
-	if _, err := os.Stat(filepath.Join(os.Getenv("GOPATH"), "bin", name)); err != nil {
+
+	// Use `go env GOBIN` to determine install location, as GOPATH may not be
+	// set in module-aware mode. Falls back to GOPATH/bin if GOBIN is empty.
+	binDir, err := run("go", "env", "GOBIN")
+	if err != nil {
+		t.Fatalf("failed to get GOBIN: %v", err)
+	}
+	binDir = strings.TrimSpace(binDir)
+	if binDir == "" {
+		binDir = filepath.Join(os.Getenv("GOPATH"), "bin")
+	}
+
+	if _, err := os.Stat(filepath.Join(binDir, name)); err != nil {
 		t.Fatal(err)
 	}
 }

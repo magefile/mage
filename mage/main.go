@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"go/build"
 	"io"
-	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -21,6 +20,12 @@ import (
 	"syscall"
 	"text/template"
 	"time"
+
+	// DEPRECATED: The ioutil package was deprecated in Go 1.16.
+	// TODO: Replace ioutil.Discard with io.Discard and ioutil.ReadDir with
+	// os.ReadDir when minimum Go version is raised to 1.16+.
+	// See: https://go.dev/doc/go1.16#ioutil
+	"io/ioutil"
 
 	"github.com/magefile/mage/internal"
 	"github.com/magefile/mage/mg"

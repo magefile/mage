@@ -3,10 +3,15 @@ package sh_test
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
+
+	// DEPRECATED: The ioutil package was deprecated in Go 1.16.
+	// TODO: Replace with os.ReadFile, os.MkdirTemp, and os.WriteFile when
+	// minimum Go version is raised to 1.16+.
+	// See: https://go.dev/doc/go1.16#ioutil
+	"io/ioutil"
 
 	"github.com/magefile/mage/sh"
 )

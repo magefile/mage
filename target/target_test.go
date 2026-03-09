@@ -1,11 +1,15 @@
 package target
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
+
+	// DEPRECATED: The ioutil package was deprecated in Go 1.16.
+	// TODO: Replace with os.MkdirTemp and os.WriteFile when minimum Go
+	// version is raised to 1.16+. See: https://go.dev/doc/go1.16#ioutil
+	"io/ioutil"
 )
 
 func TestPathMissingDest(t *testing.T) {

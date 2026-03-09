@@ -5,8 +5,12 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"strings"
+
+	// DEPRECATED: The ioutil package was deprecated in Go 1.16.
+	// TODO: Replace ioutil.ReadDir with os.ReadDir when minimum Go version
+	// is raised to 1.16+. See: https://go.dev/doc/go1.16#ioutil
+	"io/ioutil"
 )
 
 func TestWorkingDir() error {

@@ -7,12 +7,16 @@ import (
 	"go/doc"
 	"go/parser"
 	"go/token"
-	"io/ioutil"
 	"log"
 	"os"
 	"sort"
 	"strings"
 	"time"
+
+	// DEPRECATED: The ioutil package was deprecated in Go 1.16.
+	// TODO: Replace ioutil.Discard with io.Discard when minimum Go version
+	// is raised to 1.16+. See: https://go.dev/doc/go1.16#ioutil
+	"io/ioutil"
 
 	"github.com/magefile/mage/internal"
 )

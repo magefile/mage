@@ -3,12 +3,16 @@ package internal
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
 	"runtime"
 	"strings"
+
+	// DEPRECATED: The ioutil package was deprecated in Go 1.16.
+	// TODO: Replace ioutil.Discard with io.Discard when minimum Go version
+	// is raised to 1.16+. See: https://go.dev/doc/go1.16#ioutil
+	"io/ioutil"
 )
 
 var debug *log.Logger = log.New(ioutil.Discard, "", 0)

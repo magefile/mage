@@ -2,6 +2,9 @@ name: ci
 
 on: [push, pull_request]
 
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -10,6 +13,10 @@ jobs:
       matrix:
         go-version:
           - stable
+          - 1.25.x
+          - 1.24.x
+          - 1.23.x
+          - 1.22.x
           - 1.21.x
           - 1.20.x
           - 1.19.x
@@ -20,11 +27,10 @@ jobs:
           - 1.14.x
           - 1.13.x
           - 1.12.x
-          - 1.11.x
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v6
     - name: Set up Go ${{ matrix.go-version }}
-      uses: actions/setup-go@v4
+      uses: actions/setup-go@v6
       with:
         go-version: ${{ matrix.go-version }}
 
