@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/magefile/mage/internal/dryrun"
 	"github.com/magefile/mage/mg"
 )
 
@@ -16,19 +17,19 @@ import (
 // useful for creating command aliases to make your scripts easier to read, like
 // this:
 //
-//  // in a helper file somewhere
-//  var g0 = sh.RunCmd("go")  // go is a keyword :(
+//	 // in a helper file somewhere
+//	 var g0 = sh.RunCmd("go")  // go is a keyword :(
 //
-//  // somewhere in your main code
-//	if err := g0("install", "github.com/gohugo/hugo"); err != nil {
-//		return err
-//  }
+//	 // somewhere in your main code
+//		if err := g0("install", "github.com/gohugo/hugo"); err != nil {
+//			return err
+//	 }
 //
 // Args passed to command get baked in as args to the command when you run it.
 // Any args passed in when you run the returned function will be appended to the
 // original args.  For example, this is equivalent to the above:
 //
-//  var goInstall = sh.RunCmd("go", "install") goInstall("github.com/gohugo/hugo")
+//	var goInstall = sh.RunCmd("go", "install") goInstall("github.com/gohugo/hugo")
 //
 // RunCmd uses Exec underneath, so see those docs for more details.
 func RunCmd(cmd string, args ...string) func(args ...string) error {
@@ -62,7 +63,8 @@ func RunV(cmd string, args ...string) error {
 // be in the format name=value.
 func RunWith(env map[string]string, cmd string, args ...string) error {
 	var output io.Writer
-	if mg.Verbose() {
+	// In dryrun mode, the actual "command" will just print the cmd and args to stdout; so we want to make sure we're outputting that regardless of verbosity settings.
+	if mg.Verbose() || dryrun.IsDryRun() {
 		output = os.Stdout
 	}
 	_, err := Exec(env, output, os.Stderr, cmd, args...)
@@ -124,7 +126,7 @@ func Exec(env map[string]string, stdout, stderr io.Writer, cmd string, args ...s
 }
 
 func run(env map[string]string, stdout, stderr io.Writer, cmd string, args ...string) (ran bool, code int, err error) {
-	c := exec.Command(cmd, args...)
+	c := dryrun.Wrap(cmd, args...)
 	c.Env = os.Environ()
 	for k, v := range env {
 		c.Env = append(c.Env, k+"="+v)
@@ -133,9 +135,9 @@ func run(env map[string]string, stdout, stderr io.Writer, cmd string, args ...st
 	c.Stdout = stdout
 	c.Stdin = os.Stdin
 
-	var quoted []string 
+	var quoted []string
 	for i := range args {
-		quoted = append(quoted, fmt.Sprintf("%q", args[i]));
+		quoted = append(quoted, fmt.Sprintf("%q", args[i]))
 	}
 	// To protect against logging from doing exec in global variables
 	if mg.Verbose() {
@@ -144,6 +146,7 @@ func run(env map[string]string, stdout, stderr io.Writer, cmd string, args ...st
 	err = c.Run()
 	return CmdRan(err), ExitStatus(err), err
 }
+
 // CmdRan examines the error to determine if it was generated as a result of a
 // command running via os/exec.Command.  If the error is nil, or the command ran
 // (even if it exited with a non-zero exit code), CmdRan reports true.  If the

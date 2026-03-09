@@ -6,9 +6,10 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
-	"os/exec"
 	"runtime"
 	"strings"
+
+	"github.com/magefile/mage/internal/dryrun"
 )
 
 var debug *log.Logger = log.New(ioutil.Discard, "", 0)
@@ -25,7 +26,7 @@ func RunDebug(cmd string, args ...string) error {
 	buf := &bytes.Buffer{}
 	errbuf := &bytes.Buffer{}
 	debug.Println("running", cmd, strings.Join(args, " "))
-	c := exec.Command(cmd, args...)
+	c := dryrun.Wrap(cmd, args...)
 	c.Env = env
 	c.Stderr = errbuf
 	c.Stdout = buf
@@ -45,7 +46,7 @@ func OutputDebug(cmd string, args ...string) (string, error) {
 	buf := &bytes.Buffer{}
 	errbuf := &bytes.Buffer{}
 	debug.Println("running", cmd, strings.Join(args, " "))
-	c := exec.Command(cmd, args...)
+	c := dryrun.Wrap(cmd, args...)
 	c.Env = env
 	c.Stderr = errbuf
 	c.Stdout = buf

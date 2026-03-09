@@ -4,11 +4,18 @@ import (
 	"fmt"
 	"io"
 	"os"
+
+	"github.com/magefile/mage/internal/dryrun"
 )
 
 // Rm removes the given file or directory even if non-empty. It will not return
 // an error if the target doesn't exist, only if the target cannot be removed.
 func Rm(path string) error {
+	if dryrun.IsDryRun() {
+		fmt.Println("DRYRUN: rm", path)
+		return nil
+	}
+
 	err := os.RemoveAll(path)
 	if err == nil || os.IsNotExist(err) {
 		return nil
@@ -18,6 +25,11 @@ func Rm(path string) error {
 
 // Copy robustly copies the source file to the destination, overwriting the destination if necessary.
 func Copy(dst string, src string) error {
+	if dryrun.IsDryRun() {
+		fmt.Println("DRYRUN: cp", src, dst)
+		return nil
+	}
+
 	from, err := os.Open(src)
 	if err != nil {
 		return fmt.Errorf(`can't copy %s: %v`, src, err)
