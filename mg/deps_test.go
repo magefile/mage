@@ -86,7 +86,7 @@ func TestDepError(t *testing.T) {
 			t.Fatal("expected panic, but didn't get one")
 		}
 		actual := fmt.Sprint(err)
-		if "ouch" != actual {
+		if actual != "ouch" {
 			t.Fatalf(`expected to get "ouch" but got "%s"`, actual)
 		}
 	}()
@@ -103,7 +103,7 @@ func TestDepFatal(t *testing.T) {
 			t.Fatal("expected panic, but didn't get one")
 		}
 		actual := fmt.Sprint(v)
-		if "ouch!" != actual {
+		if actual != "ouch!" {
 			t.Fatalf(`expected to get "ouch!" but got "%s"`, actual)
 		}
 		err, ok := v.(error)
@@ -132,7 +132,7 @@ func TestDepTwoFatal(t *testing.T) {
 		}
 		actual := fmt.Sprint(v)
 		// order is non-deterministic, so check for both orders
-		if "ouch!\nbang!" != actual && "bang!\nouch!" != actual {
+		if actual != "ouch!\nbang!" && actual != "bang!\nouch!" {
 			t.Fatalf(`expected to get "ouch!" and "bang!" but got "%s"`, actual)
 		}
 		err, ok := v.(error)
@@ -157,7 +157,7 @@ func TestDepWithUnhandledFunc(t *testing.T) {
 			t.Fatalf("Expected type error from panic")
 		}
 	}()
-	var NotValid func(string) string = func(a string) string {
+	var NotValid = func(a string) string {
 		return a
 	}
 	Deps(NotValid)
