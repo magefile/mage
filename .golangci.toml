@@ -36,7 +36,6 @@ disable = [
   'gocognit',
   'goconst',
   'gocyclo',
-#  'godot',
   'godox',
   'goheader',
   'gomoddirectives',
@@ -77,6 +76,9 @@ comparison = true
 [linters.settings.forbidigo]
 [[linters.settings.forbidigo.forbid]]
 pattern = 'time.After\.*(# use of time After can create memory allocation issues see  https://github.com/github/go-linter/tree/main/doc/time_after.md )?'
+
+[linters.settings.gci]
+line-endings = "lf"
 
 [linters.settings.gocritic]
 disabled-checks = [
