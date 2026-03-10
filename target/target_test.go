@@ -1,7 +1,6 @@
 package target
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -10,13 +9,9 @@ import (
 
 func TestPathMissingDest(t *testing.T) {
 	t.Parallel()
-	dir, err := ioutil.TempDir("", "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(dir)
+	dir := t.TempDir()
 	src := filepath.Join(dir, "source")
-	err = ioutil.WriteFile(src, []byte("hi!"), 0644)
+	err := os.WriteFile(src, []byte("hi!"), 0o600)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -34,7 +29,7 @@ func TestPathMissingSource(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	dst := filepath.Join(dir, "dst")
-	err := os.WriteFile(dst, []byte("hi!"), 0600)
+	err := os.WriteFile(dst, []byte("hi!"), 0o600)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,7 +44,7 @@ func TestGlobEmptyGlob(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	dst := filepath.Join(dir, "dst")
-	err := os.WriteFile(dst, []byte("hi!"), 0600)
+	err := os.WriteFile(dst, []byte("hi!"), 0o600)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -64,7 +59,7 @@ func TestDirMissingSrc(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	dst := filepath.Join(dir, "dst")
-	err := os.WriteFile(dst, []byte("hi!"), 0600)
+	err := os.WriteFile(dst, []byte("hi!"), 0o600)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -79,12 +74,12 @@ func TestDirMissingDest(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	src := filepath.Join(dir, "source")
-	err := os.Mkdir(src, 0750)
+	err := os.Mkdir(src, 0o750)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = os.WriteFile(filepath.Join(src, "somefile"), []byte("hi!"), 0600)
+	err = os.WriteFile(filepath.Join(src, "somefile"), []byte("hi!"), 0o600)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,10 +94,9 @@ func TestDirMissingDest(t *testing.T) {
 }
 
 func TestGlob(t *testing.T) {
-	t.Parallel()
 	dir := t.TempDir()
 
-	err := os.MkdirAll(filepath.Join(dir, "dir", "dir2"), 0750)
+	err := os.MkdirAll(filepath.Join(dir, "dir", "dir2"), 0o750)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -119,7 +113,7 @@ func TestGlob(t *testing.T) {
 	for _, v := range files {
 		time.Sleep(10 * time.Millisecond)
 		f := filepath.Join(dir, filepath.FromSlash(v))
-		err := os.WriteFile(f, []byte(v), 0600)
+		err := os.WriteFile(f, []byte(v), 0o600)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -176,7 +170,6 @@ func TestGlob(t *testing.T) {
 	for _, c := range table {
 		c := c
 		t.Run(c.desc, func(t *testing.T) {
-			t.Parallel()
 			for i := range c.sources {
 				c.sources[i] = filepath.Join(dir, c.sources[i])
 			}
@@ -193,10 +186,9 @@ func TestGlob(t *testing.T) {
 }
 
 func TestPath(t *testing.T) {
-	t.Parallel()
 	dir := t.TempDir()
 
-	err := os.MkdirAll(filepath.Join(dir, "dir", "dir2"), 0750)
+	err := os.MkdirAll(filepath.Join(dir, "dir", "dir2"), 0o750)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -210,7 +202,7 @@ func TestPath(t *testing.T) {
 	for _, v := range files {
 		time.Sleep(10 * time.Millisecond)
 		f := filepath.Join(dir, filepath.FromSlash(v))
-		err := os.WriteFile(f, []byte(v), 0600)
+		err := os.WriteFile(f, []byte(v), 0o600)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -282,7 +274,6 @@ func TestPath(t *testing.T) {
 	for _, c := range table {
 		c := c
 		t.Run(c.desc, func(t *testing.T) {
-			t.Parallel()
 			for i := range c.sources {
 				c.sources[i] = filepath.Join(dir, c.sources[i])
 			}
@@ -299,10 +290,9 @@ func TestPath(t *testing.T) {
 }
 
 func TestDir(t *testing.T) {
-	t.Parallel()
 	dir := t.TempDir()
 
-	err := os.MkdirAll(filepath.Join(dir, "dir", "dir2"), 0750)
+	err := os.MkdirAll(filepath.Join(dir, "dir", "dir2"), 0o750)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -317,7 +307,7 @@ func TestDir(t *testing.T) {
 	for _, v := range files {
 		time.Sleep(10 * time.Millisecond)
 		f := filepath.Join(dir, filepath.FromSlash(v))
-		err := os.WriteFile(f, []byte(v), 0600)
+		err := os.WriteFile(f, []byte(v), 0o600)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -415,7 +405,6 @@ func TestDir(t *testing.T) {
 	for _, c := range table {
 		c := c
 		t.Run(c.desc, func(t *testing.T) {
-			t.Parallel()
 			sources := make([]string, len(c.sources))
 			for i := range c.sources {
 				sources[i] = filepath.Join(dir, c.sources[i])

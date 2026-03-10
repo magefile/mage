@@ -33,7 +33,7 @@ func DirNewer(target time.Time, sources ...string) (bool, error) {
 		if err == nil {
 			continue
 		}
-		if err == errNewer {
+		if errors.Is(err, errNewer) {
 			return true, nil
 		}
 		return false, err
@@ -43,7 +43,7 @@ func DirNewer(target time.Time, sources ...string) (bool, error) {
 
 // GlobNewer performs glob expansion on each source and passes the results to
 // PathNewer for inspection. It returns the first time PathNewer encounters a
-// newer file
+// newer file.
 func GlobNewer(target time.Time, sources ...string) (bool, error) {
 	for _, g := range sources {
 		files, err := filepath.Glob(g)

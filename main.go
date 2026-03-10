@@ -1,3 +1,4 @@
+// Package main is the entry point for the mage binary.
 package main
 
 import (

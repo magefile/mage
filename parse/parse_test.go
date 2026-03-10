@@ -9,7 +9,7 @@ import (
 	"github.com/magefile/mage/internal"
 )
 
-func init() {
+func init() { //nolint:gochecknoinits // required for test setup
 	internal.SetDebug(log.New(os.Stdout, "", 0))
 }
 

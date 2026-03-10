@@ -3,7 +3,6 @@ package sh_test
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -14,14 +13,14 @@ import (
 // compareFiles checks that two files are identical for testing purposes. That means they have the same length,
 // the same contents, and the same permissions. It does NOT mean they have the same timestamp, as that is expected
 // to change in normal Mage sh.Copy operation.
-func compareFiles(file1 string, file2 string) error {
+func compareFiles(file1, file2 string) error {
 	s1, err := os.Stat(file1)
 	if err != nil {
-		return fmt.Errorf("can't stat %s: %v", file1, err)
+		return fmt.Errorf("can't stat %s: %w", file1, err)
 	}
 	s2, err := os.Stat(file2)
 	if err != nil {
-		return fmt.Errorf("can't stat %s: %v", file2, err)
+		return fmt.Errorf("can't stat %s: %w", file2, err)
 	}
 	if s1.Size() != s2.Size() {
 		return fmt.Errorf("files %s and %s have different sizes: %d vs %d", file1, file2, s1.Size(), s2.Size())
@@ -29,13 +28,13 @@ func compareFiles(file1 string, file2 string) error {
 	if s1.Mode() != s2.Mode() {
 		return fmt.Errorf("files %s and %s have different permissions: %#4o vs %#4o", file1, file2, s1.Mode(), s2.Mode())
 	}
-	f1bytes, err := ioutil.ReadFile(file1)
+	f1bytes, err := os.ReadFile(file1)
 	if err != nil {
-		return fmt.Errorf("can't read %s: %v", file1, err)
+		return fmt.Errorf("can't read %s: %w", file1, err)
 	}
-	f2bytes, err := ioutil.ReadFile(file2)
+	f2bytes, err := os.ReadFile(file2)
 	if err != nil {
-		return fmt.Errorf("can't read %s: %v", file2, err)
+		return fmt.Errorf("can't read %s: %w", file2, err)
 	}
 	if !bytes.Equal(f1bytes, f2bytes) {
 		return fmt.Errorf("files %s and %s have different contents", file1, file2)
@@ -44,10 +43,7 @@ func compareFiles(file1 string, file2 string) error {
 }
 
 func TestHelpers(t *testing.T) {
-	mytmpdir, err := ioutil.TempDir("", "mage")
-	if err != nil {
-		t.Fatalf("can't create test directory: %v", err)
-	}
+	mytmpdir := t.TempDir()
 	defer func() {
 		derr := os.RemoveAll(mytmpdir)
 		if derr != nil {
@@ -55,7 +51,7 @@ func TestHelpers(t *testing.T) {
 		}
 	}()
 	srcname := filepath.Join(mytmpdir, "test1.txt")
-	err = ioutil.WriteFile(srcname, []byte("All work and no play makes Jack a dull boy."), 0644)
+	err := os.WriteFile(srcname, []byte("All work and no play makes Jack a dull boy."), 0o600)
 	if err != nil {
 		t.Fatalf("can't create test file %s: %v", srcname, err)
 	}
@@ -116,5 +112,4 @@ func TestHelpers(t *testing.T) {
 			t.Errorf("sh.Rm complained removing nonexistent dir %s", mytmpdir)
 		}
 	})
-
 }

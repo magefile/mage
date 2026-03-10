@@ -1,3 +1,4 @@
+// Package parse provides parsing of Go source files to extract mage targets.
 package parse
 
 import (
@@ -7,7 +8,7 @@ import (
 	"go/doc"
 	"go/parser"
 	"go/token"
-	"io/ioutil"
+	"io"
 	"log"
 	"os"
 	"sort"
@@ -19,7 +20,7 @@ import (
 
 const importTag = "mage:import"
 
-var debug = log.New(ioutil.Discard, "DEBUG: ", log.Ltime|log.Lmicroseconds)
+var debug = log.New(io.Discard, "DEBUG: ", log.Ltime|log.Lmicroseconds)
 
 // EnableDebug turns on debug logging.
 func EnableDebug() {
@@ -38,7 +39,7 @@ type PkgInfo struct {
 	Imports     Imports
 }
 
-// Function represents a job function from a mage file
+// Function represents a job function from a mage file.
 type Function struct {
 	PkgAlias   string
 	Package    string
@@ -52,7 +53,7 @@ type Function struct {
 	Args       []Arg
 }
 
-var _ sort.Interface = (Functions)(nil)
+var _ sort.Interface = Functions(nil)
 
 // Functions implements sort interface to optimize compiled output with
 // deterministic generated mainfile.
@@ -157,7 +158,7 @@ func (f Function) ExecCode() string {
 		name = f.Package + "." + name
 	}
 
-	var parseargs string
+	var parseargs strings.Builder
 
 	// Phase 1: Parse positional (required) arguments
 	for x, arg := range f.Args {
@@ -166,11 +167,11 @@ func (f Function) ExecCode() string {
 		}
 		switch arg.Type {
 		case "string":
-			parseargs += fmt.Sprintf(`
+			_, _ = fmt.Fprintf(&parseargs, `
 			arg%d := args.Args[x]
 			x++`, x)
 		case "int":
-			parseargs += fmt.Sprintf(`
+			_, _ = fmt.Fprintf(&parseargs, `
 				arg%d, err := strconv.Atoi(args.Args[x])
 				if err != nil {
 					logger.Printf("can't convert argument %%q to int\n", args.Args[x])
@@ -178,7 +179,7 @@ func (f Function) ExecCode() string {
 				}
 				x++`, x)
 		case "float64":
-			parseargs += fmt.Sprintf(`
+			_, _ = fmt.Fprintf(&parseargs, `
 				arg%d, err := strconv.ParseFloat(args.Args[x], 64)
 				if err != nil {
 					logger.Printf("can't convert argument %%q to float64\n", args.Args[x])
@@ -186,7 +187,7 @@ func (f Function) ExecCode() string {
 				}
 				x++`, x)
 		case "bool":
-			parseargs += fmt.Sprintf(`
+			_, _ = fmt.Fprintf(&parseargs, `
 				arg%d, err := strconv.ParseBool(args.Args[x])
 				if err != nil {
 					logger.Printf("can't convert argument %%q to bool\n", args.Args[x])
@@ -194,13 +195,15 @@ func (f Function) ExecCode() string {
 				}
 				x++`, x)
 		case "time.Duration":
-			parseargs += fmt.Sprintf(`
+			_, _ = fmt.Fprintf(&parseargs, `
 				arg%d, err := time.ParseDuration(args.Args[x])
 				if err != nil {
 					logger.Printf("can't convert argument %%q to time.Duration\n", args.Args[x])
 					os.Exit(2)
 				}
 				x++`, x)
+		default:
+			// unsupported type, skip
 		}
 	}
 
@@ -209,7 +212,7 @@ func (f Function) ExecCode() string {
 		if !arg.Optional {
 			continue
 		}
-		parseargs += fmt.Sprintf(`
+		_, _ = fmt.Fprintf(&parseargs, `
 				var arg%d *%s`, x, arg.Type)
 	}
 
@@ -223,7 +226,7 @@ func (f Function) ExecCode() string {
 			}
 		}
 
-		parseargs += fmt.Sprintf(`
+		_, _ = fmt.Fprint(&parseargs, `
 				for x < len(args.Args) && _strings.HasPrefix(args.Args[x], "-") {
 					_optArg := args.Args[x]
 					_eqIdx := _strings.Index(_optArg, "=")
@@ -233,11 +236,11 @@ func (f Function) ExecCode() string {
 						switch _optName {`)
 		// Generate cases for each bool optional arg
 		for _, bname := range boolOptNames {
-			parseargs += fmt.Sprintf(`
+			_, _ = fmt.Fprintf(&parseargs, `
 						case %q:
 							_optVal = "true"`, bname)
 		}
-		parseargs += fmt.Sprintf(`
+		_, _ = fmt.Fprintf(&parseargs, `
 						default:
 							logger.Printf("invalid option %%q for target \"%s\", expected -name=value format\n", _optArg)
 							os.Exit(2)
@@ -254,12 +257,12 @@ func (f Function) ExecCode() string {
 			lowerName := strings.ToLower(arg.Name)
 			switch arg.Type {
 			case "string":
-				parseargs += fmt.Sprintf(`
+				_, _ = fmt.Fprintf(&parseargs, `
 					case %q:
 						_tmp%d := _optVal
 						arg%d = &_tmp%d`, lowerName, x, x, x)
 			case "int":
-				parseargs += fmt.Sprintf(`
+				_, _ = fmt.Fprintf(&parseargs, `
 					case %q:
 						_tmp%d, err := strconv.Atoi(_optVal)
 						if err != nil {
@@ -268,7 +271,7 @@ func (f Function) ExecCode() string {
 						}
 						arg%d = &_tmp%d`, lowerName, x, x, x)
 			case "float64":
-				parseargs += fmt.Sprintf(`
+				_, _ = fmt.Fprintf(&parseargs, `
 					case %q:
 						_tmp%d, err := strconv.ParseFloat(_optVal, 64)
 						if err != nil {
@@ -277,7 +280,7 @@ func (f Function) ExecCode() string {
 						}
 						arg%d = &_tmp%d`, lowerName, x, x, x)
 			case "bool":
-				parseargs += fmt.Sprintf(`
+				_, _ = fmt.Fprintf(&parseargs, `
 					case %q:
 						_tmp%d, err := strconv.ParseBool(_optVal)
 						if err != nil {
@@ -286,7 +289,7 @@ func (f Function) ExecCode() string {
 						}
 						arg%d = &_tmp%d`, lowerName, x, x, x)
 			case "time.Duration":
-				parseargs += fmt.Sprintf(`
+				_, _ = fmt.Fprintf(&parseargs, `
 					case %q:
 						_tmp%d, err := time.ParseDuration(_optVal)
 						if err != nil {
@@ -294,9 +297,11 @@ func (f Function) ExecCode() string {
 							os.Exit(2)
 						}
 						arg%d = &_tmp%d`, lowerName, x, x, x)
+			default:
+				// unsupported type, skip
 			}
 		}
-		parseargs += fmt.Sprintf(`
+		_, _ = fmt.Fprintf(&parseargs, `
 					default:
 						logger.Printf("unknown option %%q for target \"%s\"\n", _optName)
 						os.Exit(2)
@@ -305,7 +310,7 @@ func (f Function) ExecCode() string {
 				}`, f.TargetName())
 	}
 
-	out := parseargs + `
+	out := parseargs.String() + `
 				wrapFn := func(ctx context.Context) error {
 					`
 	if f.IsError {
@@ -413,13 +418,14 @@ func Package(path string, files []string) (*PkgInfo, error) {
 
 	hasDupes, names := checkDupeTargets(pi)
 	if hasDupes {
-		msg := "Build targets must be case insensitive, thus the following targets conflict:\n"
+		var msg strings.Builder
+		_, _ = fmt.Fprint(&msg, "Build targets must be case insensitive, thus the following targets conflict:\n")
 		for _, v := range names {
 			if len(v) > 1 {
-				msg += "  " + strings.Join(v, ", ") + "\n"
+				_, _ = fmt.Fprint(&msg, "  "+strings.Join(v, ", ")+"\n")
 			}
 		}
-		return nil, errors.New(msg)
+		return nil, errors.New(msg.String())
 	}
 
 	return pi, nil
@@ -472,7 +478,7 @@ func getImport(gocmd, importpath, alias string) (*Import, error) {
 	return &Import{Alias: alias, Name: name, Path: importpath, Info: *info}, nil
 }
 
-// Import represents the data about a mage:import package
+// Import represents the data about a mage:import package.
 type Import struct {
 	Alias      string
 	Name       string
@@ -481,7 +487,7 @@ type Import struct {
 	Info       PkgInfo
 }
 
-var _ sort.Interface = (Imports)(nil)
+var _ sort.Interface = Imports(nil)
 
 // Imports implements sort interface to optimize compiled output with
 // deterministic generated mainfile.
@@ -621,14 +627,15 @@ func getImportPath(imp *ast.ImportSpec) (path, alias string, ok bool) {
 	trailingVals := getImportPathFromCommentGroup(imp.Comment)
 
 	var vals []string
-	if len(leadingVals) > 0 {
+	switch {
+	case len(leadingVals) > 0:
 		vals = leadingVals
 		if len(trailingVals) > 0 {
 			log.Println("warning:", importTag, "specified both before and after, picking first")
 		}
-	} else if len(trailingVals) > 0 {
+	case len(trailingVals) > 0:
 		vals = trailingVals
-	} else {
+	default:
 		return "", "", false
 	}
 	path, ok = lit2string(imp.Path)
@@ -728,7 +735,10 @@ func setDefault(pi *PkgInfo) {
 			if name != "Default" {
 				continue
 			}
-			spec := v.Decl.Specs[x].(*ast.ValueSpec)
+			spec, ok := v.Decl.Specs[x].(*ast.ValueSpec)
+			if !ok {
+				continue
+			}
 			if len(spec.Values) != 1 {
 				log.Println("warning: default declaration has multiple values")
 			}
@@ -896,7 +906,7 @@ func getPackage(path string, files []string, fset *token.FileSet) (*ast.Package,
 
 	pkgs, err := parser.ParseDir(fset, path, filter, parser.ParseComments)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse directory: %v", err)
+		return nil, fmt.Errorf("failed to parse directory: %w", err)
 	}
 
 	switch len(pkgs) {
@@ -943,11 +953,6 @@ func hasContextParam(ft *ast.FuncType) (bool, error) {
 		return false, errors.New("ETOOMANYCONTEXTS")
 	}
 	return true, nil
-}
-
-func hasVoidReturn(ft *ast.FuncType) bool {
-	res := ft.Results
-	return res.NumFields() == 0
 }
 
 func hasErrorReturn(ft *ast.FuncType) (bool, error) {
@@ -1010,7 +1015,7 @@ func funcType(ft *ast.FuncType) (*Function, error) {
 }
 
 func toOneLine(s string) string {
-	return strings.TrimSpace(strings.Replace(s, "\n", " ", -1))
+	return strings.TrimSpace(strings.ReplaceAll(s, "\n", " "))
 }
 
 var argTypes = map[string]string{

@@ -2,17 +2,18 @@ package mage
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"debug/macho"
 	"debug/pe"
 	"encoding/hex"
+	"errors"
 	"flag"
 	"fmt"
 	"go/build"
 	"go/parser"
 	"go/token"
 	"io"
-	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -35,13 +36,13 @@ const testExeEnv = "MAGE_TEST_STRING"
 func TestMain(m *testing.M) {
 	if s := os.Getenv(testExeEnv); s != "" {
 		_, _ = fmt.Fprint(os.Stdout, s)
-		os.Exit(0)
+		return
 	}
 	code, err := runmain(m)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(err) //nolint:revive // complex TestMain needs explicit error handling
 	}
-	os.Exit(code)
+	os.Exit(code) //nolint:revive // complex TestMain needs explicit exit with runmain code
 }
 
 func runmain(m *testing.M) (int, error) {
@@ -73,20 +74,25 @@ func runmain(m *testing.M) (int, error) {
 	if err := os.Unsetenv(mg.TargetColorEnv); err != nil {
 		return 0, err
 	}
-	resetTerm()
+	if err := resetTerm(); err != nil {
+		return 0, err
+	}
 	return m.Run(), nil
 }
 
-func resetTerm() {
+func resetTerm() error {
 	if term, exists := os.LookupEnv("TERM"); exists {
 		log.Printf("Current terminal: %s", term)
 		// unset TERM env var in order to disable color output to make the tests simpler
 		// there is a specific test for colorized output, so all the other tests can use non-colorized one
 		if err := os.Unsetenv("TERM"); err != nil {
-			log.Fatal(err)
+			return fmt.Errorf("failed to unset TERM: %w", err)
 		}
 	}
-	os.Setenv(mg.EnableColorEnv, "false")
+	if err := os.Setenv(mg.EnableColorEnv, "false"); err != nil {
+		return fmt.Errorf("failed to set %s: %w", mg.EnableColorEnv, err)
+	}
+	return nil
 }
 
 func TestTransitiveDepCache(t *testing.T) {
@@ -193,10 +199,9 @@ func TestTransitiveHashFast(t *testing.T) {
 }
 
 func TestListMagefilesMain(t *testing.T) {
-	buf := &bytes.Buffer{}
-	files, err := Magefiles("testdata/mixed_main_files", "", "", "go", buf, false, false)
+	files, err := Magefiles("testdata/mixed_main_files", "", "", false)
 	if err != nil {
-		t.Errorf("error from magefile list: %v: %s", err, buf)
+		t.Errorf("error from magefile list: %v", err)
 	}
 	expected := []string{
 		filepath.FromSlash("testdata/mixed_main_files/mage_helpers.go"),
@@ -208,16 +213,14 @@ func TestListMagefilesMain(t *testing.T) {
 }
 
 func TestListMagefilesIgnoresGOOS(t *testing.T) {
-	buf := &bytes.Buffer{}
 	if runtime.GOOS == "windows" {
 		t.Setenv("GOOS", "linux")
 	} else {
 		t.Setenv("GOOS", "windows")
 	}
-	defer t.Setenv("GOOS", runtime.GOOS)
-	files, err := Magefiles("testdata/goos_magefiles", "", "", "go", buf, false, false)
+	files, err := Magefiles("testdata/goos_magefiles", "", "", false)
 	if err != nil {
-		t.Errorf("error from magefile list: %v: %s", err, buf)
+		t.Errorf("error from magefile list: %v", err)
 	}
 	var expected []string
 	if runtime.GOOS == "windows" {
@@ -231,7 +234,6 @@ func TestListMagefilesIgnoresGOOS(t *testing.T) {
 }
 
 func TestListMagefilesIgnoresRespectsGOOSArg(t *testing.T) {
-	buf := &bytes.Buffer{}
 	var goos string
 	if runtime.GOOS == "windows" {
 		goos = "linux"
@@ -239,9 +241,9 @@ func TestListMagefilesIgnoresRespectsGOOSArg(t *testing.T) {
 		goos = "windows"
 	}
 	// Set GOARCH as amd64 because windows is not on all non-x86 architectures.
-	files, err := Magefiles("testdata/goos_magefiles", goos, "amd64", "go", buf, false, false)
+	files, err := Magefiles("testdata/goos_magefiles", goos, "amd64", false)
 	if err != nil {
-		t.Errorf("error from magefile list: %v: %s", err, buf)
+		t.Errorf("error from magefile list: %v", err)
 	}
 	var expected []string
 	if goos == "windows" {
@@ -255,11 +257,7 @@ func TestListMagefilesIgnoresRespectsGOOSArg(t *testing.T) {
 }
 
 func TestCompileDiffGoosGoarch(t *testing.T) {
-	target, err := ioutil.TempDir("./testdata", "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(target)
+	target := t.TempDir()
 
 	// intentionally choose an arch and os to build that are not our current one.
 
@@ -273,13 +271,14 @@ func TestCompileDiffGoosGoarch(t *testing.T) {
 	}
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
+
+	outputFile := filepath.Join(target, "output")
 	inv := Invocation{
-		Stderr: stderr,
-		Stdout: stdout,
-		Debug:  true,
-		Dir:    "testdata",
-		// this is relative to the Dir above
-		CompileOut: filepath.Join(".", filepath.Base(target), "output"),
+		Stderr:     stderr,
+		Stdout:     stdout,
+		Debug:      true,
+		Dir:        "testdata",
+		CompileOut: outputFile,
 		GOOS:       goos,
 		GOARCH:     goarch,
 	}
@@ -287,17 +286,17 @@ func TestCompileDiffGoosGoarch(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("got code %v, err: %s", code, stderr)
 	}
-	os, arch, err := fileData(filepath.Join(target, "output"))
+	exeOS, arch, err := fileData(outputFile)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if goos == "windows" {
-		if os != winExe {
+		if exeOS != winExe {
 			t.Error("ran with GOOS=windows but did not produce a windows exe")
 		}
 	} else {
-		if os != macExe {
-			t.Error("ran with GOOS=darwin but did not a mac exe")
+		if exeOS != macExe {
+			t.Error("ran with GOOS=darwin but did not produce a mac exe")
 		}
 	}
 	if goarch == "amd64" {
@@ -306,16 +305,15 @@ func TestCompileDiffGoosGoarch(t *testing.T) {
 		}
 	} else {
 		if arch != arch32 {
-			t.Error("rand with GOARCH=386 but did not produce a 32 bit exe")
+			t.Error("ran with GOARCH=386 but did not produce a 32 bit exe")
 		}
 	}
 }
 
 func TestListMagefilesLib(t *testing.T) {
-	buf := &bytes.Buffer{}
-	files, err := Magefiles("testdata/mixed_lib_files", "", "", "go", buf, false, false)
+	files, err := Magefiles("testdata/mixed_lib_files", "", "", false)
 	if err != nil {
-		t.Errorf("error from magefile list: %v: %s", err, buf)
+		t.Fatalf("error from magefile list: %v", err)
 	}
 	expected := []string{
 		filepath.FromSlash("testdata/mixed_lib_files/mage_helpers.go"),
@@ -327,7 +325,7 @@ func TestListMagefilesLib(t *testing.T) {
 }
 
 func TestMixedMageImports(t *testing.T) {
-	resetTerm()
+	_ = resetTerm()
 	stderr := &bytes.Buffer{}
 	stdout := &bytes.Buffer{}
 	inv := Invocation{
@@ -348,7 +346,7 @@ func TestMixedMageImports(t *testing.T) {
 }
 
 func TestMagefilesFolder(t *testing.T) {
-	resetTerm()
+	_ = resetTerm()
 	wd, err := os.Getwd()
 	t.Log(wd)
 	if err != nil {
@@ -380,7 +378,7 @@ func TestMagefilesFolder(t *testing.T) {
 }
 
 func TestMagefilesFolderMixedWithMagefiles(t *testing.T) {
-	resetTerm()
+	_ = resetTerm()
 	wd, err := os.Getwd()
 	t.Log(wd)
 	if err != nil {
@@ -418,7 +416,7 @@ func TestMagefilesFolderMixedWithMagefiles(t *testing.T) {
 }
 
 func TestUntaggedMagefilesFolder(t *testing.T) {
-	resetTerm()
+	_ = resetTerm()
 	wd, err := os.Getwd()
 	t.Log(wd)
 	if err != nil {
@@ -450,7 +448,7 @@ func TestUntaggedMagefilesFolder(t *testing.T) {
 }
 
 func TestMixedTaggingMagefilesFolder(t *testing.T) {
-	resetTerm()
+	_ = resetTerm()
 	wd, err := os.Getwd()
 	t.Log(wd)
 	if err != nil {
@@ -482,7 +480,7 @@ func TestMixedTaggingMagefilesFolder(t *testing.T) {
 }
 
 func TestSetDirWithMagefilesFolder(t *testing.T) {
-	resetTerm()
+	_ = resetTerm()
 
 	stderr := &bytes.Buffer{}
 	stdout := &bytes.Buffer{}
@@ -504,7 +502,7 @@ func TestSetDirWithMagefilesFolder(t *testing.T) {
 }
 
 func TestGoRun(t *testing.T) {
-	c := exec.Command("go", "run", "main.go")
+	c := exec.CommandContext(context.Background(), "go", "run", "main.go")
 	c.Dir = "./testdata"
 	c.Env = os.Environ()
 	b, err := c.CombinedOutput()
@@ -553,26 +551,24 @@ func TestVerbose(t *testing.T) {
 }
 
 func TestVerboseEnv(t *testing.T) {
-	os.Setenv("MAGEFILE_VERBOSE", "true")
-	defer os.Unsetenv("MAGEFILE_VERBOSE")
+	t.Setenv("MAGEFILE_VERBOSE", "true")
 	stdout := &bytes.Buffer{}
-	inv, _, err := Parse(ioutil.Discard, stdout, []string{})
+	inv, _, err := Parse(io.Discard, stdout, []string{})
 	if err != nil {
 		t.Fatal("unexpected error", err)
 	}
 
 	expected := true
 
-	if inv.Verbose != true {
+	if !inv.Verbose {
 		t.Fatalf("expected %t, but got %t ", expected, inv.Verbose)
 	}
 }
 
 func TestVerboseFalseEnv(t *testing.T) {
-	os.Setenv("MAGEFILE_VERBOSE", "0")
-	defer os.Unsetenv("MAGEFILE_VERBOSE")
+	t.Setenv("MAGEFILE_VERBOSE", "0")
 	stdout := &bytes.Buffer{}
-	code := ParseAndRun(ioutil.Discard, stdout, nil, []string{"-d", "testdata", "testverbose"})
+	code := ParseAndRun(io.Discard, stdout, nil, []string{"-d", "testdata", "testverbose"})
 	if code != 0 {
 		t.Fatal("unexpected code", code)
 	}
@@ -587,7 +583,7 @@ func TestList(t *testing.T) {
 	inv := Invocation{
 		Dir:    "./testdata/list",
 		Stdout: stdout,
-		Stderr: ioutil.Discard,
+		Stderr: io.Discard,
 		List:   true,
 	}
 
@@ -629,8 +625,8 @@ var terminals = []struct {
 }
 
 func TestListWithColor(t *testing.T) {
-	os.Setenv(mg.EnableColorEnv, "true")
-	os.Setenv(mg.TargetColorEnv, mg.Cyan.String())
+	t.Setenv(mg.EnableColorEnv, "true")
+	t.Setenv(mg.TargetColorEnv, mg.Cyan.String())
 
 	expectedPlainText := `
 This is a comment on the package which should get turned into output with the list of targets.
@@ -656,13 +652,13 @@ Targets:
 
 	for _, terminal := range terminals {
 		t.Run(terminal.code, func(t *testing.T) {
-			os.Setenv("TERM", terminal.code)
+			t.Setenv("TERM", terminal.code)
 
 			stdout := &bytes.Buffer{}
 			inv := Invocation{
 				Dir:    "./testdata/list",
 				Stdout: stdout,
-				Stderr: ioutil.Discard,
+				Stderr: io.Discard,
 				List:   true,
 			}
 
@@ -688,7 +684,7 @@ Targets:
 }
 
 func TestNoArgNoDefaultList(t *testing.T) {
-	resetTerm()
+	_ = resetTerm()
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
 	inv := Invocation{
@@ -722,11 +718,8 @@ func TestIgnoreDefault(t *testing.T) {
 		Stdout: stdout,
 		Stderr: stderr,
 	}
-	defer os.Unsetenv(mg.IgnoreDefaultEnv)
-	if err := os.Setenv(mg.IgnoreDefaultEnv, "1"); err != nil {
-		t.Fatal(err)
-	}
-	resetTerm()
+	t.Setenv(mg.IgnoreDefaultEnv, "1")
+	_ = resetTerm()
 
 	code := Invoke(inv)
 	if code != 0 {
@@ -754,7 +747,7 @@ func TestTargetError(t *testing.T) {
 	stderr := &bytes.Buffer{}
 	inv := Invocation{
 		Dir:    "./testdata",
-		Stdout: ioutil.Discard,
+		Stdout: io.Discard,
 		Stderr: stderr,
 		Args:   []string{"returnsnonnilerror"},
 	}
@@ -774,7 +767,7 @@ func TestStdinCopy(t *testing.T) {
 	stdin := strings.NewReader("hi!")
 	inv := Invocation{
 		Dir:    "./testdata",
-		Stderr: ioutil.Discard,
+		Stderr: io.Discard,
 		Stdout: stdout,
 		Stdin:  stdin,
 		Args:   []string{"CopyStdin"},
@@ -794,7 +787,7 @@ func TestTargetPanics(t *testing.T) {
 	stderr := &bytes.Buffer{}
 	inv := Invocation{
 		Dir:    "./testdata",
-		Stdout: ioutil.Discard,
+		Stdout: io.Discard,
 		Stderr: stderr,
 		Args:   []string{"panics"},
 	}
@@ -813,7 +806,7 @@ func TestPanicsErr(t *testing.T) {
 	stderr := &bytes.Buffer{}
 	inv := Invocation{
 		Dir:    "./testdata",
-		Stdout: ioutil.Discard,
+		Stdout: io.Discard,
 		Stderr: stderr,
 		Args:   []string{"panicserr"},
 	}
@@ -848,11 +841,11 @@ func TestHashTemplate(t *testing.T) {
 	}
 }
 
-// Test if the -keep flag does keep the mainfile around after running
+// Test if the -keep flag does keep the mainfile around after running.
 func TestKeepFlag(t *testing.T) {
 	buildFile := fmt.Sprintf("./testdata/keep_flag/%s", mainfile)
-	os.Remove(buildFile)
-	defer os.Remove(buildFile)
+	_ = os.Remove(buildFile)
+	defer func() { _ = os.Remove(buildFile) }()
 	w := tLogWriter{t}
 
 	inv := Invocation{
@@ -1006,7 +999,7 @@ func TestBadSecondTargets(t *testing.T) {
 
 func TestParse(t *testing.T) {
 	buf := &bytes.Buffer{}
-	inv, cmd, err := Parse(ioutil.Discard, buf, []string{"-v", "-debug", "-gocmd=foo", "-d", "dir", "build", "deploy"})
+	inv, cmd, err := Parse(io.Discard, buf, []string{"-v", "-debug", "-gocmd=foo", "-d", "dir", "build", "deploy"})
 	if err != nil {
 		t.Fatal("unexpected error", err)
 	}
@@ -1016,7 +1009,7 @@ func TestParse(t *testing.T) {
 	if cmd == Version {
 		t.Error("showVersion should be false but was true")
 	}
-	if inv.Debug != true {
+	if !inv.Debug {
 		t.Error("debug should be true")
 	}
 	if inv.Dir != "dir" {
@@ -1076,7 +1069,7 @@ func TestSetWorkingDir(t *testing.T) {
 	}
 }
 
-// Test the timeout option
+// Test the timeout option.
 func TestTimeout(t *testing.T) {
 	stderr := &bytes.Buffer{}
 	stdout := &bytes.Buffer{}
@@ -1085,7 +1078,7 @@ func TestTimeout(t *testing.T) {
 		Stdout:  stdout,
 		Stderr:  stderr,
 		Args:    []string{"timeout"},
-		Timeout: time.Duration(100 * time.Millisecond),
+		Timeout: 100 * time.Millisecond,
 	}
 	code := Invoke(inv)
 	if code != 1 {
@@ -1101,13 +1094,13 @@ func TestTimeout(t *testing.T) {
 
 func TestParseHelp(t *testing.T) {
 	buf := &bytes.Buffer{}
-	_, _, err := Parse(ioutil.Discard, buf, []string{"-h"})
-	if err != flag.ErrHelp {
+	_, _, err := Parse(io.Discard, buf, []string{"-h"})
+	if !errors.Is(err, flag.ErrHelp) {
 		t.Fatal("unexpected error", err)
 	}
 	buf2 := &bytes.Buffer{}
-	_, _, err = Parse(ioutil.Discard, buf2, []string{"--help"})
-	if err != flag.ErrHelp {
+	_, _, err = Parse(io.Discard, buf2, []string{"--help"})
+	if !errors.Is(err, flag.ErrHelp) {
 		t.Fatal("unexpected error", err)
 	}
 	s := buf.String()
@@ -1122,7 +1115,7 @@ func TestHelpTarget(t *testing.T) {
 	inv := Invocation{
 		Dir:    "./testdata",
 		Stdout: stdout,
-		Stderr: ioutil.Discard,
+		Stderr: io.Discard,
 		Args:   []string{"panics"},
 		Help:   true,
 	}
@@ -1142,7 +1135,7 @@ func TestHelpAlias(t *testing.T) {
 	inv := Invocation{
 		Dir:    "./testdata/alias",
 		Stdout: stdout,
-		Stderr: ioutil.Discard,
+		Stderr: io.Discard,
 		Args:   []string{"status"},
 		Help:   true,
 	}
@@ -1158,7 +1151,7 @@ func TestHelpAlias(t *testing.T) {
 	inv = Invocation{
 		Dir:    "./testdata/alias",
 		Stdout: stdout,
-		Stderr: ioutil.Discard,
+		Stderr: io.Discard,
 		Args:   []string{"checkout"},
 		Help:   true,
 	}
@@ -1181,7 +1174,7 @@ func TestAlias(t *testing.T) {
 	inv := Invocation{
 		Dir:    "testdata/alias",
 		Stdout: stdout,
-		Stderr: ioutil.Discard,
+		Stderr: io.Discard,
 		Args:   []string{"status"},
 		Debug:  true,
 	}
@@ -1208,10 +1201,10 @@ func TestAlias(t *testing.T) {
 
 func TestInvalidAlias(t *testing.T) {
 	stderr := &bytes.Buffer{}
-	log.SetOutput(ioutil.Discard)
+	log.SetOutput(io.Discard)
 	inv := Invocation{
 		Dir:    "./testdata/invalid_alias",
-		Stdout: ioutil.Discard,
+		Stdout: io.Discard,
 		Stderr: stderr,
 		Args:   []string{"co"},
 	}
@@ -1243,23 +1236,16 @@ func TestCompiledFlags(t *testing.T) {
 	stderr := &bytes.Buffer{}
 	stdout := &bytes.Buffer{}
 	dir := "./testdata/compiled"
-	compileDir, err := ioutil.TempDir(dir, "")
-	if err != nil {
-		t.Fatal(err)
-	}
+	compileDir := t.TempDir()
 	name := filepath.Join(compileDir, "mage_out")
 	if runtime.GOOS == "windows" {
 		name += ".exe"
 	}
-	// The CompileOut directory is relative to the
-	// invocation directory, so chop off the invocation dir.
-	outName := "./" + name[len(dir)-1:]
-	defer os.RemoveAll(compileDir)
 	inv := Invocation{
 		Dir:        dir,
 		Stdout:     stdout,
 		Stderr:     stderr,
-		CompileOut: outName,
+		CompileOut: name,
 	}
 	code := Invoke(inv)
 	if code != 0 {
@@ -1269,12 +1255,12 @@ func TestCompiledFlags(t *testing.T) {
 	run := func(stdout, stderr *bytes.Buffer, filename string, args ...string) error {
 		stderr.Reset()
 		stdout.Reset()
-		cmd := exec.Command(filename, args...)
+		cmd := exec.CommandContext(context.Background(), filename, args...)
 		cmd.Env = os.Environ()
 		cmd.Stderr = stderr
 		cmd.Stdout = stdout
 		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("running '%s %s' failed with: %v\nstdout: %s\nstderr: %s",
+			return fmt.Errorf("running '%s %s' failed with: %w\nstdout: %s\nstderr: %s",
 				filename, strings.Join(args, " "), err, stdout, stderr)
 		}
 		return nil
@@ -1315,9 +1301,9 @@ func TestCompiledFlags(t *testing.T) {
 	}
 
 	// pass flag -t 1ms
-	err = run(stdout, stderr, name, "-t", "1ms", "sleep")
+	err := run(stdout, stderr, name, "-t", "1ms", "sleep")
 	if err == nil {
-		t.Fatalf("expected an error because of timeout")
+		t.Fatal("expected an error because of timeout")
 	}
 	got = stderr.String()
 	want = "context deadline exceeded"
@@ -1330,23 +1316,16 @@ func TestCompiledEnvironmentVars(t *testing.T) {
 	stderr := &bytes.Buffer{}
 	stdout := &bytes.Buffer{}
 	dir := "./testdata/compiled"
-	compileDir, err := ioutil.TempDir(dir, "")
-	if err != nil {
-		t.Fatal(err)
-	}
+	compileDir := t.TempDir()
 	name := filepath.Join(compileDir, "mage_out")
 	if runtime.GOOS == "windows" {
 		name += ".exe"
 	}
-	// The CompileOut directory is relative to the
-	// invocation directory, so chop off the invocation dir.
-	outName := "./" + name[len(dir)-1:]
-	defer os.RemoveAll(compileDir)
 	inv := Invocation{
 		Dir:        dir,
 		Stdout:     stdout,
 		Stderr:     stderr,
-		CompileOut: outName,
+		CompileOut: name,
 	}
 	code := Invoke(inv)
 	if code != 0 {
@@ -1356,12 +1335,12 @@ func TestCompiledEnvironmentVars(t *testing.T) {
 	run := func(stdout, stderr *bytes.Buffer, filename string, envval string, args ...string) error {
 		stderr.Reset()
 		stdout.Reset()
-		cmd := exec.Command(filename, args...)
+		cmd := exec.CommandContext(context.Background(), filename, args...)
 		cmd.Env = []string{envval}
 		cmd.Stderr = stderr
 		cmd.Stdout = stdout
 		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("running '%s %s' failed with: %v\nstdout: %s\nstderr: %s",
+			return fmt.Errorf("running '%s %s' failed with: %w\nstdout: %s\nstderr: %s",
 				filename, strings.Join(args, " "), err, stdout, stderr)
 		}
 		return nil
@@ -1407,9 +1386,9 @@ func TestCompiledEnvironmentVars(t *testing.T) {
 		t.Errorf("got %q, does not contain %q", got, want)
 	}
 
-	err = run(stdout, stderr, name, "MAGEFILE_TIMEOUT=1ms", "sleep")
+	err := run(stdout, stderr, name, "MAGEFILE_TIMEOUT=1ms", "sleep")
 	if err == nil {
-		t.Fatalf("expected an error because of timeout")
+		t.Fatal("expected an error because of timeout")
 	}
 	got = stderr.String()
 	want = "context deadline exceeded"
@@ -1422,23 +1401,17 @@ func TestCompiledVerboseFlag(t *testing.T) {
 	stderr := &bytes.Buffer{}
 	stdout := &bytes.Buffer{}
 	dir := "./testdata/compiled"
-	compileDir, err := ioutil.TempDir(dir, "")
-	if err != nil {
-		t.Fatal(err)
-	}
+	compileDir := t.TempDir()
+
 	filename := filepath.Join(compileDir, "mage_out")
 	if runtime.GOOS == "windows" {
 		filename += ".exe"
 	}
-	// The CompileOut directory is relative to the
-	// invocation directory, so chop off the invocation dir.
-	outName := "./" + filename[len(dir)-1:]
-	defer os.RemoveAll(compileDir)
 	inv := Invocation{
 		Dir:        dir,
 		Stdout:     stdout,
 		Stderr:     stderr,
-		CompileOut: outName,
+		CompileOut: filename,
 	}
 	code := Invoke(inv)
 	if code != 0 {
@@ -1448,7 +1421,7 @@ func TestCompiledVerboseFlag(t *testing.T) {
 	run := func(verboseEnv string, args ...string) string {
 		var stdout, stderr bytes.Buffer
 		args = append(args, "printverboseflag")
-		cmd := exec.Command(filename, args...)
+		cmd := exec.CommandContext(context.Background(), filename, args...)
 		cmd.Env = []string{verboseEnv}
 		cmd.Stderr = &stderr
 		cmd.Stdout = &stdout
@@ -1488,20 +1461,13 @@ func TestSignals(t *testing.T) {
 	stderr := &bytes.Buffer{}
 	stdout := &bytes.Buffer{}
 	dir := "./testdata/signals"
-	compileDir, err := ioutil.TempDir(dir, "")
-	if err != nil {
-		t.Fatal(err)
-	}
+	compileDir := t.TempDir()
 	name := filepath.Join(compileDir, "mage_out")
-	// The CompileOut directory is relative to the
-	// invocation directory, so chop off the invocation dir.
-	outName := "./" + name[len(dir)-1:]
-	defer os.RemoveAll(compileDir)
 	inv := Invocation{
 		Dir:        dir,
 		Stdout:     stdout,
 		Stderr:     stderr,
-		CompileOut: outName,
+		CompileOut: name,
 	}
 	code := Invoke(inv)
 	if code != 0 {
@@ -1511,23 +1477,23 @@ func TestSignals(t *testing.T) {
 	run := func(stdout, stderr *bytes.Buffer, filename string, target string, signals ...syscall.Signal) error {
 		stderr.Reset()
 		stdout.Reset()
-		cmd := exec.Command(filename, target)
+		cmd := exec.CommandContext(context.Background(), filename, target)
 		cmd.Stderr = stderr
 		cmd.Stdout = stdout
 		if err := cmd.Start(); err != nil {
-			return fmt.Errorf("running '%s %s' failed with: %v\nstdout: %s\nstderr: %s",
+			return fmt.Errorf("running '%s %s' failed with: %w\nstdout: %s\nstderr: %s",
 				filename, target, err, stdout, stderr)
 		}
 		pid := cmd.Process.Pid
 		go func() {
 			time.Sleep(time.Millisecond * 500)
 			for _, s := range signals {
-				syscall.Kill(pid, s)
+				_ = syscall.Kill(pid, s)
 				time.Sleep(time.Millisecond * 50)
 			}
 		}()
 		if err := cmd.Wait(); err != nil {
-			return fmt.Errorf("running '%s %s' failed with: %v\nstdout: %s\nstderr: %s",
+			return fmt.Errorf("running '%s %s' failed with: %w\nstdout: %s\nstderr: %s",
 				filename, target, err, stdout, stderr)
 		}
 		return nil
@@ -1571,7 +1537,7 @@ func TestSignals(t *testing.T) {
 	}
 
 	if err := run(stdout, stderr, name, "ignoresSignals", syscall.SIGINT, syscall.SIGINT); err == nil {
-		t.Fatalf("expected an error because of force kill")
+		t.Fatal("expected an error because of force kill")
 	}
 	got = stderr.String()
 	want = "cancelling mage targets, waiting up to 5 seconds for cleanup...\nexiting mage\nError: exit forced\n"
@@ -1580,7 +1546,7 @@ func TestSignals(t *testing.T) {
 	}
 
 	if err := run(stdout, stderr, name, "ignoresSignals", syscall.SIGINT); err == nil {
-		t.Fatalf("expected an error because of force kill")
+		t.Fatal("expected an error because of force kill")
 	}
 	got = stderr.String()
 	want = "cancelling mage targets, waiting up to 5 seconds for cleanup...\nError: cleanup timeout exceeded\n"
@@ -1591,10 +1557,7 @@ func TestSignals(t *testing.T) {
 
 func TestCompiledDeterministic(t *testing.T) {
 	dir := "./testdata/compiled"
-	compileDir, err := ioutil.TempDir(dir, "")
-	if err != nil {
-		t.Fatal(err)
-	}
+	compileDir := t.TempDir()
 
 	var exp string
 	outFile := filepath.Join(dir, mainfile)
@@ -1609,19 +1572,13 @@ func TestCompiledDeterministic(t *testing.T) {
 				filename += ".exe"
 			}
 
-			// The CompileOut directory is relative to the
-			// invocation directory, so chop off the invocation dir.
-			outName := "./" + filename[len(dir)-1:]
-			defer os.RemoveAll(compileDir)
-			defer os.Remove(outFile)
-
 			inv := Invocation{
 				Stderr:     os.Stderr,
 				Stdout:     os.Stdout,
 				Verbose:    true,
 				Keep:       true,
 				Dir:        dir,
-				CompileOut: outName,
+				CompileOut: filename,
 			}
 
 			code := Invoke(inv)
@@ -1657,13 +1614,13 @@ func TestClean(t *testing.T) {
 	if err := os.RemoveAll(mg.CacheDir()); err != nil {
 		t.Error("error removing cache dir:", err)
 	}
-	code := ParseAndRun(ioutil.Discard, ioutil.Discard, &bytes.Buffer{}, []string{"-clean"})
+	code := ParseAndRun(io.Discard, io.Discard, &bytes.Buffer{}, []string{"-clean"})
 	if code != 0 {
 		t.Errorf("expected 0, but got %v", code)
 	}
 
 	TestAlias(t) // make sure we've got something in the CACHE_DIR
-	files, err := ioutil.ReadDir(mg.CacheDir())
+	files, err := os.ReadDir(mg.CacheDir())
 	if err != nil {
 		t.Error("issue reading file:", err)
 	}
@@ -1672,7 +1629,7 @@ func TestClean(t *testing.T) {
 		t.Error("Need at least 1 cached binaries to test --clean")
 	}
 
-	_, cmd, err := Parse(ioutil.Discard, ioutil.Discard, []string{"-clean"})
+	_, cmd, err := Parse(io.Discard, io.Discard, []string{"-clean"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1680,12 +1637,12 @@ func TestClean(t *testing.T) {
 		t.Errorf("Expected 'clean' command but got %v", cmd)
 	}
 	buf := &bytes.Buffer{}
-	code = ParseAndRun(ioutil.Discard, buf, &bytes.Buffer{}, []string{"-clean"})
+	code = ParseAndRun(io.Discard, buf, &bytes.Buffer{}, []string{"-clean"})
 	if code != 0 {
 		t.Fatalf("expected 0, but got %v: %s", code, buf)
 	}
 
-	infos, err := ioutil.ReadDir(mg.CacheDir())
+	infos, err := os.ReadDir(mg.CacheDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1705,16 +1662,13 @@ func TestClean(t *testing.T) {
 func TestGoCmd(t *testing.T) {
 	textOutput := "TestGoCmd"
 	t.Setenv(testExeEnv, textOutput)
-
+	dir := t.TempDir()
 	// fake out the compiled file, since the code checks for it.
-	f, err := ioutil.TempFile("", "")
+	f, err := os.CreateTemp(dir, "mage_out")
 	if err != nil {
 		t.Fatal(err)
 	}
 	name := f.Name()
-	dir := filepath.Dir(name)
-	defer os.Remove(name)
-	f.Close()
 
 	buf := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
@@ -1727,21 +1681,17 @@ func TestGoCmd(t *testing.T) {
 	}
 }
 
-var runtimeVer = regexp.MustCompile(`go1\.([0-9]+)`)
+var runtimeVer = regexp.MustCompile(`go1\.(\d+)`)
 
 func TestGoModules(t *testing.T) {
-	resetTerm()
+	_ = resetTerm()
 	matches := runtimeVer.FindStringSubmatch(runtime.Version())
 	if len(matches) < 2 || minorVer(t, matches[1]) < 11 {
 		t.Skipf("Skipping Go modules test because go version %q is less than go1.11", runtime.Version())
 	}
-	dir, err := ioutil.TempDir("", "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(dir)
+	dir := t.TempDir()
 	// beware, mage builds in go versions older than 1.17 so both build tag formats need to be present
-	err = ioutil.WriteFile(filepath.Join(dir, "magefile.go"), []byte(`//go:build mage
+	err := os.WriteFile(filepath.Join(dir, "magefile.go"), []byte(`//go:build mage
 // +build mage
 
 package main
@@ -1749,14 +1699,14 @@ package main
 func Test() {
 	print("nothing is imported here for >1.17 compatibility")
 }
-`), 0600)
+`), 0o600)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
-	cmd := exec.Command("go", "mod", "init", "app")
+	cmd := exec.CommandContext(context.Background(), "go", "mod", "init", "app")
 	cmd.Dir = dir
 	cmd.Env = os.Environ()
 	cmd.Stderr = stderr
@@ -1768,7 +1718,7 @@ func Test() {
 	stdout.Reset()
 
 	// we need to run go mod tidy, since go build will no longer auto-add dependencies.
-	cmd = exec.Command("go", "mod", "tidy")
+	cmd = exec.CommandContext(context.Background(), "go", "mod", "tidy")
 	cmd.Dir = dir
 	cmd.Env = os.Environ()
 	cmd.Stderr = stderr
@@ -1826,7 +1776,7 @@ func TestNamespace(t *testing.T) {
 	stdout := &bytes.Buffer{}
 	inv := Invocation{
 		Dir:    "./testdata/namespaces",
-		Stderr: ioutil.Discard,
+		Stderr: io.Discard,
 		Stdout: stdout,
 		Args:   []string{"ns:error"},
 	}
@@ -1844,7 +1794,7 @@ func TestNamespaceDefault(t *testing.T) {
 	stdout := &bytes.Buffer{}
 	inv := Invocation{
 		Dir:    "./testdata/namespaces",
-		Stderr: ioutil.Discard,
+		Stderr: io.Discard,
 		Stdout: stdout,
 	}
 	code := Invoke(inv)
@@ -1857,7 +1807,7 @@ func TestNamespaceDefault(t *testing.T) {
 	}
 }
 
-func TestAliasToImport(t *testing.T) {
+func TestAliasToImport(_ *testing.T) {
 }
 
 func TestWrongDependency(t *testing.T) {
@@ -1865,7 +1815,7 @@ func TestWrongDependency(t *testing.T) {
 	inv := Invocation{
 		Dir:    "./testdata/wrong_dep",
 		Stderr: stderr,
-		Stdout: ioutil.Discard,
+		Stdout: io.Discard,
 	}
 	code := Invoke(inv)
 	if code != 1 {
@@ -1880,7 +1830,7 @@ func TestWrongDependency(t *testing.T) {
 
 // Regression tests, add tests to ensure we do not regress on known issues.
 
-// TestBug508 is a regression test for: Bug: using Default with imports selects first matching func by name
+// TestBug508 is a regression test for: Bug: using Default with imports selects first matching func by name.
 func TestBug508(t *testing.T) {
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
@@ -1950,5 +1900,5 @@ func fileData(file string) (exeType, archSize, error) {
 		}
 		return macExe, arch32, nil
 	}
-	return -1, -1, fmt.Errorf("unrecognized executable format")
+	return -1, -1, errors.New("unrecognized executable format")
 }

@@ -1,3 +1,4 @@
+// Package targets defines the build targets for the mage project.
 package targets
 
 import (
@@ -27,20 +28,20 @@ func Install() error {
 	// in GOPATH environment string
 	bin, err := sh.Output(gocmd, "env", "GOBIN")
 	if err != nil {
-		return fmt.Errorf("can't determine GOBIN: %v", err)
+		return fmt.Errorf("can't determine GOBIN: %w", err)
 	}
 	if bin == "" {
 		gopath, err := sh.Output(gocmd, "env", "GOPATH")
 		if err != nil {
-			return fmt.Errorf("can't determine GOPATH: %v", err)
+			return fmt.Errorf("can't determine GOPATH: %w", err)
 		}
 		paths := strings.Split(gopath, string([]rune{os.PathListSeparator}))
 		bin = filepath.Join(paths[0], "bin")
 	}
 	// specifically don't mkdirall, if you have an invalid gopath in the first
 	// place, that's not on us to fix.
-	if err := os.Mkdir(bin, 0700); err != nil && !os.IsExist(err) {
-		return fmt.Errorf("failed to create %q: %v", bin, err)
+	if err := os.Mkdir(bin, 0o700); err != nil && !os.IsExist(err) {
+		return fmt.Errorf("failed to create %q: %w", bin, err)
 	}
 	path := filepath.Join(bin, name)
 

@@ -135,7 +135,7 @@ func TestFuncCheck(t *testing.T) {
 
 func TestF(t *testing.T) {
 	var (
-		ctxOut context.Context
+		ctxOut interface{}
 		iOut   int
 		sOut   string
 		bOut   bool
@@ -231,13 +231,13 @@ func TestFVariadic(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	fn = F(func(a string, b ...string) {}, "a", "b1", "b2")
+	fn = F(func(_ string, _ ...string) {}, "a", "b1", "b2")
 	err = fn.Run(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	fn = F(func(a ...string) {})
+	fn = F(func(_ ...string) {})
 	err = fn.Run(context.Background())
 	if err != nil {
 		t.Fatal(err)
@@ -245,12 +245,12 @@ func TestFVariadic(t *testing.T) {
 
 	func() {
 		defer func() {
-			err, _ := recover().(error)
+			err, _ := recover().(error) //nolint:revive // unchecked-type-assertion: intentional, err will be nil if not error
 			if err == nil || err.Error() != "too few arguments for target, got 0 for func(string, ...string)" {
 				t.Fatal(err)
 			}
 		}()
-		F(func(a string, b ...string) {})
+		F(func(_ string, _ ...string) {})
 	}()
 }
 
@@ -264,6 +264,6 @@ func (Foo) BareCtx(context.Context) {}
 
 func (Foo) CtxError(context.Context) error { return nil }
 
-func (Foo) CtxErrorArgs(ctx context.Context, i int, s string, b bool, d time.Duration) error {
+func (Foo) CtxErrorArgs(_ context.Context, _ int, _ string, _ bool, _ time.Duration) error {
 	return nil
 }

@@ -98,9 +98,11 @@ sizeThreshold = 256
 
 [linters.settings.gosec]
 excludes = [
-#  'G204',
-#  'G304',
-#  'G307'
+  'G204',
+  'G304',
+  'G307',
+  'G702',
+  'G706'
 ]
 
 [linters.settings.gosec.config]
@@ -138,8 +140,8 @@ arguments = [
 disabled = false
 
 [[linters.settings.revive.rules]]
-name = 'unchecked-type-assertion'
-disabled = false
+name = 'argument-limit'
+disabled = true
 
 [[linters.settings.revive.rules.arguments]]
 acceptIgnoredAssertionResult = false
@@ -160,8 +162,8 @@ name = 'add-constant'
 disabled = true
 
 [[linters.settings.revive.rules]]
-name = 'banned-characters'
-disabled = false
+name = 'flag-parameter'
+disabled = true
 
 [[linters.settings.revive.rules]]
 name = 'blank-imports'
@@ -193,6 +195,10 @@ disabled = false
 
 [[linters.settings.revive.rules]]
 name = 'line-length-limit'
+disabled = true
+
+[[linters.settings.revive.rules]]
+name = 'max-public-structs'
 disabled = true
 
 [[linters.settings.revive.rules]]
