@@ -12,8 +12,6 @@ import (
 )
 
 func TestBootstrap(t *testing.T) {
-	dir := t.TempDir()
-
 	s, err := run("go", "run", "bootstrap.go")
 	if err != nil {
 		t.Fatal(s)
