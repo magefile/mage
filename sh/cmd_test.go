@@ -91,7 +91,7 @@ func TestSettingPwd(t *testing.T) {
 		t.Fatalf("unexpected error from runner: %#v", err)
 	}
 	if !ran {
-		t.Errorf("expected ran to be true but was false.")
+		t.Error("expected ran to be true but was false.")
 	}
 	if out.String() != fmt.Sprintf("%s\n", pwd) {
 		t.Errorf("expected %s, got %q", fmt.Sprintf("%s\n", pwd), out)
@@ -101,7 +101,7 @@ func TestSettingPwd(t *testing.T) {
 func TestSettingNoPwd(t *testing.T) {
 	currentWd, err := os.Getwd()
 	if err != nil {
-		t.Errorf("Failed getting current working directory")
+		t.Errorf("Failed getting current working directory: %v", err)
 	}
 	out := &bytes.Buffer{}
 	ran, err := ExecAt(nil, out, nil, "", "pwd")
@@ -121,6 +121,6 @@ func TestSettingInvalidPwd(t *testing.T) {
 	out := &bytes.Buffer{}
 	_, err := ExecAt(nil, out, nil, pwd, "pwd")
 	if err == nil {
-		t.Fatalf("I am expected to fail because path %s does not exist", pwd)
+		t.Fatalf("Expected error because path %s does not exist", pwd)
 	}
 }
