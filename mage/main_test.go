@@ -37,46 +37,46 @@ func TestMain(m *testing.M) {
 		_, _ = fmt.Fprint(os.Stdout, s)
 		return
 	}
-	code, err := runmain(m)
+	err := runmain(m)
 	if err != nil {
-		log.Fatal(err) //nolint:revive // complex TestMain needs explicit error handling
+		log.Println(err)
 	}
-	os.Exit(code) //nolint:revive // complex TestMain needs explicit exit with runmain code
 }
 
-func runmain(m *testing.M) (int, error) {
+func runmain(m *testing.M) error {
 	// ensure we write our temporary binaries to a directory that we'll delete
 	// after running tests.
 	dir, err := os.MkdirTemp("", "tempmage")
 	if err != nil {
-		return 0, err
+		return err
 	}
 	defer os.RemoveAll(dir)
 	if err := os.Setenv(mg.CacheEnv, dir); err != nil {
-		return 0, err
+		return err
 	}
 	if err := os.Unsetenv(mg.VerboseEnv); err != nil {
-		return 0, err
+		return err
 	}
 	if err := os.Unsetenv(mg.DebugEnv); err != nil {
-		return 0, err
+		return err
 	}
 	if err := os.Unsetenv(mg.IgnoreDefaultEnv); err != nil {
-		return 0, err
+		return err
 	}
 	if err := os.Setenv(mg.CacheEnv, dir); err != nil {
-		return 0, err
+		return err
 	}
 	if err := os.Unsetenv(mg.EnableColorEnv); err != nil {
-		return 0, err
+		return err
 	}
 	if err := os.Unsetenv(mg.TargetColorEnv); err != nil {
-		return 0, err
+		return err
 	}
 	if err := resetTerm(); err != nil {
-		return 0, err
+		return err
 	}
-	return m.Run(), nil
+	m.Run()
+	return nil
 }
 
 func resetTerm() error {

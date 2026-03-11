@@ -245,8 +245,8 @@ func TestFVariadic(t *testing.T) {
 
 	func() {
 		defer func() {
-			err, _ := recover().(error) //nolint:revive // unchecked-type-assertion: intentional, err will be nil if not error
-			if err == nil || err.Error() != "too few arguments for target, got 0 for func(string, ...string)" {
+			err, ok := recover().(error)
+			if !ok || err == nil || err.Error() != "too few arguments for target, got 0 for func(string, ...string)" {
 				t.Fatal(err)
 			}
 		}()

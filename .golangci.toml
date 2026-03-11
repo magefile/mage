@@ -21,6 +21,7 @@ disable = [
   'asciicheck',
   'canonicalheader',
   'containedctx',
+  'copyloopvar', # Not applicable in go versions under 1.22
   'cyclop',
   'depguard',
   'dogsled',
