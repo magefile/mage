@@ -212,7 +212,7 @@ func run(env map[string]string, stdout, stderr io.Writer, pwd string, cmd string
 	}
 	// To protect against logging from doing exec in global variables
 	if mg.Verbose() {
-		log.Println("exec:", cmd, strings.Join(quoted, " "))
+		log.Printf("exec: %s %s, pwd: %s\n", cmd, strings.Join(quoted, " "), pwd)
 	}
 	err = c.Run()
 	return CmdRan(err), ExitStatus(err), err
