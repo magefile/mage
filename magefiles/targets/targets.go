@@ -55,9 +55,8 @@ var releaseTag = regexp.MustCompile(`^v1\.\d+\.\d+$`)
 
 // Release generates a new release. Expects a version tag in v1.x.x format.
 func Release(tag string) (err error) {
-	if err := sh.RunV("go", "install", "github.com/goreleaser/goreleaser/v2@v2.14.3"); err != nil {
-		return err
-	}
+	mg.Deps(Tools)
+
 	if !releaseTag.MatchString(tag) {
 		return errors.New("TAG environment variable must be in semver v1.x.x format, but was " + tag)
 	}
@@ -106,6 +105,7 @@ func hash() string {
 
 var goTools = []string{
 	"github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.11.2",
+	"github.com/goreleaser/goreleaser/v2@v2.14.3",
 }
 
 // Tools installs the dev tools used by mage, such as golangci-lint.
