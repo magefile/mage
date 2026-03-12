@@ -4,14 +4,12 @@ import (
 	"bytes"
 	"fmt"
 	"log"
-	"os"
 	"strings"
 	"testing"
 )
 
 func TestDepsLogging(t *testing.T) {
-	os.Setenv("MAGEFILE_VERBOSE", "1")
-	defer os.Unsetenv("MAGEFILE_VERBOSE")
+	t.Setenv("MAGEFILE_VERBOSE", "1")
 	buf := &bytes.Buffer{}
 
 	defaultLogger := logger

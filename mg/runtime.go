@@ -61,7 +61,7 @@ const EnableColorEnv = "MAGEFILE_ENABLE_COLOR"
 // - BrightBlue
 // - BrightMagenta
 // - BrightCyan
-// - BrightWhite
+// - BrightWhite.
 const TargetColorEnv = "MAGEFILE_TARGET_COLOR"
 
 // Verbose reports whether a magefile was run with the verbose flag.
@@ -132,5 +132,5 @@ func TargetColor() string {
 	return DefaultTargetAnsiColor
 }
 
-// Namespace allows for the grouping of similar commands
+// Namespace allows for the grouping of similar commands.
 type Namespace struct{}

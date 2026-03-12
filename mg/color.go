@@ -1,6 +1,7 @@
+// Package mg provides support functions for running mage targets.
 package mg
 
-// Color is ANSI color type
+// Color is ANSI color type.
 type Color int
 
 // If you add/change/remove any items in this constant,
@@ -49,7 +50,7 @@ var ansiColor = map[Color]string{
 const AnsiColorReset = "\033[0m"
 
 // DefaultTargetAnsiColor is a default ANSI color for colorizing targets.
-// It is set to Cyan as an arbitrary color, because it has a neutral meaning
+// It is set to Cyan as an arbitrary color, because it has a neutral meaning.
 var DefaultTargetAnsiColor = ansiColor[Cyan]
 
 func toLowerCase(s string) string {

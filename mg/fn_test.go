@@ -55,6 +55,12 @@ func TestFuncCheck(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
+	if hasContext {
+		t.Error("func does not have context")
+	}
+	if !isNamespace {
+		t.Error("func is on a namespace")
+	}
 
 	hasContext, isNamespace, err = checkF(Foo.Error, nil)
 	if err != nil {
@@ -64,7 +70,7 @@ func TestFuncCheck(t *testing.T) {
 		t.Error("func does not have context")
 	}
 	if !isNamespace {
-		t.Error("func is  on a namespace")
+		t.Error("func is on a namespace")
 	}
 
 	hasContext, isNamespace, err = checkF(Foo.BareCtx, nil)
@@ -117,11 +123,11 @@ func TestFuncCheck(t *testing.T) {
 	}
 
 	defer func() {
-		if r := recover(); r !=nil {
+		if r := recover(); r != nil {
 			t.Error("expected a nil function argument to be handled gracefully")
 		}
 	}()
-	_, _, err = checkF(nil, []interface{}{1,2})
+	_, _, err = checkF(nil, []interface{}{1, 2})
 	if err == nil {
 		t.Error("expected a nil function argument to be invalid")
 	}
@@ -129,7 +135,7 @@ func TestFuncCheck(t *testing.T) {
 
 func TestF(t *testing.T) {
 	var (
-		ctxOut context.Context
+		ctxOut interface{}
 		iOut   int
 		sOut   string
 		bOut   bool
@@ -225,13 +231,13 @@ func TestFVariadic(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	fn = F(func(a string, b ...string) {}, "a", "b1", "b2")
+	fn = F(func(_ string, _ ...string) {}, "a", "b1", "b2")
 	err = fn.Run(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	fn = F(func(a ...string) {})
+	fn = F(func(_ ...string) {})
 	err = fn.Run(context.Background())
 	if err != nil {
 		t.Fatal(err)
@@ -239,12 +245,12 @@ func TestFVariadic(t *testing.T) {
 
 	func() {
 		defer func() {
-			err, _ := recover().(error)
-			if err == nil || err.Error() != "too few arguments for target, got 0 for func(string, ...string)" {
+			err, ok := recover().(error)
+			if !ok || err == nil || err.Error() != "too few arguments for target, got 0 for func(string, ...string)" {
 				t.Fatal(err)
 			}
 		}()
-		F(func(a string, b ...string) {})
+		F(func(_ string, _ ...string) {})
 	}()
 }
 
@@ -258,6 +264,6 @@ func (Foo) BareCtx(context.Context) {}
 
 func (Foo) CtxError(context.Context) error { return nil }
 
-func (Foo) CtxErrorArgs(ctx context.Context, i int, s string, b bool, d time.Duration) error {
+func (Foo) CtxErrorArgs(_ context.Context, _ int, _ string, _ bool, _ time.Duration) error {
 	return nil
 }
