@@ -1,6 +1,7 @@
 package mg
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sync/atomic"
@@ -195,4 +196,90 @@ func TestDepsErrors(t *testing.T) {
 		}
 	}()
 	f()
+}
+
+func TestDepPanicNonError(t *testing.T) {
+	f := func() {
+		panic("string panic value")
+	}
+	defer func() {
+		v := recover()
+		if v == nil {
+			t.Fatal("expected panic, but didn't get one")
+		}
+		actual := fmt.Sprint(v)
+		if actual != "string panic value" {
+			t.Fatalf(`expected "string panic value" but got %q`, actual)
+		}
+		err, ok := v.(error)
+		if !ok {
+			t.Fatalf("expected recovered val to be error but was %T", v)
+		}
+		code := ExitStatus(err)
+		if code != 1 {
+			t.Fatalf("Expected exit status 1 for non-error panic, but got %v", code)
+		}
+	}()
+	Deps(f)
+}
+
+func TestCtxDepsPassesContext(t *testing.T) {
+	type ctxKey string
+	var got context.Context
+	f := func(ctx context.Context) {
+		got = ctx
+	}
+	ctx := context.WithValue(context.Background(), ctxKey("key"), "value")
+	CtxDeps(ctx, f)
+	if got == nil {
+		t.Fatal("context was not passed to dependency")
+	}
+	if got.Value(ctxKey("key")) != "value" {
+		t.Fatal("context value was not propagated")
+	}
+}
+
+func TestChangeExit(t *testing.T) {
+	tests := []struct {
+		name string
+		old  int
+		nw   int
+		want int
+	}{
+		{"both zero", 0, 0, 0},
+		{"old zero new nonzero", 0, 5, 5},
+		{"old nonzero new zero", 5, 0, 5},
+		{"same nonzero", 5, 5, 5},
+		{"different nonzero", 5, 3, 1},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := changeExit(tt.old, tt.nw)
+			if got != tt.want {
+				t.Errorf("changeExit(%d, %d) = %d, want %d", tt.old, tt.nw, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSerialCtxDeps(t *testing.T) {
+	type ctxKey string
+	ch := make(chan string, 2)
+	f := func(ctx context.Context) {
+		if ctx.Value(ctxKey("key")) != "value" {
+			panic("missing context value")
+		}
+		ch <- "f"
+	}
+	g := func(ctx context.Context) {
+		ch <- "g"
+	}
+	ctx := context.WithValue(context.Background(), ctxKey("key"), "value")
+	SerialCtxDeps(ctx, f, g)
+
+	first := <-ch
+	second := <-ch
+	if first != "f" || second != "g" {
+		t.Fatalf("expected serial execution f then g, got %s then %s", first, second)
+	}
 }

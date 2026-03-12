@@ -31,10 +31,13 @@ func Copy(dst, src string) error {
 	if err != nil {
 		return fmt.Errorf(`can't copy to %s: %w`, dst, err)
 	}
-	defer to.Close()
 	_, err = io.Copy(to, from)
 	if err != nil {
+		to.Close()
 		return fmt.Errorf(`error copying %s to %s: %w`, src, dst, err)
+	}
+	if err := to.Close(); err != nil {
+		return fmt.Errorf(`error closing %s: %w`, dst, err)
 	}
 	return nil
 }

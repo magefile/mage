@@ -2,6 +2,7 @@ package sh
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"testing"
 )
@@ -65,5 +66,59 @@ func TestAutoExpand(t *testing.T) {
 	}
 	if s != "baz" {
 		t.Fatalf(`Expected "baz" but got %q`, s)
+	}
+}
+
+func TestCmdRanNilErr(t *testing.T) {
+	if !CmdRan(nil) {
+		t.Fatal("CmdRan(nil) should return true")
+	}
+}
+
+func TestCmdRanNotFound(t *testing.T) {
+	_, err := Exec(nil, nil, nil, "thiswontwork")
+	if CmdRan(err) {
+		t.Fatal("CmdRan should return false for not-found command")
+	}
+}
+
+func TestExitStatusNil(t *testing.T) {
+	code := ExitStatus(nil)
+	if code != 0 {
+		t.Fatalf("expected 0 for nil error, got %d", code)
+	}
+}
+
+func TestExitStatusNonExecError(t *testing.T) {
+	code := ExitStatus(fmt.Errorf("generic error"))
+	if code != 1 {
+		t.Fatalf("expected 1 for generic error, got %d", code)
+	}
+}
+
+func TestExitStatusFromExec(t *testing.T) {
+	_, err := Exec(nil, nil, nil, os.Args[0], "-helper", "-exit", "42")
+	code := ExitStatus(err)
+	if code != 42 {
+		t.Fatalf("expected exit status 42, got %d", code)
+	}
+}
+
+func TestRunCmd(t *testing.T) {
+	echoHello := RunCmd("echo", "hello")
+	err := echoHello("world")
+	// RunWith directs output based on verbose, so just check no error
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestOutputWith(t *testing.T) {
+	out, err := OutputWith(map[string]string{"MY_TEST_VAR": "xyz"}, os.Args[0], "-printVar", "MY_TEST_VAR")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out != "xyz" {
+		t.Fatalf("expected 'xyz', got %q", out)
 	}
 }

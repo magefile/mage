@@ -267,3 +267,90 @@ func (Foo) CtxError(context.Context) error { return nil }
 func (Foo) CtxErrorArgs(_ context.Context, _ int, _ string, _ bool, _ time.Duration) error {
 	return nil
 }
+
+func TestFNonFunction(t *testing.T) {
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Fatal("expected panic for non-function")
+		}
+	}()
+	F("not a function")
+}
+
+func TestFTooManyArgs(t *testing.T) {
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Fatal("expected panic for too many args")
+		}
+	}()
+	F(func(int) {}, 1, 2)
+}
+
+func TestFWrongArgType(t *testing.T) {
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Fatal("expected panic for wrong arg type")
+		}
+	}()
+	F(func(int) {}, "not an int")
+}
+
+func TestFUnsupportedArgType(t *testing.T) {
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Fatal("expected panic for unsupported arg type")
+		}
+	}()
+	F(func(*int) {}, (*int)(nil))
+}
+
+func TestFTooManyReturns(t *testing.T) {
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Fatal("expected panic for too many return values")
+		}
+	}()
+	F(func() (int, error) { return 0, nil })
+}
+
+func TestFNonErrorReturn(t *testing.T) {
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Fatal("expected panic for non-error return")
+		}
+	}()
+	F(func() int { return 0 })
+}
+
+func TestFReturnsError(t *testing.T) {
+	fn := F(func() error { return fmt.Errorf("boom") })
+	err := fn.Run(context.Background())
+	if err == nil || err.Error() != "boom" {
+		t.Fatalf("expected 'boom' error, got %v", err)
+	}
+}
+
+func TestFnID(t *testing.T) {
+	fn1 := F(func(int) {}, 1)
+	fn2 := F(func(int) {}, 2)
+	fn3 := F(func(int) {}, 1)
+	if fn1.ID() == fn2.ID() {
+		t.Error("different args should produce different IDs")
+	}
+	if fn1.ID() != fn3.ID() {
+		t.Error("same args should produce same IDs")
+	}
+}
+
+func TestFnName(t *testing.T) {
+	fn := F(func() {})
+	if fn.Name() == "" {
+		t.Error("expected non-empty function name")
+	}
+}

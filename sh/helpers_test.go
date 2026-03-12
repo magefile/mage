@@ -113,3 +113,65 @@ func TestHelpers(t *testing.T) {
 		}
 	})
 }
+
+func TestCopyNonExistentSource(t *testing.T) {
+	dir := t.TempDir()
+	dst := filepath.Join(dir, "dst.txt")
+	err := sh.Copy(dst, filepath.Join(dir, "nonexistent.txt"))
+	if err == nil {
+		t.Fatal("expected error copying from non-existent source")
+	}
+}
+
+func TestCopyReadOnlyDir(t *testing.T) {
+	dir := t.TempDir()
+	src := filepath.Join(dir, "src.txt")
+	if err := os.WriteFile(src, []byte("data"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	// Try to copy to a path inside a non-existent subdirectory
+	dst := filepath.Join(dir, "nodir", "dst.txt")
+	err := sh.Copy(dst, src)
+	if err == nil {
+		t.Fatal("expected error copying to non-existent directory")
+	}
+}
+
+func TestCopyPreservesPermissions(t *testing.T) {
+	dir := t.TempDir()
+	src := filepath.Join(dir, "src.txt")
+	if err := os.WriteFile(src, []byte("data"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	dst := filepath.Join(dir, "dst.txt")
+	if err := sh.Copy(dst, src); err != nil {
+		t.Fatal(err)
+	}
+	srcInfo, _ := os.Stat(src)
+	dstInfo, _ := os.Stat(dst)
+	if srcInfo.Mode() != dstInfo.Mode() {
+		t.Errorf("permissions differ: src=%v dst=%v", srcInfo.Mode(), dstInfo.Mode())
+	}
+}
+
+func TestCopyOverwrite(t *testing.T) {
+	dir := t.TempDir()
+	src := filepath.Join(dir, "src.txt")
+	dst := filepath.Join(dir, "dst.txt")
+	if err := os.WriteFile(src, []byte("new content"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(dst, []byte("old content"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := sh.Copy(dst, src); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(dst)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != "new content" {
+		t.Fatalf("expected 'new content', got %q", string(data))
+	}
+}
