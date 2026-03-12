@@ -1,7 +1,6 @@
 package target
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -10,20 +9,16 @@ import (
 
 func TestNewestModTime(t *testing.T) {
 	t.Parallel()
-	dir, err := ioutil.TempDir("", "")
-	if err != nil {
-		t.Fatalf("error creating temp dir: %s", err.Error())
-	}
-	defer os.RemoveAll(dir)
+	dir := t.TempDir()
 	for _, name := range []string{"a", "b", "c", "d"} {
 		out := filepath.Join(dir, name)
-		if err := ioutil.WriteFile(out, []byte("hi!"), 0644); err != nil {
+		if err := os.WriteFile(out, []byte("hi!"), 0o600); err != nil {
 			t.Fatalf("error writing file: %s", err.Error())
 		}
 	}
 	time.Sleep(10 * time.Millisecond)
 	outName := filepath.Join(dir, "c")
-	outfh, err := os.OpenFile(outName, os.O_APPEND|os.O_WRONLY, 0644)
+	outfh, err := os.OpenFile(outName, os.O_APPEND|os.O_WRONLY, 0o600)
 	if err != nil {
 		t.Fatalf("error opening file to append: %s", err.Error())
 	}
@@ -58,21 +53,17 @@ func TestNewestModTime(t *testing.T) {
 
 func TestOldestModTime(t *testing.T) {
 	t.Parallel()
-	dir, err := ioutil.TempDir("", "")
-	if err != nil {
-		t.Fatalf("error creating temp dir: %s", err.Error())
-	}
-	defer os.RemoveAll(dir)
+	dir := t.TempDir()
 	for _, name := range []string{"a", "b", "c", "d"} {
 		out := filepath.Join(dir, name)
-		if err := ioutil.WriteFile(out, []byte("hi!"), 0644); err != nil {
+		if err := os.WriteFile(out, []byte("hi!"), 0o600); err != nil {
 			t.Fatalf("error writing file: %s", err.Error())
 		}
 	}
 	time.Sleep(10 * time.Millisecond)
 	for _, name := range []string{"a", "b", "d"} {
 		outName := filepath.Join(dir, name)
-		outfh, err := os.OpenFile(outName, os.O_APPEND|os.O_WRONLY, 0644)
+		outfh, err := os.OpenFile(outName, os.O_APPEND|os.O_WRONLY, 0o600)
 		if err != nil {
 			t.Fatalf("error opening file to append: %s", err.Error())
 		}

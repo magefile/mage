@@ -1,7 +1,5 @@
-name: ci
-
+name: Runs Tests
 on: [push, pull_request]
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -15,22 +13,15 @@ jobs:
           - 1.19.x
           - 1.18.x
           - 1.17.x
-          - 1.16.x
-          - 1.15.x
-          - 1.14.x
-          - 1.13.x
-          - 1.12.x
-          - 1.11.x
+        os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
-    - uses: actions/checkout@v3
+    - name: Checkout code
+      uses: actions/checkout@v5
     - name: Set up Go ${{ matrix.go-version }}
-      uses: actions/setup-go@v4
+      uses: actions/setup-go@v6
       with:
         go-version: ${{ matrix.go-version }}
-
     - name: Test
-      run: |
-        go vet ./...
-        go test -tags CI -race ./...
+      run: go test -v -vet=all -tags CI -race ./...
       env:
         GOPATH: /home/runner/go

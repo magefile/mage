@@ -1,9 +1,11 @@
+// Package internal provides shared utilities for the mage build tool.
 package internal
 
 import (
 	"bytes"
+	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"os"
 	"os/exec"
@@ -11,12 +13,14 @@ import (
 	"strings"
 )
 
-var debug *log.Logger = log.New(ioutil.Discard, "", 0)
+var debug = log.New(io.Discard, "", 0)
 
+// SetDebug sets the debug logger.
 func SetDebug(l *log.Logger) {
 	debug = l
 }
 
+// RunDebug runs a command in debug mode, logging the output.
 func RunDebug(cmd string, args ...string) error {
 	env, err := EnvWithCurrentGOOS()
 	if err != nil {
@@ -25,7 +29,7 @@ func RunDebug(cmd string, args ...string) error {
 	buf := &bytes.Buffer{}
 	errbuf := &bytes.Buffer{}
 	debug.Println("running", cmd, strings.Join(args, " "))
-	c := exec.Command(cmd, args...)
+	c := exec.CommandContext(context.Background(), cmd, args...)
 	c.Env = env
 	c.Stderr = errbuf
 	c.Stdout = buf
@@ -37,6 +41,7 @@ func RunDebug(cmd string, args ...string) error {
 	return nil
 }
 
+// OutputDebug runs a command in debug mode and returns its stdout output.
 func OutputDebug(cmd string, args ...string) (string, error) {
 	env, err := EnvWithCurrentGOOS()
 	if err != nil {
@@ -45,14 +50,14 @@ func OutputDebug(cmd string, args ...string) (string, error) {
 	buf := &bytes.Buffer{}
 	errbuf := &bytes.Buffer{}
 	debug.Println("running", cmd, strings.Join(args, " "))
-	c := exec.Command(cmd, args...)
+	c := exec.CommandContext(context.Background(), cmd, args...)
 	c.Env = env
 	c.Stderr = errbuf
 	c.Stdout = buf
 	if err := c.Run(); err != nil {
 		errMsg := strings.TrimSpace(errbuf.String())
 		debug.Print("error running '", cmd, strings.Join(args, " "), "': ", err, ": ", errMsg)
-		return "", fmt.Errorf("error running \"%s %s\": %s\n%s", cmd, strings.Join(args, " "), err, errMsg)
+		return "", fmt.Errorf("error running \"%s %s\": %w\n%s", cmd, strings.Join(args, " "), err, errMsg)
 	}
 	return strings.TrimSpace(buf.String()), nil
 }
@@ -94,7 +99,7 @@ func EnvWithCurrentGOOS() ([]string, error) {
 	return joinEnv(vals), nil
 }
 
-// EnvWithGOOS retuns the os.Environ() values with GOOS and/or GOARCH either set
+// EnvWithGOOS returns the os.Environ() values with GOOS and/or GOARCH either set
 // to their runtime value, or the given value if non-empty.
 func EnvWithGOOS(goos, goarch string) ([]string, error) {
 	env, err := SplitEnv(os.Environ())

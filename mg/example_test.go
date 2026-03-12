@@ -15,7 +15,7 @@ func Example() {
 	// output.
 
 	mg.SerialDeps(mg.F(Say, "hi"), Bark)
-	// output:
+	// Output:
 	// hi
 	// woof
 }

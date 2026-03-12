@@ -16,7 +16,7 @@ var (
 	printVar  string
 )
 
-func init() {
+func init() { //nolint:gochecknoinits // required for test flag setup
 	flag.BoolVar(&helperCmd, "helper", false, "")
 	flag.BoolVar(&printArgs, "printArgs", false, "")
 	flag.StringVar(&stderr, "stderr", "", "")
@@ -38,9 +38,9 @@ func TestMain(m *testing.M) {
 	}
 
 	if helperCmd {
-		fmt.Fprintln(os.Stderr, stderr)
-		fmt.Fprintln(os.Stdout, stdout)
-		os.Exit(exitCode)
+		_, _ = fmt.Fprintln(os.Stderr, stderr)
+		_, _ = fmt.Fprintln(os.Stdout, stdout)
+		os.Exit(exitCode) //nolint:revive // sub-process test helper requires explicit exit
 	}
-	os.Exit(m.Run())
+	os.Exit(m.Run()) //nolint:revive // TestMain with branching logic needs explicit exit
 }
