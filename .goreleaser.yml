@@ -1,53 +1,63 @@
+version: 2
+
 project_name: mage
+
 release:
   github:
     owner: magefile
     name: mage
   draft: true
-build:
-  binary: mage
-  main: .
-  ldflags: -s -w -X github.com/magefile/mage/mage.timestamp={{.Date}} -X github.com/magefile/mage/mage.commitHash={{.Commit}} -X github.com/magefile/mage/mage.gitTag={{.Version}}
-  goos:
-    - darwin
-    - linux
-    - windows
-    - freebsd
-    - netbsd
-    - openbsd
-    - dragonfly
-  goarch:
-    - amd64
-    - arm
-    - arm64
-  ignore:
-    - goos: openbsd
-      goarch: arm
-      goarm: 6
-  env:
-    - CGO_ENABLED=0
+builds:
+  - binary: mage
+    main: .
+    ldflags: -s -w -X github.com/magefile/mage/mage.timestamp={{.Date}} -X github.com/magefile/mage/mage.commitHash={{.Commit}} -X github.com/magefile/mage/mage.gitTag={{.Version}}
+    goos:
+      - darwin
+      - linux
+      - windows
+      - freebsd
+      - netbsd
+      - openbsd
+      - dragonfly
+    goarch:
+      - amd64
+      - arm
+      - arm64
+    ignore:
+      - goos: openbsd
+        goarch: arm
+        goarm: 6
+      - goos: windows # goreleaser says this is a broken build
+        goarch: arm
+        goarm: 6
+    env:
+      - CGO_ENABLED=0
 archives:
-- 
-  name_template: "{{.Binary}}_{{.Version}}_{{.Os}}-{{.Arch}}"
-  replacements:
-    amd64: 64bit
-    386: 32bit
-    arm: ARM
-    arm64: ARM64
-    darwin: macOS
-    linux: Linux
-    windows: Windows
-    openbsd: OpenBSD
-    netbsd: NetBSD
-    freebsd: FreeBSD
-    dragonfly: DragonFlyBSD
-  format: tar.gz
+-
+  name_template: >-
+    {{.Binary}}_{{.Version}}_{{.Os}}_{{.Arch}}
+    {{- if eq .Os "darwin"}}macOS
+    {{- else if eq .Os "linux"}}Linux
+    {{- else if eq .Os "windows"}}Windows
+    {{- else if eq .Os "freebsd"}}FreeBSD
+    {{- else if eq .Os "netbsd"}}NetBSD
+    {{- else if eq .Os "openbsd"}}OpenBSD
+    {{- else if eq .Os "dragonfly"}}DragonFlyBSD
+    {{- else}}{{.Os}}{{end}}-
+    {{- if eq .Arch "amd64"}}64bit
+    {{- else if eq .Arch "386"}}32bit
+    {{- else if eq .Arch "arm"}}ARM
+    {{- else if eq .Arch "arm64"}}ARM64
+    {{- else}}{{.Arch}}{{end}}
+  formats:
+    - tar.gz
   format_overrides:
     - goos: windows
-      format: zip
+      formats:
+        - zip
   files:
   - LICENSE
 snapshot:
-  name_template: SNAPSHOT-{{ .Commit }}
+  version_template: SNAPSHOT-{{ .Commit }}
 checksum:
   name_template: '{{ .ProjectName }}_{{ .Version }}_checksums.txt'

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -56,9 +55,8 @@ var releaseTag = regexp.MustCompile(`^v1\.\d+\.\d+$`)
 
 // Release generates a new release. Expects a version tag in v1.x.x format.
 func Release(tag string) (err error) {
-	if _, err := exec.LookPath("goreleaser"); err != nil {
-		return fmt.Errorf("can't find goreleaser: %w", err)
-	}
+	mg.Deps(Tools)
+
 	if !releaseTag.MatchString(tag) {
 		return errors.New("TAG environment variable must be in semver v1.x.x format, but was " + tag)
 	}
@@ -75,7 +73,7 @@ func Release(tag string) (err error) {
 			_ = sh.RunV("git", "push", "--delete", "origin", tag)
 		}
 	}()
-	return sh.RunV("goreleaser")
+	return sh.RunV("goreleaser", "release")
 }
 
 // Clean removes the temporarily generated files from Release.
@@ -107,6 +105,7 @@ func hash() string {
 
 var goTools = []string{
 	"github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.11.2",
+	"github.com/goreleaser/goreleaser/v2@v2.14.3",
 }
 
 // Tools installs the dev tools used by mage, such as golangci-lint.
