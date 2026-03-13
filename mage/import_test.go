@@ -28,6 +28,9 @@ Targets:
   zz:buildSubdir2    Builds stuff.
   zz:ns:deploy2*     deploys stuff.
 
+Aliases:
+  nsd2    -> zz:ns:deploy2
+
 * default target
 `[1:]
 
