@@ -592,7 +592,9 @@ func TestList(t *testing.T) {
 	}
 	actual := stdout.String()
 	expected := `
-This is a comment on the package which should get turned into output with the list of targets.
+This is a comment on the package which should get turned into output with the
+list of targets.
+
 
 Targets:
   somePig*       This is the synopsis for SomePig.
@@ -628,7 +630,9 @@ func TestListWithColor(t *testing.T) {
 	t.Setenv(mg.TargetColorEnv, mg.Cyan.String())
 
 	expectedPlainText := `
-This is a comment on the package which should get turned into output with the list of targets.
+This is a comment on the package which should get turned into output with the
+list of targets.
+
 
 Targets:
   somePig*       This is the synopsis for SomePig.
@@ -641,8 +645,8 @@ Targets:
 	// in the middle and join with a normal string for the target names,
 	// otherwise the single backslash would be taken literally and encoded as \\
 	expectedColorizedText := "" +
-		"This is a comment on the package which should get turned into output with the list of targets.\n" +
-		"\n" +
+		"This is a comment on the package which should get turned into output with the\nlist of targets.\n" +
+		"\n\n" +
 		"Targets:\n" +
 		"  \x1b[36msomePig*\x1b[0m       This is the synopsis for SomePig.\n" +
 		"  \x1b[36mtestVerbose\x1b[0m    \n" +
@@ -726,7 +730,9 @@ func TestIgnoreDefault(t *testing.T) {
 	}
 	actual := stdout.String()
 	expected := `
-This is a comment on the package which should get turned into output with the list of targets.
+This is a comment on the package which should get turned into output with the
+list of targets.
+
 
 Targets:
   somePig*       This is the synopsis for SomePig.
