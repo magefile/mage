@@ -1711,6 +1711,24 @@ func TestNamespaceDefault(t *testing.T) {
 func TestAliasToImport(_ *testing.T) {
 }
 
+func TestAliasToKebabCase(t *testing.T) {
+	stdout := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:    "./testdata/kebabcase",
+		Stderr: io.Discard,
+		Stdout: stdout,
+		Args:   []string{"fooBar", "foo-bar"},
+	}
+	code := Invoke(inv)
+	if code != 0 {
+		t.Fatalf("expected 0, but got %v", code)
+	}
+	expected := "FooBar\nFooBar\n"
+	if stdout.String() != expected {
+		t.Fatalf("expected %q, but got %q", expected, stdout.String())
+	}
+}
+
 func TestWrongDependency(t *testing.T) {
 	stderr := &bytes.Buffer{}
 	inv := Invocation{
@@ -1802,4 +1820,32 @@ func fileData(file string) (exeType, archSize, error) {
 		return macExe, arch32, nil
 	}
 	return -1, -1, errors.New("unrecognized executable format")
+}
+
+func TestCamelToKebab(t *testing.T) {
+	testCases := []struct {
+		camelCaseWord string
+		kebabWord     string
+	}{
+		{
+			camelCaseWord: "FizzBazz",
+			kebabWord:     "fizz-bazz",
+		},
+		{
+			camelCaseWord: "C",
+			kebabWord:     "c",
+		},
+		{
+			camelCaseWord: "DoSomeHTTPStuff",
+			kebabWord:     "do-some-http-stuff",
+		},
+	}
+
+	for _, tCase := range testCases {
+		t.Run(tCase.camelCaseWord, func(t *testing.T) {
+			if want, have := tCase.kebabWord, camelToKebab(tCase.camelCaseWord); want != have {
+				t.Errorf("unexpected transformation, want %q, have %q", want, have)
+			}
+		})
+	}
 }
