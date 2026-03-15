@@ -2,7 +2,7 @@ package sh
 
 import (
 	"bytes"
-	"fmt"
+	"errors"
 	"os"
 	"testing"
 )
@@ -90,7 +90,7 @@ func TestExitStatusNil(t *testing.T) {
 }
 
 func TestExitStatusNonExecError(t *testing.T) {
-	code := ExitStatus(fmt.Errorf("generic error"))
+	code := ExitStatus(errors.New("generic error"))
 	if code != 1 {
 		t.Fatalf("expected 1 for generic error, got %d", code)
 	}

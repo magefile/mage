@@ -2,6 +2,7 @@ package mg
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 	"sync/atomic"
@@ -329,9 +330,10 @@ func TestFNonErrorReturn(t *testing.T) {
 }
 
 func TestFReturnsError(t *testing.T) {
-	fn := F(func() error { return fmt.Errorf("boom") })
+	origErr := errors.New("boom")
+	fn := F(func() error { return origErr })
 	err := fn.Run(context.Background())
-	if err == nil || err.Error() != "boom" {
+	if !errors.Is(err, origErr) {
 		t.Fatalf("expected 'boom' error, got %v", err)
 	}
 }

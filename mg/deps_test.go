@@ -225,17 +225,17 @@ func TestDepPanicNonError(t *testing.T) {
 
 func TestCtxDepsPassesContext(t *testing.T) {
 	type ctxKey string
-	var got context.Context
+	found := false
 	f := func(ctx context.Context) {
-		got = ctx
+		if ctx.Value(ctxKey("key")) != "value" {
+			t.Fatal("context value was not propagated")
+		}
+		found = true
 	}
 	ctx := context.WithValue(context.Background(), ctxKey("key"), "value")
 	CtxDeps(ctx, f)
-	if got == nil {
+	if !found {
 		t.Fatal("context was not passed to dependency")
-	}
-	if got.Value(ctxKey("key")) != "value" {
-		t.Fatal("context value was not propagated")
 	}
 }
 
@@ -271,7 +271,7 @@ func TestSerialCtxDeps(t *testing.T) {
 		}
 		ch <- "f"
 	}
-	g := func(ctx context.Context) {
+	g := func(_ context.Context) {
 		ch <- "g"
 	}
 	ctx := context.WithValue(context.Background(), ctxKey("key"), "value")

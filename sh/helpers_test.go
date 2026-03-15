@@ -140,7 +140,7 @@ func TestCopyReadOnlyDir(t *testing.T) {
 func TestCopyPreservesPermissions(t *testing.T) {
 	dir := t.TempDir()
 	src := filepath.Join(dir, "src.txt")
-	if err := os.WriteFile(src, []byte("data"), 0o755); err != nil {
+	if err := os.WriteFile(src, []byte("data"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	dst := filepath.Join(dir, "dst.txt")

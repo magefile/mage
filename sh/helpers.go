@@ -33,7 +33,7 @@ func Copy(dst, src string) error {
 	}
 	_, err = io.Copy(to, from)
 	if err != nil {
-		to.Close()
+		_ = to.Close()
 		return fmt.Errorf(`error copying %s to %s: %w`, src, dst, err)
 	}
 	if err := to.Close(); err != nil {
