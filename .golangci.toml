@@ -116,6 +116,9 @@ disable = [
 ]
 enable-all = true
 
+[linters.settings.modernize]
+disable = ["any"]
+
 [linters.settings.nestif]
 min-complexity = 9
 
