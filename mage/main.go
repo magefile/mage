@@ -16,6 +16,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	dbg "runtime/debug"
 	"sort"
 	"strings"
 	"syscall"
@@ -68,13 +69,6 @@ const (
 )
 
 var debug = log.New(io.Discard, "DEBUG: ", log.Ltime|log.Lmicroseconds)
-
-// set by ldflags when you "mage build".
-var (
-	commitHash = "<not set>"
-	timestamp  = "<not set>"
-	gitTag     = "<not set>"
-)
 
 //go:generate stringer -type=Command
 
@@ -149,10 +143,7 @@ func ParseAndRun(stdout, stderr io.Writer, stdin io.Reader, args []string) int {
 
 	switch cmd {
 	case Version:
-		out.Println("Mage Build Tool", gitTag)
-		out.Println("Build Date:", timestamp)
-		out.Println("Commit:", commitHash)
-		out.Println("built with:", runtime.Version())
+		doVersion(out)
 		return 0
 	case Init:
 		if err := generateInit(inv.Dir); err != nil {
@@ -174,6 +165,35 @@ func ParseAndRun(stdout, stderr io.Writer, stdin io.Reader, args []string) int {
 		errlog.Printf("unknown command type: %v", cmd)
 		return 1
 	}
+}
+
+func doVersion(out *log.Logger) {
+	var (
+		commitHash = "<not set>"
+		timestamp  = "<not set>"
+		gitTag     = ""
+	)
+
+	info, ok := dbg.ReadBuildInfo()
+	if ok {
+		if info.Main.Version != "" {
+			gitTag = info.Main.Version
+		}
+		for _, kv := range info.Settings {
+			switch kv.Key {
+			case "vcs.revision":
+				commitHash = kv.Value
+			case "vcs.time":
+				timestamp = kv.Value
+			default:
+				continue
+			}
+		}
+	}
+	out.Println("Mage Build Tool", gitTag)
+	out.Println("Build Date:", timestamp)
+	out.Println("Commit:", commitHash)
+	out.Println("built with:", runtime.Version())
 }
 
 // Parse parses the given args and returns structured data.  If parse returns
