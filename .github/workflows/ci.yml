@@ -6,7 +6,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go-version: [ stable, 1.17.x ] # min and max versions should be sufficient
+        go-version: [ stable, 1.18.x ] # min and max versions should be sufficient
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
     - name: Checkout code
