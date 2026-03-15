@@ -97,3 +97,74 @@ func TestOldestModTime(t *testing.T) {
 		t.Fatal("expected newest mod time to match c")
 	}
 }
+
+func TestDirNewerWithEmptyDir(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	// No files inside dir — nothing newer than any target time
+	newer, err := DirNewer(time.Now(), dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The directory itself was just created, its modtime is very recent
+	// so it should be newer than time.Time{} but we pass time.Now()
+	// The dir's modtime should be ≤ now, so it should not be newer
+	if newer {
+		t.Fatal("expected empty dir to not be newer than now")
+	}
+}
+
+func TestDirNewerMissingSource(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	_, err := DirNewer(time.Now(), filepath.Join(dir, "nonexistent"))
+	if err == nil {
+		t.Fatal("expected error for missing source")
+	}
+}
+
+func TestNewestModTimeEmptyDir(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	// An empty directory still has the directory entry itself
+	newest, err := NewestModTime(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Should return the directory's own modtime
+	info, _ := os.Stat(dir)
+	if !newest.Equal(info.ModTime()) {
+		t.Fatalf("expected dir modtime, got %v vs %v", newest, info.ModTime())
+	}
+}
+
+func TestOldestModTimeEmptyDir(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	oldest, err := OldestModTime(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	info, _ := os.Stat(dir)
+	if !oldest.Equal(info.ModTime()) {
+		t.Fatalf("expected dir modtime, got %v vs %v", oldest, info.ModTime())
+	}
+}
+
+func TestPathNewerMissingSource(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	_, err := PathNewer(time.Now(), filepath.Join(dir, "nonexistent"))
+	if err == nil {
+		t.Fatal("expected error for missing source")
+	}
+}
+
+func TestGlobNewerNoMatch(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	_, err := GlobNewer(time.Now(), filepath.Join(dir, "*.nonexistent"))
+	if err == nil {
+		t.Fatal("expected error for glob with no matches")
+	}
+}

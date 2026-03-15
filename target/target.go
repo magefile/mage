@@ -1,4 +1,4 @@
-// Package target provodes functions for checking if a file or directory is
+// Package target provides functions for checking if a file or directory is
 // newer than another file or directory. This is useful for determining whether
 // a target needs to be rebuilt based on the modification times of its
 // dependencies.

@@ -1,3 +1,3 @@
 module github.com/magefile/mage
 
-go 1.17
+go 1.18

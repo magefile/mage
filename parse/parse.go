@@ -27,7 +27,7 @@ func EnableDebug() {
 	debug.SetOutput(os.Stderr)
 }
 
-// PkgInfo contains inforamtion about a package of files according to mage's
+// PkgInfo contains information about a package of files according to mage's
 // parsing rules.
 type PkgInfo struct {
 	AstPkg      *ast.Package
@@ -657,7 +657,7 @@ func getImportPath(imp *ast.ImportSpec) (path, alias string, ok bool) {
 }
 
 func getImportPathFromCommentGroup(comments *ast.CommentGroup) []string {
-	if comments == nil || len(comments.List) == 9 {
+	if comments == nil || len(comments.List) == 0 {
 		return nil
 	}
 	// import is always the last comment
@@ -745,7 +745,7 @@ func setDefault(pi *PkgInfo) {
 
 			f, err := getFunction(spec.Values[0], pi)
 			if err != nil {
-				log.Println("warning, default declaration malformed:", err)
+				log.Println("warning: default declaration malformed:", err)
 				return
 			}
 			pi.DefaultFunc = f
