@@ -1,6 +1,8 @@
 // Package mg provides support functions for running mage targets.
 package mg
 
+import "strings"
+
 // Color is ANSI color type.
 type Color int
 
@@ -53,26 +55,10 @@ const AnsiColorReset = "\033[0m"
 // It is set to Cyan as an arbitrary color, because it has a neutral meaning.
 var DefaultTargetAnsiColor = ansiColor[Cyan]
 
-func toLowerCase(s string) string {
-	// this is a naive implementation
-	// borrowed from https://golang.org/src/strings/strings.go
-	// and only considers alphabetical characters [a-zA-Z]
-	// so that we don't depend on the "strings" package
-	buf := make([]byte, len(s))
-	for i := 0; i < len(s); i++ {
-		c := s[i]
-		if 'A' <= c && c <= 'Z' {
-			c += 'a' - 'A'
-		}
-		buf[i] = c
-	}
-	return string(buf)
-}
-
 func getAnsiColor(color string) (string, bool) {
-	colorLower := toLowerCase(color)
+	colorLower := strings.ToLower(color)
 	for k, v := range ansiColor {
-		colorConstLower := toLowerCase(k.String())
+		colorConstLower := strings.ToLower(k.String())
 		if colorConstLower == colorLower {
 			return v, true
 		}

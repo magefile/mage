@@ -9,7 +9,6 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
-	"time"
 
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
@@ -17,6 +16,7 @@ import (
 
 // Install runs "go install" for mage. This generates the version info the binary.
 func Install() error {
+	fmt.Println("`mage install` is deprecated. Just use `go install` now.")
 	name := "mage"
 	if runtime.GOOS == "windows" {
 		name += ".exe"
@@ -48,7 +48,7 @@ func Install() error {
 	// install` turns into a no-op, and `go install -a` fails on people's
 	// machines that have go installed in a non-writeable directory (such as
 	// normal OS installs in /usr/bin)
-	return sh.RunV(gocmd, "build", "-o", path, "-ldflags="+flags(), "github.com/magefile/mage")
+	return sh.RunV(gocmd, "build", "-o", path, "github.com/magefile/mage")
 }
 
 var releaseTag = regexp.MustCompile(`^v1\.\d+\.\d+$`)
@@ -79,28 +79,6 @@ func Release(tag string) (err error) {
 // Clean removes the temporarily generated files from Release.
 func Clean() error {
 	return sh.Rm("dist")
-}
-
-func flags() string {
-	timestamp := time.Now().Format(time.RFC3339)
-	hash := hash()
-	tag := tag()
-	if tag == "" {
-		tag = "dev"
-	}
-	return fmt.Sprintf(`-X "github.com/magefile/mage/mage.timestamp=%s" -X "github.com/magefile/mage/mage.commitHash=%s" -X "github.com/magefile/mage/mage.gitTag=%s"`, timestamp, hash, tag)
-}
-
-// tag returns the git tag for the current branch or "" if none.
-func tag() string {
-	s, _ := sh.Output("git", "describe", "--tags")
-	return s
-}
-
-// hash returns the git hash for the current repo or "" if none.
-func hash() string {
-	hash, _ := sh.Output("git", "rev-parse", "--short", "HEAD")
-	return hash
 }
 
 var goTools = []string{

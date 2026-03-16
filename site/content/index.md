@@ -11,18 +11,10 @@ and Mage automatically uses them as Makefile-like runnable targets.
 
 ### From GitHub source (any OS)
 
-Mage has no dependencies outside the Go standard library, and builds with Go 1.7
-and above (possibly even lower versions, but they're not regularly tested).
+Mage has no dependencies outside the Go standard library, and builds with Go 1.18
+and above.
 
-#### Using Go Modules (With go version < 1.17)
-
-```plain
-git clone https://github.com/magefile/mage
-cd mage
-go run bootstrap.go
-```
-
-#### Using Go Install (With go version >= [1.17](https://go.dev/doc/go-get-install-deprecation))
+#### Using Go Install
 
 ```plain
 go install github.com/magefile/mage@latest
@@ -31,26 +23,8 @@ mage -init
 Instead of the @latest tag, you can specify the desired version, for example:
 
 ```plain
-go install github.com/magefile/mage@v1.15.0
+go install github.com/magefile/mage@v1.16.0
 ```
-
-#### Using GOPATH
-
-```plain
-go get -u -d github.com/magefile/mage
-cd $GOPATH/src/github.com/magefile/mage
-go run bootstrap.go
-```
-
-This will download the code into your GOPATH, and then run the bootstrap script
-to build mage with version information embedded in it.  A normal `go get`
-(without -d) will build the binary correctly, but no version info will be
-embedded.  If you've done this, no worries, just go to
-`$GOPATH/src/github.com/magefile/mage` and run `mage install` or `go run
-bootstrap.go` and a new binary will be created with the correct version
-information.
-
-The mage binary will be created in your $GOPATH/bin directory.
 
 ### From GitHub releases (any OS)
 
