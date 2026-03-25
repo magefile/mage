@@ -52,6 +52,10 @@ of converting line returns in a comment to a space.
 Alternatively, you can inclide //mage:multiline as a comment in the magefile code
 while will have the same effect, and will override the environment variable.
 
+Note that this is a generation-time check, so if you use this with `-compile`,
+the compiled binary will be stuck with whatever choice was set on the machine
+that generated the binary.
+
 ## MAGEFILE_TARGET_COLOR
 
 Sets the target ANSI color name which should be used to colorize mage targets.
