@@ -20,6 +20,8 @@ import (
 
 const importTag = "mage:import"
 
+const multilineTag = "mage:multiline"
+
 var debug = log.New(io.Discard, "DEBUG: ", log.Ltime|log.Lmicroseconds)
 
 // EnableDebug turns on debug logging.
@@ -37,6 +39,7 @@ type PkgInfo struct {
 	DefaultFunc *Function
 	Aliases     map[string]*Function
 	Imports     Imports
+	Multiline   bool
 }
 
 // Function represents a job function from a mage file.
@@ -337,8 +340,8 @@ func (f Function) ExecCode() string {
 }
 
 // PrimaryPackage parses a package.  If files is non-empty, it will only parse the files given.
-func PrimaryPackage(gocmd, path string, files []string) (*PkgInfo, error) {
-	info, err := Package(path, files)
+func PrimaryPackage(gocmd, path string, files []string, multiline bool) (*PkgInfo, error) {
+	info, err := Package(path, files, multiline)
 	if err != nil {
 		return nil, err
 	}
@@ -396,7 +399,7 @@ func checkDupes(info *PkgInfo, imports []*Import) error {
 }
 
 // Package compiles information about a mage package.
-func Package(path string, files []string) (*PkgInfo, error) {
+func Package(path string, files []string, multiline bool) (*PkgInfo, error) {
 	start := time.Now()
 	defer func() {
 		debug.Println("time parse Magefiles:", time.Since(start))
@@ -406,11 +409,20 @@ func Package(path string, files []string) (*PkgInfo, error) {
 	if err != nil {
 		return nil, err
 	}
+	if hasComment(pkg, multilineTag) {
+		debug.Printf("found %s tag, using multiline descriptions", multilineTag)
+		multiline = true
+	}
 	p := doc.New(pkg, "./", 0)
 	pi := &PkgInfo{
-		AstPkg:      pkg,
-		DocPkg:      p,
-		Description: toOneLine(p.Doc),
+		AstPkg:    pkg,
+		DocPkg:    p,
+		Multiline: multiline,
+	}
+	if multiline {
+		pi.Description = strings.TrimSuffix(p.Doc, "\n")
+	} else {
+		pi.Description = toOneLine(p.Doc)
 	}
 
 	setNamespaces(pi)
@@ -431,11 +443,11 @@ func Package(path string, files []string) (*PkgInfo, error) {
 	return pi, nil
 }
 
-func getNamedImports(gocmd string, pkgs map[string]string) ([]*Import, error) {
+func getNamedImports(gocmd string, pkgs map[string]string, multiline bool) ([]*Import, error) {
 	var imports []*Import
 	for pkg, alias := range pkgs {
 		debug.Printf("getting import package %q, alias %q", pkg, alias)
-		imp, err := getImport(gocmd, pkg, alias)
+		imp, err := getImport(gocmd, pkg, alias, multiline)
 		if err != nil {
 			return nil, err
 		}
@@ -445,7 +457,7 @@ func getNamedImports(gocmd string, pkgs map[string]string) ([]*Import, error) {
 }
 
 // getImport returns the metadata about a package that has been mage:import'ed.
-func getImport(gocmd, importpath, alias string) (*Import, error) {
+func getImport(gocmd, importpath, alias string, multiline bool) (*Import, error) {
 	out, err := internal.OutputDebug(gocmd, "list", "-f", "{{.Dir}}||{{.Name}}", importpath)
 	if err != nil {
 		return nil, err
@@ -466,7 +478,7 @@ func getImport(gocmd, importpath, alias string) (*Import, error) {
 	}
 	files := strings.Split(out, "||")
 
-	info, err := Package(dir, files)
+	info, err := Package(dir, files, multiline)
 	if err != nil {
 		return nil, err
 	}
@@ -512,20 +524,10 @@ func setFuncs(pi *PkgInfo) {
 			// skip methods
 			continue
 		}
-		if !ast.IsExported(f.Name) {
-			debug.Printf("skipping non-exported function %s", f.Name)
-			// skip non-exported functions
+		fn, ok := funcFromDoc(f, pi.DocPkg.ImportPath, f.Name, pi.Multiline)
+		if !ok {
 			continue
 		}
-		fn, err := funcType(f.Decl.Type)
-		if err != nil {
-			debug.Printf("skipping function with invalid signature func %s: %v", f.Name, err)
-			continue
-		}
-		debug.Printf("found target %v", f.Name)
-		fn.Name = f.Name
-		fn.Comment = toOneLine(f.Doc)
-		fn.Synopsis = sanitizeSynopsis(f)
 		pi.Funcs = append(pi.Funcs, fn)
 	}
 }
@@ -537,23 +539,34 @@ func setNamespaces(pi *PkgInfo) {
 		}
 		debug.Printf("found namespace %s %s", pi.DocPkg.ImportPath, t.Name)
 		for _, f := range t.Methods {
-			if !ast.IsExported(f.Name) {
+			fn, ok := funcFromDoc(f, pi.DocPkg.ImportPath, t.Name+"."+f.Name, pi.Multiline)
+			if !ok {
 				continue
 			}
-			fn, err := funcType(f.Decl.Type)
-			if err != nil {
-				debug.Printf("skipping invalid namespace method %s %s.%s: %v", pi.DocPkg.ImportPath, t.Name, f.Name, err)
-				continue
-			}
-			debug.Printf("found namespace method %s %s.%s", pi.DocPkg.ImportPath, t.Name, f.Name)
-			fn.Name = f.Name
-			fn.Comment = toOneLine(f.Doc)
-			fn.Synopsis = sanitizeSynopsis(f)
 			fn.Receiver = t.Name
-
 			pi.Funcs = append(pi.Funcs, fn)
 		}
 	}
+}
+
+func funcFromDoc(f *doc.Func, importpath, funcname string, multiline bool) (*Function, bool) {
+	if !ast.IsExported(f.Name) {
+		return nil, false
+	}
+	fn, err := funcType(f.Decl.Type)
+	if err != nil {
+		debug.Printf("skipping invalid method %s %s: %v", importpath, funcname, err)
+		return nil, false
+	}
+	debug.Printf("found method %s %s", importpath, funcname)
+	fn.Name = f.Name
+	if multiline {
+		fn.Comment = strings.TrimSuffix(f.Doc, "\n")
+	} else {
+		fn.Comment = toOneLine(f.Doc)
+	}
+	fn.Synopsis = sanitizeSynopsis(f)
+	return fn, true
 }
 
 func setImports(gocmd string, pi *PkgInfo) error {
@@ -588,12 +601,12 @@ func setImports(gocmd string, pi *PkgInfo) error {
 			}
 		}
 	}
-	imports, err := getNamedImports(gocmd, importNames)
+	imports, err := getNamedImports(gocmd, importNames, pi.Multiline)
 	if err != nil {
 		return err
 	}
 	for _, s := range rootImports {
-		imp, err := getImport(gocmd, s, "")
+		imp, err := getImport(gocmd, s, "", pi.Multiline)
 		if err != nil {
 			return err
 		}
@@ -1016,6 +1029,22 @@ func funcType(ft *ast.FuncType) (*Function, error) {
 
 func toOneLine(s string) string {
 	return strings.TrimSpace(strings.ReplaceAll(s, "\n", " "))
+}
+
+// hasComment reports whether any file in the package contains a comment
+// matching the given tag (e.g. "mage:multiline").
+func hasComment(pkg *ast.Package, tag string) bool {
+	for _, f := range pkg.Files {
+		for _, cg := range f.Comments {
+			for _, c := range cg.List {
+				vals := strings.Fields(strings.ToLower(c.Text[2:]))
+				if len(vals) > 0 && vals[0] == tag {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 var argTypes = map[string]string{

@@ -1,8 +1,10 @@
 package mage
 
-var mageTpl = `//go:build mage
-// +build mage
+var mageTpl = `
+//go:build mage
+//mage:multiline
 
+// Set the general description you want to have displayed with mage -l here.
 package main
 
 import (

@@ -209,6 +209,10 @@ name = 'optimize-operands-order'
 disabled = false
 
 [[linters.settings.revive.rules]]
+name = 'redundant-test-main-exit'
+disabled = true
+
+[[linters.settings.revive.rules]]
 name = 'use-any'
 disabled = true
 

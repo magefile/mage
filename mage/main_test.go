@@ -551,8 +551,7 @@ func TestVerbose(t *testing.T) {
 
 func TestVerboseEnv(t *testing.T) {
 	t.Setenv("MAGEFILE_VERBOSE", "true")
-	stdout := &bytes.Buffer{}
-	inv, _, err := Parse(io.Discard, stdout, []string{})
+	inv, _, err := Parse(io.Discard, io.Discard, []string{})
 	if err != nil {
 		t.Fatal("unexpected error", err)
 	}
@@ -566,14 +565,129 @@ func TestVerboseEnv(t *testing.T) {
 
 func TestVerboseFalseEnv(t *testing.T) {
 	t.Setenv("MAGEFILE_VERBOSE", "0")
-	stdout := &bytes.Buffer{}
-	code := ParseAndRun(io.Discard, stdout, nil, []string{"-d", "testdata", "testverbose"})
+	stderr := &bytes.Buffer{}
+	code := ParseAndRun(io.Discard, stderr, nil, []string{"-d", "testdata", "testverbose"})
 	if code != 0 {
 		t.Fatal("unexpected code", code)
 	}
 
-	if stdout.String() != "" {
-		t.Fatalf("expected no output, but got %s", stdout.String())
+	if stderr.String() != "" {
+		t.Fatalf("expected no output, but got %s", stderr.String())
+	}
+}
+
+func TestMultilineEnv(t *testing.T) {
+	t.Setenv(mg.MultilineEnv, "true")
+	inv, _, err := Parse(io.Discard, io.Discard, []string{})
+	if err != nil {
+		t.Fatal("unexpected error", err)
+	}
+
+	expected := true
+
+	if !inv.Multiline {
+		t.Fatalf("expected %t, but got %t ", expected, inv.Multiline)
+	}
+}
+
+func TestMultilineEnvFalse(t *testing.T) {
+	t.Setenv(mg.MultilineEnv, "0")
+	inv, _, err := Parse(io.Discard, io.Discard, []string{})
+	if err != nil {
+		t.Fatal("unexpected error", err)
+	}
+
+	expected := false
+
+	if inv.Multiline {
+		t.Fatalf("expected %t, but got %t ", expected, inv.Multiline)
+	}
+}
+
+func TestMultiline(t *testing.T) {
+	t.Setenv(mg.MultilineEnv, "true")
+
+	for _, tc := range []struct {
+		name   string
+		args   []string
+		output string
+	}{
+		{
+			name: "list",
+			args: []string{"-d", "testdata/multiline", "-l"},
+			// line returns at the end here are important to show that we don't add an extra line return.
+			output: "This is a global comment for the mage output.\nIt should retain line returns.\n\nTargets:",
+		},
+		{
+			name:   "help-func",
+			args:   []string{"-d", "testdata/multiline", "-h", "doit"},
+			output: "DoIt is a dummy function with a multiline comment.\nThat should show up with multiple lines.\n\nUsage:",
+		},
+		{
+			name:   "help-func",
+			args:   []string{"-d", "testdata/multiline", "-h", "sub:doittoo"},
+			output: "DoItToo is a dummy function with a multiline comment.\nHere's the second line.\n\nUsage:",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			stdout := &bytes.Buffer{}
+			stderr := &bytes.Buffer{}
+			code := ParseAndRun(stdout, stderr, nil, tc.args)
+			if code != 0 {
+				t.Log("stderr:", stderr)
+				t.Log("stdout:", stdout)
+				t.Fatal("unexpected code", code)
+			}
+
+			if !strings.Contains(stdout.String(), tc.output) {
+				t.Errorf("Could not find %q in output:\n%s", tc.output, stdout.String())
+			}
+		})
+	}
+}
+
+func TestMultilineTag(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		args   []string
+		output string
+	}{
+		{
+			name: "list",
+			args: []string{"-d", "testdata/multiline/tag", "-l"},
+			// line returns at the end here are important to show that we don't add an extra line return.
+			output: "This is a global comment for the mage output.\nIt should retain line returns.\n\nTargets:",
+		},
+		{
+			name:   "help-func",
+			args:   []string{"-d", "testdata/multiline/tag", "-h", "doit"},
+			output: "DoIt is a dummy function with a multiline comment.\nThat should show up with multiple lines.\n\nUsage:",
+		},
+		{
+			name:   "help-func",
+			args:   []string{"-d", "testdata/multiline/tag", "-h", "sub:doittoo"},
+			output: "DoItToo is a dummy function with a multiline comment.\nHere's the second line.\n\nUsage:",
+		},
+	} {
+		// The tests should be the same regardless of the environment variable, because the tag should override.
+		testFunc := func(t *testing.T) {
+			stdout := &bytes.Buffer{}
+			stderr := &bytes.Buffer{}
+			code := ParseAndRun(stdout, stderr, nil, tc.args)
+			if code != 0 {
+				t.Log("stderr:", stderr)
+				t.Log("stdout:", stdout)
+				t.Fatal("unexpected code", code)
+			}
+
+			if !strings.Contains(stdout.String(), tc.output) {
+				t.Errorf("Could not find %q in output:\n%s", tc.output, stdout.String())
+			}
+		}
+		t.Setenv(mg.MultilineEnv, "false")
+		t.Run(tc.name+"TagFalse", testFunc)
+		t.Setenv(mg.MultilineEnv, "true")
+		t.Run(tc.name+"TagTrue", testFunc)
 	}
 }
 

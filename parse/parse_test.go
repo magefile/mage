@@ -16,7 +16,7 @@ func init() { //nolint:gochecknoinits // required for test setup
 }
 
 func TestParse(t *testing.T) {
-	info, err := PrimaryPackage("go", "./testdata", []string{"func.go", "command.go", "alias.go", "repeating_synopsis.go", "subcommands.go"})
+	info, err := PrimaryPackage("go", "./testdata", []string{"func.go", "command.go", "alias.go", "repeating_synopsis.go", "subcommands.go"}, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -261,7 +261,7 @@ func TestSanitizeSynopsis(t *testing.T) {
 }
 
 func TestGetImportSelf(t *testing.T) {
-	imp, err := getImport("go", "github.com/magefile/mage/parse/testdata/importself", "")
+	imp, err := getImport("go", "github.com/magefile/mage/parse/testdata/importself", "", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -271,7 +271,7 @@ func TestGetImportSelf(t *testing.T) {
 }
 
 func TestOptionalArgs(t *testing.T) {
-	info, err := PrimaryPackage("go", "./testdata", []string{"optargs.go"})
+	info, err := PrimaryPackage("go", "./testdata", []string{"optargs.go"}, false)
 	if err != nil {
 		t.Fatal(err)
 	}
