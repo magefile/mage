@@ -43,10 +43,10 @@ const HashFastEnv = "MAGEFILE_HASHFAST"
 const EnableColorEnv = "MAGEFILE_ENABLE_COLOR"
 
 // MultilineEnv is the environment variable that indicates the user has
-// requested to retain CRLF line endings in comments for the generated main
-// file. The default is false for backwards compatibility. When the value is
-// true, then CRLF line endings will be retained in comments for the generated
-// main file.
+// requested to preserve line breaks in help text generated from mage package
+// and target documentation comments. The default is false for backwards
+// compatibility. When the value is true, newline characters in those
+// descriptions are retained in mage's help and list output.
 const MultilineEnv = "MAGEFILE_MULTILINE"
 
 // TargetColorEnv is the environment variable that indicates which ANSI color
