@@ -26,6 +26,8 @@ func init() { //nolint:gochecknoinits // required for test flag setup
 }
 
 func TestMain(m *testing.M) {
+	flag.Parse()
+
 	if printArgs {
 		fmt.Println(flag.Args())
 		return
@@ -38,7 +40,7 @@ func TestMain(m *testing.M) {
 	if helperCmd {
 		_, _ = fmt.Fprintln(os.Stderr, stderr)
 		_, _ = fmt.Fprintln(os.Stdout, stdout)
-		os.Exit(exitCode) //nolint:revive // required for test helper command
+		os.Exit(exitCode)
 	}
-	m.Run()
+	os.Exit(m.Run())
 }
