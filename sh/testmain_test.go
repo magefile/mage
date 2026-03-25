@@ -25,7 +25,7 @@ func init() { //nolint:gochecknoinits // required for test flag setup
 	flag.StringVar(&printVar, "printVar", "", "")
 }
 
-func TestMain(_ *testing.M) {
+func TestMain(m *testing.M) {
 	if printArgs {
 		fmt.Println(flag.Args())
 		return
@@ -40,4 +40,5 @@ func TestMain(_ *testing.M) {
 		_, _ = fmt.Fprintln(os.Stdout, stdout)
 		os.Exit(exitCode) //nolint:revive // required for test helper command
 	}
+	m.Run()
 }

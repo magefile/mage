@@ -49,7 +49,7 @@ If set to "1" or "true", tells the compiled magefile to print comments from the
 code with their original line returns. Default is the backwards compatible behavior
 of converting line returns in a comment to a space.
 
-Alternatively, you can inclide //mage:multiline as a comment in the magefile code
+Alternatively, you can include //mage:multiline as a comment in the magefile code
 while will have the same effect, and will override the environment variable.
 
 Note that this is a generation-time check, so if you use this with `-compile`,

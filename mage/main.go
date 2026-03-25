@@ -209,7 +209,7 @@ func Parse(stderr, stdout io.Writer, args []string) (inv Invocation, cmd Command
 	fs.BoolVar(&inv.Force, "f", false, "force recreation of compiled magefile")
 	fs.BoolVar(&inv.Debug, "debug", mg.Debug(), "turn on debug messages")
 	fs.BoolVar(&inv.Verbose, "v", mg.Verbose(), "show verbose output when running mage targets")
-	fs.BoolVar(&inv.Multiline, "retain-crlf", mg.Multiline(), "retain CRLF line endings in descriptions")
+	fs.BoolVar(&inv.Multiline, "multiline", mg.Multiline(), "retain CRLF line endings in descriptions")
 	fs.BoolVar(&inv.Help, "h", false, "show this help")
 	fs.DurationVar(&inv.Timeout, "t", 0, "timeout in duration parsable format (e.g. 5m30s)")
 	fs.BoolVar(&inv.Keep, "keep", false, "keep intermediate mage files around after running")
@@ -249,21 +249,22 @@ Commands:
 
 Options:
   -d <string> 
-            directory to read magefiles from (default "." or "magefiles" if exists)
-  -debug    turn on debug messages
-  -f        force recreation of compiled magefile
-  -goarch   sets the GOARCH for the binary created by -compile (default: current arch)
+              directory to read magefiles from (default "." or "magefiles" if exists)
+  -debug      turn on debug messages
+  -f          force recreation of compiled magefile
+  -goarch     sets the GOARCH for the binary created by -compile (default: current arch)
   -gocmd <string>
-		    use the given go binary to compile the output (default: "go")
-  -goos     sets the GOOS for the binary created by -compile (default: current OS)
-  -ldflags  sets the ldflags for the binary created by -compile (default: "")
-  -h        show description of a target
-  -keep     keep intermediate mage files around after running
+		      use the given go binary to compile the output (default: "go")
+  -goos       sets the GOOS for the binary created by -compile (default: current OS)
+  -ldflags    sets the ldflags for the binary created by -compile (default: "")
+  -multiline  retain line returns in help docs (default: convert to spaces)
+  -h          show description of a target
+  -keep       keep intermediate mage files around after running
   -t <string>
-            timeout in duration parsable format (e.g. 5m30s)
-  -v        show verbose output when running mage targets
+              timeout in duration parsable format (e.g. 5m30s)
+  -v          show verbose output when running mage targets
   -w <string>
-            working directory where magefiles will run (default -d value)
+              working directory where magefiles will run (default -d value)
 `[1:])
 	}
 	err = fs.Parse(args)
