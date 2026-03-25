@@ -38,6 +38,6 @@ func TestMain(_ *testing.M) {
 	if helperCmd {
 		_, _ = fmt.Fprintln(os.Stderr, stderr)
 		_, _ = fmt.Fprintln(os.Stdout, stdout)
-		os.Exit(exitCode)
+		os.Exit(exitCode) //nolint:revive // required for test helper command
 	}
 }
