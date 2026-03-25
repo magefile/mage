@@ -66,6 +66,8 @@ asdf global mage latest
 
 package main
 
+//mage:multiline // enable line return retention in doc output.
+
 import (
     "github.com/magefile/mage/sh"
 )

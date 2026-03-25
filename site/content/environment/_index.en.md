@@ -3,35 +3,14 @@ title = "Environment Variables"
 weight = 40
 +++
 
-## MAGEFILE_VERBOSE
-
-Set to "1" or "true" to turn on verbose mode (like running with -v)
-
-## MAGEFILE_DEBUG
-
-Set to "1" or "true" to turn on debug mode (like running with -debug)
-
 ## MAGEFILE_CACHE
 
 Sets the directory where mage will store binaries compiled from magefiles
 (default is $HOME/. or %USERPROFILE%\magefile)
 
-## MAGEFILE_GOCMD
+## MAGEFILE_DEBUG
 
-Sets the binary that mage will use to compile with (default is "go").
-
-## MAGEFILE_IGNOREDEFAULT
-
-If set to "1" or "true", tells the compiled magefile to ignore the default
-target and print the list of targets when you run `mage`.
-
-## MAGEFILE_HASHFAST
-
-If set to "1" or "true", tells mage to use a quick hash of magefiles to
-determine whether or not the magefile binary needs to be rebuilt. This results
-in faster run times (especially on Windows), but means that mage will fail to
-rebuild if a dependency has changed. To force a rebuild when you know or suspect
-a dependency has changed, run mage with the -f flag.
+Set to "1" or "true" to turn on debug mode (like running with -debug)
 
 ## MAGEFILE_ENABLE_COLOR
 
@@ -46,6 +25,32 @@ then the list of mage targets will be displayed in ANSI color.
 When the value is true but the detected terminal does not support colors,
 then the list of mage targets will be displayed in the default colors
 (e.g. black and white).
+
+## MAGEFILE_GOCMD
+
+Sets the binary that mage will use to compile with (default is "go").
+
+## MAGEFILE_HASHFAST
+
+If set to "1" or "true", tells mage to use a quick hash of magefiles to
+determine whether or not the magefile binary needs to be rebuilt. This results
+in faster run times (especially on Windows), but means that mage will fail to
+rebuild if a dependency has changed. To force a rebuild when you know or suspect
+a dependency has changed, run mage with the -f flag.
+
+## MAGEFILE_IGNOREDEFAULT
+
+If set to "1" or "true", tells the compiled magefile to ignore the default
+target and print the list of targets when you run `mage`.
+
+## MAGEFILE_MULTILINE
+
+If set to "1" or "true", tells the compiled magefile to print comments from the 
+code with their original line returns. Default is the backwards compatible behavior
+of converting line returns in a comment to a space.
+
+Alternatively, you can inclide //mage:multiline as a comment in the magefile code
+while will have the same effect, and will override the environment variable.
 
 ## MAGEFILE_TARGET_COLOR
 
@@ -73,3 +78,8 @@ The supported ANSI color names are any of these:
 - BrightWhite
 
 The names are case-insensitive.
+
+## MAGEFILE_VERBOSE
+
+Set to "1" or "true" to turn on verbose mode (like running with -v)
+
