@@ -113,7 +113,7 @@ type Invocation struct {
 	GoCmd      string        // the go binary command to run
 	CacheDir   string        // the directory where we should store compiled binaries
 	HashFast   bool          // don't rely on GOCACHE, just hash the magefiles
-	Multiline  bool          // whether to retain CRLF line endings in comments for the generated main file
+	Multiline  bool          // whether to retain line returns in help text for the generated main file
 }
 
 // MagefilesDirName is the name of the default folder to look for if no directory was specified,
@@ -209,7 +209,7 @@ func Parse(stderr, stdout io.Writer, args []string) (inv Invocation, cmd Command
 	fs.BoolVar(&inv.Force, "f", false, "force recreation of compiled magefile")
 	fs.BoolVar(&inv.Debug, "debug", mg.Debug(), "turn on debug messages")
 	fs.BoolVar(&inv.Verbose, "v", mg.Verbose(), "show verbose output when running mage targets")
-	fs.BoolVar(&inv.Multiline, "multiline", mg.Multiline(), "retain CRLF line endings in descriptions")
+	fs.BoolVar(&inv.Multiline, "multiline", mg.Multiline(), "retain line returns in help text")
 	fs.BoolVar(&inv.Help, "h", false, "show this help")
 	fs.DurationVar(&inv.Timeout, "t", 0, "timeout in duration parsable format (e.g. 5m30s)")
 	fs.BoolVar(&inv.Keep, "keep", false, "keep intermediate mage files around after running")

@@ -616,17 +616,17 @@ func TestMultiline(t *testing.T) {
 			name: "list",
 			args: []string{"-d", "testdata/multiline", "-l"},
 			// line returns at the end here are important to show that we don't add an extra line return.
-			output: "This is a global comment for the mage output.\nIt should be retained with CRLF.\n\nTargets:",
+			output: "This is a global comment for the mage output.\nIt should retain line returns.\n\nTargets:",
 		},
 		{
 			name:   "help-func",
 			args:   []string{"-d", "testdata/multiline", "-h", "doit"},
-			output: "DoIt is a dummy function with a crlf comment.\nThat should show up with multiple lines.\n\nUsage:",
+			output: "DoIt is a dummy function with a multiline comment.\nThat should show up with multiple lines.\n\nUsage:",
 		},
 		{
 			name:   "help-func",
 			args:   []string{"-d", "testdata/multiline", "-h", "sub:doittoo"},
-			output: "DoItToo is a dummy function with a crlf comment.\nHere's the second line.\n\nUsage:",
+			output: "DoItToo is a dummy function with a multiline comment.\nHere's the second line.\n\nUsage:",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -656,17 +656,17 @@ func TestMultilineTag(t *testing.T) {
 			name: "list",
 			args: []string{"-d", "testdata/multiline/tag", "-l"},
 			// line returns at the end here are important to show that we don't add an extra line return.
-			output: "This is a global comment for the mage output.\nIt should be retained with CRLF.\n\nTargets:",
+			output: "This is a global comment for the mage output.\nIt should retain line returns.\n\nTargets:",
 		},
 		{
 			name:   "help-func",
 			args:   []string{"-d", "testdata/multiline/tag", "-h", "doit"},
-			output: "DoIt is a dummy function with a crlf comment.\nThat should show up with multiple lines.\n\nUsage:",
+			output: "DoIt is a dummy function with a multiline comment.\nThat should show up with multiple lines.\n\nUsage:",
 		},
 		{
 			name:   "help-func",
 			args:   []string{"-d", "testdata/multiline/tag", "-h", "sub:doittoo"},
-			output: "DoItToo is a dummy function with a crlf comment.\nHere's the second line.\n\nUsage:",
+			output: "DoItToo is a dummy function with a multiline comment.\nHere's the second line.\n\nUsage:",
 		},
 	} {
 		// The tests should be the same regardless of the environment variable, because the tag should override.

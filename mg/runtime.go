@@ -99,8 +99,8 @@ func HashFast() bool {
 	return b
 }
 
-// Multiline reports whether the user has requested to retain CRLF line endings
-// in comments for the generated main file.
+// Multiline reports whether the user has requested to retain line returns
+// in help text for the generated main file.
 func Multiline() bool {
 	b, _ := strconv.ParseBool(os.Getenv(MultilineEnv))
 	return b
