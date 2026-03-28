@@ -175,34 +175,34 @@ func (f Function) ExecCode() string {
 			x++`, x)
 		case "int":
 			_, _ = fmt.Fprintf(&parseargs, `
-				arg%d, err := strconv.Atoi(args.Args[x])
+				arg%d, err := _strconv.Atoi(args.Args[x])
 				if err != nil {
 					logger.Printf("can't convert argument %%q to int\n", args.Args[x])
-					os.Exit(2)
+					_os.Exit(2)
 				}
 				x++`, x)
 		case "float64":
 			_, _ = fmt.Fprintf(&parseargs, `
-				arg%d, err := strconv.ParseFloat(args.Args[x], 64)
+				arg%d, err := _strconv.ParseFloat(args.Args[x], 64)
 				if err != nil {
 					logger.Printf("can't convert argument %%q to float64\n", args.Args[x])
-					os.Exit(2)
+					_os.Exit(2)
 				}
 				x++`, x)
 		case "bool":
 			_, _ = fmt.Fprintf(&parseargs, `
-				arg%d, err := strconv.ParseBool(args.Args[x])
+				arg%d, err := _strconv.ParseBool(args.Args[x])
 				if err != nil {
 					logger.Printf("can't convert argument %%q to bool\n", args.Args[x])
-					os.Exit(2)
+					_os.Exit(2)
 				}
 				x++`, x)
-		case "time.Duration":
+		case "_time.Duration":
 			_, _ = fmt.Fprintf(&parseargs, `
-				arg%d, err := time.ParseDuration(args.Args[x])
+				arg%d, err := _time.ParseDuration(args.Args[x])
 				if err != nil {
 					logger.Printf("can't convert argument %%q to time.Duration\n", args.Args[x])
-					os.Exit(2)
+					_os.Exit(2)
 				}
 				x++`, x)
 		default:
@@ -246,7 +246,7 @@ func (f Function) ExecCode() string {
 		_, _ = fmt.Fprintf(&parseargs, `
 						default:
 							logger.Printf("invalid option %%q for target \"%s\", expected -name=value format\n", _optArg)
-							os.Exit(2)
+							_os.Exit(2)
 						}
 					} else {
 						_optName = _strings.ToLower(_optArg[1:_eqIdx])
@@ -267,37 +267,37 @@ func (f Function) ExecCode() string {
 			case "int":
 				_, _ = fmt.Fprintf(&parseargs, `
 					case %q:
-						_tmp%d, err := strconv.Atoi(_optVal)
+						_tmp%d, err := _strconv.Atoi(_optVal)
 						if err != nil {
 							logger.Printf("can't convert option %%q value %%q to int\n", _optName, _optVal)
-							os.Exit(2)
+							_os.Exit(2)
 						}
 						arg%d = &_tmp%d`, lowerName, x, x, x)
 			case "float64":
 				_, _ = fmt.Fprintf(&parseargs, `
 					case %q:
-						_tmp%d, err := strconv.ParseFloat(_optVal, 64)
+						_tmp%d, err := _strconv.ParseFloat(_optVal, 64)
 						if err != nil {
 							logger.Printf("can't convert option %%q value %%q to float64\n", _optName, _optVal)
-							os.Exit(2)
+							_os.Exit(2)
 						}
 						arg%d = &_tmp%d`, lowerName, x, x, x)
 			case "bool":
 				_, _ = fmt.Fprintf(&parseargs, `
 					case %q:
-						_tmp%d, err := strconv.ParseBool(_optVal)
+						_tmp%d, err := _strconv.ParseBool(_optVal)
 						if err != nil {
 							logger.Printf("can't convert option %%q value %%q to bool\n", _optName, _optVal)
-							os.Exit(2)
+							_os.Exit(2)
 						}
 						arg%d = &_tmp%d`, lowerName, x, x, x)
 			case "time.Duration":
 				_, _ = fmt.Fprintf(&parseargs, `
 					case %q:
-						_tmp%d, err := time.ParseDuration(_optVal)
+						_tmp%d, err := _time.ParseDuration(_optVal)
 						if err != nil {
 							logger.Printf("can't convert option %%q value %%q to time.Duration\n", _optName, _optVal)
-							os.Exit(2)
+							_os.Exit(2)
 						}
 						arg%d = &_tmp%d`, lowerName, x, x, x)
 			default:
@@ -307,14 +307,14 @@ func (f Function) ExecCode() string {
 		_, _ = fmt.Fprintf(&parseargs, `
 					default:
 						logger.Printf("unknown option %%q for target \"%s\"\n", _optName)
-						os.Exit(2)
+						_os.Exit(2)
 					}
 					x++
 				}`, f.TargetName())
 	}
 
 	out := parseargs.String() + `
-				wrapFn := func(ctx context.Context) error {
+				wrapFn := func(ctx _context.Context) error {
 					`
 	if f.IsError {
 		out += "return "
@@ -1051,6 +1051,6 @@ var argTypes = map[string]string{
 	"string":           "string",
 	"int":              "int",
 	"float64":          "float64",
-	"&{time Duration}": "time.Duration",
+	"&{time Duration}": "_time.Duration",
 	"bool":             "bool",
 }

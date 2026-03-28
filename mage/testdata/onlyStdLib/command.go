@@ -12,6 +12,8 @@ import (
 
 var Default = SomePig
 
+func NOOP() {}
+
 // this should not be a target because it returns a string
 func ReturnsString() string {
 	fmt.Println("more stuff")
