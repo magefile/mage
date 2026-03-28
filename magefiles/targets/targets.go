@@ -54,11 +54,21 @@ func Install() error {
 var releaseTag = regexp.MustCompile(`^v1\.\d+\.\d+$`)
 
 // Release generates a new release. Expects a version tag in v1.x.x format.
-func Release(tag string) (err error) {
+// If dryRun is true, it runs goreleaser in snapshot mode without tagging or
+// publishing, which can be used to verify the release artifacts.
+func Release(tag string, dryRun *bool) (err error) {
 	mg.Deps(Tools)
 
 	if !releaseTag.MatchString(tag) {
 		return errors.New("TAG environment variable must be in semver v1.x.x format, but was " + tag)
+	}
+
+	if dryRun != nil && *dryRun {
+		if err := sh.RunV("git", "tag", "-a", tag, "-m", tag); err != nil {
+			return err
+		}
+		defer func() { _ = sh.RunV("git", "tag", "--delete", tag) }()
+		return sh.RunV("goreleaser", "release", "--skip=publish", "--skip=validate")
 	}
 
 	if err := sh.RunV("git", "tag", "-a", tag, "-m", tag); err != nil {
@@ -73,7 +83,7 @@ func Release(tag string) (err error) {
 			_ = sh.RunV("git", "push", "--delete", "origin", tag)
 		}
 	}()
-	return sh.RunV("goreleaser", "release")
+	return sh.RunV("goreleaser", "release", "--clean")
 }
 
 // Clean removes the temporarily generated files from Release.
