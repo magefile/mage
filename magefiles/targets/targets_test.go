@@ -47,32 +47,28 @@ func TestRelease(t *testing.T) {
 	if err := os.Chdir(repoRoot); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() {
-		err := os.RemoveAll("../../dist")
-		if err != nil {
-			t.Fatal(err)
-		}
-	})
+	t.Cleanup(func() { _ = os.RemoveAll(filepath.Join(repoRoot, "dist")) })
 	t.Cleanup(func() { _ = os.Chdir(origDir) })
 
-	version := "v1.0.99"
+	const tag = "v1.0.99"
 
 	dryRun := true
-	if err := Release(version, &dryRun); err != nil {
+	if err := Release(tag, &dryRun); err != nil {
 		t.Fatal(err)
 	}
+
+	// goreleaser strips the leading "v" from the tag for artifact names.
+	version := strings.TrimPrefix(tag, "v")
 
 	entries, err := os.ReadDir("dist")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	releaserVer := strings.TrimPrefix(version, "v")
-
 	// Build expected set, initially marking each as not found.
 	expected := make(map[string]bool, len(expectedReleaseFiles))
 	for _, pattern := range expectedReleaseFiles {
-		expected[fmt.Sprintf(pattern, releaserVer)] = false
+		expected[fmt.Sprintf(pattern, version)] = false
 	}
 
 	// Walk dist/ and match release artifacts.

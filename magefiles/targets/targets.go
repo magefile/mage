@@ -54,8 +54,8 @@ func Install() error {
 var releaseTag = regexp.MustCompile(`^v1\.\d+\.\d+$`)
 
 // Release generates a new release. Expects a version tag in v1.x.x format.
-// If dryRun is true, it runs goreleaser in snapshot mode without tagging or
-// publishing, which can be used to verify the release artifacts.
+// If dryRun is true, it creates a local tag and runs goreleaser without
+// publishing, then deletes the tag. This can be used to verify release artifacts.
 func Release(tag string, dryRun *bool) (err error) {
 	if err := installTool("goreleaser"); err != nil {
 		return err
@@ -70,7 +70,7 @@ func Release(tag string, dryRun *bool) (err error) {
 			return err
 		}
 		defer func() { _ = sh.RunV("git", "tag", "--delete", tag) }()
-		return sh.RunV("goreleaser", "release", "--skip=publish", "--skip=validate")
+		return sh.RunV("goreleaser", "release", "--skip=publish", "--skip=validate", "--clean")
 	}
 
 	if err := sh.RunV("git", "tag", "-a", tag, "-m", tag); err != nil {
