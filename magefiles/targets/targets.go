@@ -57,7 +57,9 @@ var releaseTag = regexp.MustCompile(`^v1\.\d+\.\d+$`)
 // If dryRun is true, it runs goreleaser in snapshot mode without tagging or
 // publishing, which can be used to verify the release artifacts.
 func Release(tag string, dryRun *bool) (err error) {
-	mg.Deps(Tools)
+	if err := installTool("goreleaser"); err != nil {
+		return err
+	}
 
 	if !releaseTag.MatchString(tag) {
 		return errors.New("TAG environment variable must be in semver v1.x.x format, but was " + tag)
@@ -91,23 +93,38 @@ func Clean() error {
 	return sh.Rm("dist")
 }
 
-var goTools = []string{
-	"github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.11.2",
-	"github.com/goreleaser/goreleaser/v2@v2.14.3",
+var goTools = map[string]string{
+	"lint":       "github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.11.2",
+	"goreleaser": "github.com/goreleaser/goreleaser/v2@v2.14.3",
 }
 
 // Tools installs the dev tools used by mage, such as golangci-lint.
 func Tools() error {
 	for _, tool := range goTools {
-		if err := sh.Run("go", "install", tool); err != nil {
-			return fmt.Errorf("failed to install %s: %w", tool, err)
+		if err := installTool(tool); err != nil {
+			return err
 		}
+	}
+	return nil
+}
+
+func installTool(tool string) error {
+	version, ok := goTools[tool]
+	if !ok {
+		return fmt.Errorf("unknown tool %q", tool)
+	}
+	if err := sh.Run("go", "install", version); err != nil {
+		return fmt.Errorf("failed to install %s: %w", version, err)
 	}
 	return nil
 }
 
 // Lint runs golangci-lint on the codebase.
 func Lint() error {
-	mg.Deps(Tools)
+	err := installTool("lint")
+	if err != nil {
+		return err
+	}
+
 	return sh.RunV("golangci-lint", "run")
 }
