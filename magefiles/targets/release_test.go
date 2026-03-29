@@ -1,3 +1,7 @@
+//go:build go1.24
+
+// These tests fail on older Go versions because of the change in go.mod format.
+// But it doesn't matter because we only call release with modern go versions.
 package targets
 
 import (
