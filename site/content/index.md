@@ -131,6 +131,7 @@ Usage:
 	mage deploy <env> [<flags>]
 
 Flags:
+
     -version=<string>  git tag for the build, defaults to the next minor build if not set
     -dryrun=<bool>     if set to true, just outputs the build artifacts
 ```

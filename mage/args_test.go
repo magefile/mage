@@ -480,8 +480,8 @@ Usage:
 
 Flags:
 
-  -greeting=<string>  the message to append to the name
-  -repeat=<int>       the number of times to repeat
+	-greeting=<string>  the message to append to the name
+	-repeat=<int>       the number of times to repeat
 
 `
 	if actual != expected {
@@ -514,7 +514,7 @@ Usage:
 
 Flags:
 
-  -greeting=<string>  the greeting to use
+	-greeting=<string>  the greeting to use
 
 `
 	if actual != expected {

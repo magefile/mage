@@ -195,7 +195,7 @@ func (f Function) FlagDocsString() string {
 	var entries []entry
 	maxLen := 0
 	for _, a := range opts {
-		label := fmt.Sprintf("  -%s=<%s>", a.Name, a.Type)
+		label := fmt.Sprintf("-%s=<%s>", a.Name, a.Type)
 		if len(label) > maxLen {
 			maxLen = len(label)
 		}
@@ -203,15 +203,15 @@ func (f Function) FlagDocsString() string {
 	}
 
 	var buf strings.Builder
-	buf.WriteString("Flags:\n\n")
+	_, _ = buf.WriteString("Flags:\n\n")
 	for _, e := range entries {
 		if e.comment != "" {
-			buf.WriteString(fmt.Sprintf("%-*s  %s\n", maxLen, e.label, e.comment))
+			_, _ = buf.WriteString(fmt.Sprintf("\t%-*s  %s\n", maxLen, e.label, e.comment))
 		} else {
-			buf.WriteString(e.label + "\n")
+			_, _ = buf.WriteString(fmt.Sprintf("\t%s\n", e.label))
 		}
 	}
-	buf.WriteString("\n")
+	_, _ = buf.WriteString("\n")
 	return buf.String()
 }
 
