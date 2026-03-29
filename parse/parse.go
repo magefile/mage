@@ -480,6 +480,22 @@ func Package(path string, files []string, multiline bool) (*PkgInfo, error) {
 		multiline = true
 	}
 	p := doc.New(pkg, "./", doc.PreserveAST)
+
+	// Build a map from AST fields to their inline comments. We use
+	// ast.NewCommentMap because the Go parser does not populate
+	// ast.Field.Comment for function parameters (only for struct fields).
+	fieldComments := make(map[*ast.Field]string)
+	for _, f := range pkg.Files {
+		cmap := ast.NewCommentMap(fset, f, f.Comments)
+		for node, groups := range cmap {
+			field, ok := node.(*ast.Field)
+			if !ok || len(groups) == 0 {
+				continue
+			}
+			fieldComments[field] = strings.TrimSpace(groups[0].Text())
+		}
+	}
+
 	pi := &PkgInfo{
 		AstPkg:    pkg,
 		DocPkg:    p,
@@ -491,8 +507,8 @@ func Package(path string, files []string, multiline bool) (*PkgInfo, error) {
 		pi.Description = toOneLine(p.Doc)
 	}
 
-	setNamespaces(pi, fset)
-	setFuncs(pi, fset)
+	setNamespaces(pi, fieldComments)
+	setFuncs(pi, fieldComments)
 
 	hasDupes, names := checkDupeTargets(pi)
 	if hasDupes {
@@ -583,15 +599,14 @@ func (s Imports) Swap(i, j int) {
 	s[i], s[j] = s[j], s[i]
 }
 
-func setFuncs(pi *PkgInfo, fset *token.FileSet) {
+func setFuncs(pi *PkgInfo, fieldComments map[*ast.Field]string) {
 	for _, f := range pi.DocPkg.Funcs {
 		if f.Recv != "" {
 			debug.Printf("skipping method %s.%s", f.Recv, f.Name)
 			// skip methods
 			continue
 		}
-		comments := fileCommentsForFunc(fset, pi.AstPkg, f.Decl)
-		fn, ok := funcFromDoc(f, pi.DocPkg.ImportPath, f.Name, pi.Multiline, fset, comments)
+		fn, ok := funcFromDoc(f, pi.DocPkg.ImportPath, f.Name, pi.Multiline, fieldComments)
 		if !ok {
 			continue
 		}
@@ -599,15 +614,14 @@ func setFuncs(pi *PkgInfo, fset *token.FileSet) {
 	}
 }
 
-func setNamespaces(pi *PkgInfo, fset *token.FileSet) {
+func setNamespaces(pi *PkgInfo, fieldComments map[*ast.Field]string) {
 	for _, t := range pi.DocPkg.Types {
 		if !isNamespace(t) {
 			continue
 		}
 		debug.Printf("found namespace %s %s", pi.DocPkg.ImportPath, t.Name)
 		for _, f := range t.Methods {
-			comments := fileCommentsForFunc(fset, pi.AstPkg, f.Decl)
-			fn, ok := funcFromDoc(f, pi.DocPkg.ImportPath, t.Name+"."+f.Name, pi.Multiline, fset, comments)
+			fn, ok := funcFromDoc(f, pi.DocPkg.ImportPath, t.Name+"."+f.Name, pi.Multiline, fieldComments)
 			if !ok {
 				continue
 			}
@@ -617,23 +631,11 @@ func setNamespaces(pi *PkgInfo, fset *token.FileSet) {
 	}
 }
 
-// fileCommentsForFunc returns all comment groups from the file containing the
-// given function declaration.
-func fileCommentsForFunc(fset *token.FileSet, pkg *ast.Package, decl *ast.FuncDecl) []*ast.CommentGroup {
-	filename := fset.Position(decl.Pos()).Filename
-	for name, f := range pkg.Files {
-		if name == filename {
-			return f.Comments
-		}
-	}
-	return nil
-}
-
-func funcFromDoc(f *doc.Func, importpath, funcname string, multiline bool, fset *token.FileSet, comments []*ast.CommentGroup) (*Function, bool) {
+func funcFromDoc(f *doc.Func, importpath, funcname string, multiline bool, fieldComments map[*ast.Field]string) (*Function, bool) {
 	if !ast.IsExported(f.Name) {
 		return nil, false
 	}
-	fn, err := funcType(f.Decl.Type, fset, comments)
+	fn, err := funcType(f.Decl.Type, fieldComments)
 	if err != nil {
 		debug.Printf("skipping invalid method %s %s: %v", importpath, funcname, err)
 		return nil, false
@@ -1067,7 +1069,7 @@ func hasErrorReturn(ft *ast.FuncType) (bool, error) {
 	return false, errors.New("EBADRETURNTYPE")
 }
 
-func funcType(ft *ast.FuncType, fset *token.FileSet, comments []*ast.CommentGroup) (*Function, error) {
+func funcType(ft *ast.FuncType, fieldComments map[*ast.Field]string) (*Function, error) {
 	var err error
 	f := &Function{}
 	f.IsContext, err = hasContextParam(ft)
@@ -1077,17 +1079,6 @@ func funcType(ft *ast.FuncType, fset *token.FileSet, comments []*ast.CommentGrou
 	f.IsError, err = hasErrorReturn(ft)
 	if err != nil {
 		return nil, err
-	}
-
-	// Build a map of line number → comment text for matching inline comments
-	lineComments := make(map[int]string)
-	for _, cg := range comments {
-		for _, c := range cg.List {
-			if strings.HasPrefix(c.Text, "//") {
-				line := fset.Position(c.Pos()).Line
-				lineComments[line] = strings.TrimSpace(strings.TrimPrefix(c.Text, "//"))
-			}
-		}
 	}
 
 	x := 0
@@ -1111,8 +1102,7 @@ func funcType(ft *ast.FuncType, fset *token.FileSet, comments []*ast.CommentGrou
 			}
 			return nil, fmt.Errorf("unsupported argument type: %s", t)
 		}
-		// Match trailing inline comment by line number
-		comment := lineComments[fset.Position(param.End()).Line]
+		comment := fieldComments[param]
 		// support for foo, bar string
 		for _, name := range param.Names {
 			f.Args = append(f.Args, Arg{Name: name.Name, Type: typ, Optional: optional, Comment: comment})

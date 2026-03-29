@@ -73,7 +73,9 @@ import (
 )
 
 // Runs go mod download and then installs the binary.
-func Build() error {
+func Deploy(env string,
+    dryrun *bool, // if set to true, only builds the artifacts
+) error {
     if err := sh.Run("go", "mod", "download"); err != nil {
         return err
     }
@@ -81,7 +83,57 @@ func Build() error {
 }
 ```
 
-Run the above `Build` target by simply running `mage build` in the same directory as the magefile.
+
+## Comments as Help Text
+
+Comments on targets (functions) get converted into help text output. The first
+sentence becomes the brief comment for the target on `mage -l`. The full comment
+is printed out when you run `mage -h <target>`.  Comments on flag arguments are
+printed as docs on the flags.
+
+For example:
+
+```go
+//go:build mage
+
+// These docs will become the main help text when you run `mage` or `mage -l`.
+// This is where you talk about what the thing does.
+package main
+
+//mage:multiline // enable line return retention in doc output.
+
+import (
+    "github.com/any-go-packge/youwant"
+)
+
+// Deploy runs the build and then uploads the artifacts to the server.
+// It deploys to the given environment.
+func Deploy(ctx context.Context, env string,
+    version *string, // git tag for the build, defaults to the next minor build if not set
+    dryRun *bool,    // if set to true, just outputs the build artifacts
+) error {
+    return youwant.ToCallGoCode()
+}
+```
+
+```plain
+$ mage -l
+These docs will become the main help text when you run `mage` or `mage -l`.
+
+Targets:
+  deploy  runs the build and then uploads the artifacts to the server.
+
+$ mage -h deploy
+Deploy runs the build and then uploads the artifacts to the server.
+It deploys to the given environment.
+
+Usage:
+	mage deploy <env> [<flags>]
+
+Flags:
+    -version=<string>  git tag for the build, defaults to the next minor build if not set
+    -dryrun=<bool>     if set to true, just outputs the build artifacts
+```
 
 ## Magefiles directory
 
