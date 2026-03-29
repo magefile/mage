@@ -206,9 +206,9 @@ func (f Function) FlagDocsString() string {
 	_, _ = buf.WriteString("Flags:\n\n")
 	for _, e := range entries {
 		if e.comment != "" {
-			_, _ = buf.WriteString(fmt.Sprintf("\t%-*s  %s\n", maxLen, e.label, e.comment))
+			_, _ = fmt.Fprintf(&buf, "\t%-*s  %s\n", maxLen, e.label, e.comment)
 		} else {
-			_, _ = buf.WriteString(fmt.Sprintf("\t%s\n", e.label))
+			_, _ = fmt.Fprintf(&buf, "\t%s\n", e.label)
 		}
 	}
 	_, _ = buf.WriteString("\n")

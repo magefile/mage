@@ -478,7 +478,7 @@ Usage:
 
 	mage flagdocs <name> [<flags>]
 
-Flags:
+	Flags:
 
 	-greeting=<string>  the message to append to the name
 	-repeat=<int>       the number of times to repeat
