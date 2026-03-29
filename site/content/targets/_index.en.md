@@ -73,7 +73,13 @@ the `-name=value` flag syntax and can appear in any order after the required
 arguments.
 
 ```go
-func Deploy(ctx context.Context, env string, version *string, dryRun *bool) error {
+// Deploy runs the build and then uploads the artifacts to the server.
+// It deploys to the given environment.
+func Deploy(ctx context.Context, env string, 
+    version *string, // git tag for the build, defaults to the next minor build if not set 
+    dryRun *bool,    // if set to true, just outputs the build artifacts 
+    ) error {
+
     // env is required, version and dryRun are optional
 }
 ```
@@ -85,12 +91,18 @@ $ mage deploy production -version=1.2.3 -dryrun=true
 The help output shows optional arguments in brackets:
 
 ```plain
-$ mage -h greet
-Greet greets someone with an optional greeting.
+$ mage -h deploy
+Deploy runs the build and then uploads the artifacts to the server.
+It deploys to the given environment.
 
 Usage:
 
-	mage greet <name> [-greeting=<string>]
+	mage deploy <env> [<flags>]
+
+Flags:
+
+    -version=<string>  git tag for the build, defaults to the next minor build if not set
+    -dryrun=<bool>     if set to true, just outputs the build artifacts
 ```
 
 ## Errors

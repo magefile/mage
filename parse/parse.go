@@ -78,6 +78,7 @@ func (s Functions) Swap(i, j int) {
 type Arg struct {
 	Name, Type string
 	Optional   bool
+	Comment    string
 }
 
 // ID returns user-readable information about where this function is defined.
@@ -147,6 +148,71 @@ func (f Function) HasOptionalArgs() bool {
 		}
 	}
 	return false
+}
+
+// MultipleOptionalArgs reports whether the function has more than one optional argument.
+func (f Function) MultipleOptionalArgs() bool {
+	n := 0
+	for _, a := range f.Args {
+		if a.Optional {
+			n++
+			if n > 1 {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// ShowFlagDocs reports whether the Flags section should be displayed.
+// This is true when there are multiple optional args (since they are
+// condensed to [<flags>] in the usage line) or when any optional arg
+// has a doc comment.
+func (f Function) ShowFlagDocs() bool {
+	if f.MultipleOptionalArgs() {
+		return true
+	}
+	for _, a := range f.Args {
+		if a.Optional && a.Comment != "" {
+			return true
+		}
+	}
+	return false
+}
+
+// FlagDocsString returns a formatted string documenting optional arguments.
+// It aligns comments to the same column based on the longest flag name.
+func (f Function) FlagDocsString() string {
+	opts := f.OptionalArgs()
+	if len(opts) == 0 {
+		return ""
+	}
+	// Compute flag labels and find max width for alignment
+	type entry struct {
+		label   string
+		comment string
+	}
+	var entries []entry
+	maxLen := 0
+	for _, a := range opts {
+		label := fmt.Sprintf("  -%s=<%s>", a.Name, a.Type)
+		if len(label) > maxLen {
+			maxLen = len(label)
+		}
+		entries = append(entries, entry{label: label, comment: a.Comment})
+	}
+
+	var buf strings.Builder
+	buf.WriteString("Flags:\n\n")
+	for _, e := range entries {
+		if e.comment != "" {
+			buf.WriteString(fmt.Sprintf("%-*s  %s\n", maxLen, e.label, e.comment))
+		} else {
+			buf.WriteString(e.label + "\n")
+		}
+	}
+	buf.WriteString("\n")
+	return buf.String()
 }
 
 // ExecCode returns code for the template switch to run the target.
@@ -413,7 +479,7 @@ func Package(path string, files []string, multiline bool) (*PkgInfo, error) {
 		debug.Printf("found %s tag, using multiline descriptions", multilineTag)
 		multiline = true
 	}
-	p := doc.New(pkg, "./", 0)
+	p := doc.New(pkg, "./", doc.PreserveAST)
 	pi := &PkgInfo{
 		AstPkg:    pkg,
 		DocPkg:    p,
@@ -425,8 +491,8 @@ func Package(path string, files []string, multiline bool) (*PkgInfo, error) {
 		pi.Description = toOneLine(p.Doc)
 	}
 
-	setNamespaces(pi)
-	setFuncs(pi)
+	setNamespaces(pi, fset)
+	setFuncs(pi, fset)
 
 	hasDupes, names := checkDupeTargets(pi)
 	if hasDupes {
@@ -517,14 +583,15 @@ func (s Imports) Swap(i, j int) {
 	s[i], s[j] = s[j], s[i]
 }
 
-func setFuncs(pi *PkgInfo) {
+func setFuncs(pi *PkgInfo, fset *token.FileSet) {
 	for _, f := range pi.DocPkg.Funcs {
 		if f.Recv != "" {
 			debug.Printf("skipping method %s.%s", f.Recv, f.Name)
 			// skip methods
 			continue
 		}
-		fn, ok := funcFromDoc(f, pi.DocPkg.ImportPath, f.Name, pi.Multiline)
+		comments := fileCommentsForFunc(fset, pi.AstPkg, f.Decl)
+		fn, ok := funcFromDoc(f, pi.DocPkg.ImportPath, f.Name, pi.Multiline, fset, comments)
 		if !ok {
 			continue
 		}
@@ -532,14 +599,15 @@ func setFuncs(pi *PkgInfo) {
 	}
 }
 
-func setNamespaces(pi *PkgInfo) {
+func setNamespaces(pi *PkgInfo, fset *token.FileSet) {
 	for _, t := range pi.DocPkg.Types {
 		if !isNamespace(t) {
 			continue
 		}
 		debug.Printf("found namespace %s %s", pi.DocPkg.ImportPath, t.Name)
 		for _, f := range t.Methods {
-			fn, ok := funcFromDoc(f, pi.DocPkg.ImportPath, t.Name+"."+f.Name, pi.Multiline)
+			comments := fileCommentsForFunc(fset, pi.AstPkg, f.Decl)
+			fn, ok := funcFromDoc(f, pi.DocPkg.ImportPath, t.Name+"."+f.Name, pi.Multiline, fset, comments)
 			if !ok {
 				continue
 			}
@@ -549,11 +617,23 @@ func setNamespaces(pi *PkgInfo) {
 	}
 }
 
-func funcFromDoc(f *doc.Func, importpath, funcname string, multiline bool) (*Function, bool) {
+// fileCommentsForFunc returns all comment groups from the file containing the
+// given function declaration.
+func fileCommentsForFunc(fset *token.FileSet, pkg *ast.Package, decl *ast.FuncDecl) []*ast.CommentGroup {
+	filename := fset.Position(decl.Pos()).Filename
+	for name, f := range pkg.Files {
+		if name == filename {
+			return f.Comments
+		}
+	}
+	return nil
+}
+
+func funcFromDoc(f *doc.Func, importpath, funcname string, multiline bool, fset *token.FileSet, comments []*ast.CommentGroup) (*Function, bool) {
 	if !ast.IsExported(f.Name) {
 		return nil, false
 	}
-	fn, err := funcType(f.Decl.Type)
+	fn, err := funcType(f.Decl.Type, fset, comments)
 	if err != nil {
 		debug.Printf("skipping invalid method %s %s: %v", importpath, funcname, err)
 		return nil, false
@@ -987,7 +1067,7 @@ func hasErrorReturn(ft *ast.FuncType) (bool, error) {
 	return false, errors.New("EBADRETURNTYPE")
 }
 
-func funcType(ft *ast.FuncType) (*Function, error) {
+func funcType(ft *ast.FuncType, fset *token.FileSet, comments []*ast.CommentGroup) (*Function, error) {
 	var err error
 	f := &Function{}
 	f.IsContext, err = hasContextParam(ft)
@@ -998,6 +1078,18 @@ func funcType(ft *ast.FuncType) (*Function, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// Build a map of line number → comment text for matching inline comments
+	lineComments := make(map[int]string)
+	for _, cg := range comments {
+		for _, c := range cg.List {
+			if strings.HasPrefix(c.Text, "//") {
+				line := fset.Position(c.Pos()).Line
+				lineComments[line] = strings.TrimSpace(strings.TrimPrefix(c.Text, "//"))
+			}
+		}
+	}
+
 	x := 0
 	if f.IsContext {
 		x++
@@ -1019,9 +1111,11 @@ func funcType(ft *ast.FuncType) (*Function, error) {
 			}
 			return nil, fmt.Errorf("unsupported argument type: %s", t)
 		}
+		// Match trailing inline comment by line number
+		comment := lineComments[fset.Position(param.End()).Line]
 		// support for foo, bar string
 		for _, name := range param.Names {
-			f.Args = append(f.Args, Arg{Name: name.Name, Type: typ, Optional: optional})
+			f.Args = append(f.Args, Arg{Name: name.Name, Type: typ, Optional: optional, Comment: comment})
 		}
 	}
 	return f, nil

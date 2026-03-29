@@ -16,3 +16,9 @@ func OptionalBool(verbose *bool) {}
 func OptionalDuration(base time.Duration, extra *time.Duration) {}
 
 func AllOptional(a *string, b *int) {}
+
+func FlagDocFunc(name string,
+	greeting *string, // the greeting message
+	count *int, // how many times
+) {
+}
