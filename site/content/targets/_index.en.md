@@ -36,9 +36,9 @@ You can intersperse multiple targets with arguments as you'd expect:
 
 `mage run foo.exe exec somename 5 true 100ms`
 
-### Optional Arguments (v1.16.0+)
+### Flags (v1.16.0+)
 
-You can define optional arguments by using pointer types for any of the
+You can define flags (optional arguments) by using pointer types for any of the
 supported argument types (`*string`, `*int`, `*float64`, `*bool`,
 `*time.Duration`). Optional arguments are passed on the command line using
 `-name=value` syntax, where `name` is the Go parameter name (case-insensitive).
@@ -72,37 +72,11 @@ signature. Required arguments are always positional, while optional arguments us
 the `-name=value` flag syntax and can appear in any order after the required
 arguments.
 
-```go
-func Deploy(ctx context.Context, env string, version *string, dryRun *bool) error {
-    // env is required, version and dryRun are optional
-}
-```
-
-```plain
-$ mage deploy production -version=1.2.3 -dryrun=true
-```
-
-The help output shows optional arguments in brackets:
-
-```plain
-$ mage -h greet
-Greet greets someone with an optional greeting.
-
-Usage:
-
-	mage greet <name> [-greeting=<string>]
-```
-
 ## Errors
 
 If the function has an error return, errors returned from the function will
 print to stdout and cause the magefile to exit with an exit code of 1.  Any
 functions that do not fit this pattern are not considered targets by mage.
-
-Comments on the target function will become documentation accessible by running
-`mage -l` which will list all the build targets in this directory with the first
-sentence from their docs, or `mage -h <target>` which will show the full comment
-from the docs on the function, and a list of aliases if specified.
 
 A target may be designated the default target, which is run when the user runs
 `mage` with no target specified. To denote the default, create a `var Default =

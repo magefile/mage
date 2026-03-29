@@ -99,3 +99,27 @@ func Mixed(ctx context.Context, name string, greeting *string, count int) error 
 	}
 	return nil
 }
+
+// FlagDocs tests that docs on flags are properly displayed when you
+// run mage -h FlagDocs.
+func FlagDocs(ctx context.Context, name string,
+	greeting *string, // the message to append to the name
+	repeat *int, // the number of times to repeat
+) error {
+	// should show up like this with mage -h FlagDocs below the current usage text:
+	//
+	// -greeting=<string>  the message to append to the name
+	// -repeat=<int>       the number of times to repeat
+	return nil
+}
+
+// SingleFlagDoc tests that a single documented flag shows the Flags section.
+func SingleFlagDoc(name string,
+	greeting *string, // the greeting to use
+) {
+	if greeting != nil {
+		fmt.Printf("%s, %s!\n", *greeting, name)
+	} else {
+		fmt.Printf("Hello, %s!\n", name)
+	}
+}

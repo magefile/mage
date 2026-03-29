@@ -285,6 +285,14 @@ func TestOptionalArgs(t *testing.T) {
 			},
 		},
 		{
+			Name: "FlagDocFunc",
+			Args: []Arg{
+				{Name: "name", Type: "string"},
+				{Name: "greeting", Type: "string", Optional: true, Comment: "the greeting message"},
+				{Name: "count", Type: "int", Optional: true, Comment: "how many times"},
+			},
+		},
+		{
 			Name: "OptionalBool",
 			Args: []Arg{
 				{Name: "verbose", Type: "bool", Optional: true},
