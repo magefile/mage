@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/magefile/mage/internal"
+	magemcp "github.com/magefile/mage/mcp"
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/parse"
 	"github.com/magefile/mage/sh"
@@ -106,6 +107,7 @@ type Invocation struct {
 	GOOS       string        // sets the GOOS when producing a binary with -compileout
 	GOARCH     string        // sets the GOARCH when producing a binary with -compileout
 	Ldflags    string        // sets the ldflags when producing a binary with -compileout
+	MCP        bool          // generate an MCP server instead of a CLI
 	Stdout     io.Writer     // writer to write stdout messages to
 	Stderr     io.Writer     // writer to write stderr messages to
 	Stdin      io.Reader     // reader to read stdin from
@@ -219,6 +221,7 @@ func Parse(stderr, stdout io.Writer, args []string) (inv Invocation, cmd Command
 	fs.StringVar(&inv.GOOS, "goos", "", "set GOOS for binary produced with -compile")
 	fs.StringVar(&inv.GOARCH, "goarch", "", "set GOARCH for binary produced with -compile")
 	fs.StringVar(&inv.Ldflags, "ldflags", "", "set ldflags for binary produced with -compile")
+	fs.BoolVar(&inv.MCP, "mcp", false, "generate an MCP server instead of a CLI")
 
 	// commands below
 
@@ -257,6 +260,7 @@ Options:
 		      use the given go binary to compile the output (default: "go")
   -goos       sets the GOOS for the binary created by -compile (default: current OS)
   -ldflags    sets the ldflags for the binary created by -compile (default: "")
+  -mcp        generate an MCP server instead of a CLI
   -multiline  retain line returns in help docs (default: convert to spaces)
   -h          show description of a target
   -keep       keep intermediate mage files around after running
@@ -318,6 +322,10 @@ Options:
 
 	if cmd != CompileStatic && (inv.GOARCH != "" || inv.GOOS != "") {
 		return inv, cmd, errors.New("-goos and -goarch only apply when running with -compile")
+	}
+
+	if inv.MCP && cmd != None && cmd != CompileStatic {
+		return inv, cmd, errors.New("-mcp cannot be combined with -init, -clean, or -version")
 	}
 
 	inv.Args = fs.Args()
@@ -450,7 +458,11 @@ func Invoke(inv Invocation) int {
 		binaryName = filepath.Base(inv.CompileOut)
 	}
 
-	err = GenerateMainfile(binaryName, main, info)
+	if inv.MCP {
+		err = magemcp.GenerateMainfile(binaryName, main, info)
+	} else {
+		err = GenerateMainfile(binaryName, main, info)
+	}
 	if err != nil {
 		errlog.Println("Error:", err)
 		return 1

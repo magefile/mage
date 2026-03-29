@@ -1917,3 +1917,61 @@ func fileData(file string) (exeType, archSize, error) {
 	}
 	return -1, -1, errors.New("unrecognized executable format")
 }
+
+func TestParseMCPFlag(t *testing.T) {
+	buf := &bytes.Buffer{}
+	inv, _, err := Parse(io.Discard, buf, []string{"-mcp"})
+	if err != nil {
+		t.Fatal("unexpected error", err)
+	}
+	if !inv.MCP {
+		t.Error("expected MCP to be true")
+	}
+}
+
+func TestParseMCPWithCompile(t *testing.T) {
+	buf := &bytes.Buffer{}
+	inv, cmd, err := Parse(io.Discard, buf, []string{"-mcp", "-compile", "output"})
+	if err != nil {
+		t.Fatal("unexpected error", err)
+	}
+	if !inv.MCP {
+		t.Error("expected MCP to be true")
+	}
+	if cmd != CompileStatic {
+		t.Errorf("expected CompileStatic command, got %v", cmd)
+	}
+}
+
+func TestParseMCPWithInit(t *testing.T) {
+	buf := &bytes.Buffer{}
+	_, _, err := Parse(io.Discard, buf, []string{"-mcp", "-init"})
+	if err == nil {
+		t.Fatal("expected error combining -mcp with -init")
+	}
+	if !strings.Contains(err.Error(), "-mcp cannot be combined") {
+		t.Fatalf("unexpected error message: %v", err)
+	}
+}
+
+func TestParseMCPWithClean(t *testing.T) {
+	buf := &bytes.Buffer{}
+	_, _, err := Parse(io.Discard, buf, []string{"-mcp", "-clean"})
+	if err == nil {
+		t.Fatal("expected error combining -mcp with -clean")
+	}
+	if !strings.Contains(err.Error(), "-mcp cannot be combined") {
+		t.Fatalf("unexpected error message: %v", err)
+	}
+}
+
+func TestParseMCPWithVersion(t *testing.T) {
+	buf := &bytes.Buffer{}
+	_, _, err := Parse(io.Discard, buf, []string{"-mcp", "-version"})
+	if err == nil {
+		t.Fatal("expected error combining -mcp with -version")
+	}
+	if !strings.Contains(err.Error(), "-mcp cannot be combined") {
+		t.Fatalf("unexpected error message: %v", err)
+	}
+}
