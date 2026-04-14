@@ -224,7 +224,7 @@ Options:
 	}
 
 	list := func() error {
-		{{with .Description}}_fmt.Println(` + "`{{.}}\n`" + `)
+		{{with .Description}}_fmt.Println({{printf "%q" .}} + "\n")
 		{{- end}}
 		{{- $default := .DefaultFunc}}
 		targets := map[string]string{
