@@ -809,8 +809,7 @@ func checkDupeTargets(info *PkgInfo) (hasDupes bool, names map[string][]string) 
 
 // sanitizeSynopsis sanitizes function Doc to create a summary.
 func sanitizeSynopsis(f *doc.Func) string {
-	var p doc.Package
-	synopsis := p.Synopsis(f.Doc)
+	synopsis := doc.Synopsis(f.Doc)
 	synopsis = sanitizeDocComment(synopsis)
 
 	// If the synopsis begins with the function name, remove it. This is done to
