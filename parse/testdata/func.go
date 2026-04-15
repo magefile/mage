@@ -13,3 +13,6 @@ func ReturnsNilError() error {
 }
 
 func nonexported() {}
+
+// WithBackticks has a synopsis that includes `backticks` which were a problem once.
+func WithBackticks() {}

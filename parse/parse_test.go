@@ -57,6 +57,12 @@ func TestParse(t *testing.T) {
 			Receiver: "Build",
 			IsError:  false,
 		},
+		{
+			Name:     "WithBackticks",
+			IsError:  false,
+			Comment:  "WithBackticks has a synopsis that includes 'backticks' which were a problem once.",
+			Synopsis: "has a synopsis that includes 'backticks' which were a problem once.",
+		},
 	}
 
 	if info.DefaultFunc == nil {
@@ -92,11 +98,14 @@ func TestParse(t *testing.T) {
 	for _, fn := range expected {
 		found := false
 		for _, infoFn := range info.Funcs {
-			if reflect.DeepEqual(fn, *infoFn) {
-				found = true
+			if fn.Name == infoFn.Name && fn.Receiver == infoFn.Receiver {
+				if reflect.DeepEqual(fn, *infoFn) {
+					found = true
+					break
+				}
+				t.Errorf("expected:\n%#v\n\nto equal:\n%#v", fn, *infoFn)
 				break
 			}
-			t.Logf("%#v", infoFn)
 		}
 		if !found {
 			t.Fatalf("expected:\n%#v\n\nto be in:\n%#v", fn, info.Funcs)

@@ -51,8 +51,8 @@ type Function struct {
 	Receiver   string
 	IsError    bool
 	IsContext  bool
-	Synopsis   string
-	Comment    string
+	Synopsis   string // Synopsis is a one sentence description of the function, without its leading function name.
+	Comment    string // Comment is the full comment on the function, with newlines replaced by spaces and trimmed.
 	Args       []Arg
 }
 
@@ -504,7 +504,7 @@ func Package(path string, files []string, multiline bool) (*PkgInfo, error) {
 	if multiline {
 		pi.Description = strings.TrimSuffix(p.Doc, "\n")
 	} else {
-		pi.Description = toOneLine(p.Doc)
+		pi.Description = oneLineDoc(p.Doc)
 	}
 
 	setNamespaces(pi, fieldComments)
@@ -645,7 +645,7 @@ func funcFromDoc(f *doc.Func, importpath, funcname string, multiline bool, field
 	if multiline {
 		fn.Comment = strings.TrimSuffix(f.Doc, "\n")
 	} else {
-		fn.Comment = toOneLine(f.Doc)
+		fn.Comment = oneLineDoc(f.Doc)
 	}
 	fn.Synopsis = sanitizeSynopsis(f)
 	return fn, true
@@ -810,6 +810,7 @@ func checkDupeTargets(info *PkgInfo) (hasDupes bool, names map[string][]string) 
 // sanitizeSynopsis sanitizes function Doc to create a summary.
 func sanitizeSynopsis(f *doc.Func) string {
 	synopsis := doc.Synopsis(f.Doc)
+	synopsis = sanitizeDocComment(synopsis)
 
 	// If the synopsis begins with the function name, remove it. This is done to
 	// not repeat the text.
@@ -817,8 +818,12 @@ func sanitizeSynopsis(f *doc.Func) string {
 	// clean	Clean removes the temporarily generated files
 	// To:
 	// clean 	removes the temporarily generated files
-	if syns := strings.Split(synopsis, " "); strings.EqualFold(f.Name, syns[0]) {
-		return strings.Join(syns[1:], " ")
+	start, rest, found := strings.Cut(synopsis, " ")
+	if !found {
+		return synopsis
+	}
+	if strings.EqualFold(f.Name, start) {
+		return rest
 	}
 
 	return synopsis
@@ -1111,8 +1116,18 @@ func funcType(ft *ast.FuncType, fieldComments map[*ast.Field]string) (*Function,
 	return f, nil
 }
 
-func toOneLine(s string) string {
-	return strings.TrimSpace(strings.ReplaceAll(s, "\n", " "))
+// sanitizeDocComment sanitizes a doc comment by replacing characters that would screw up formatting
+// in the output file.
+func sanitizeDocComment(s string) string {
+	s = strings.ReplaceAll(s, "`", "'")
+	return s
+}
+
+// oneLineDoc converts a doc comment to a single line, and sanitizes it for output.
+func oneLineDoc(s string) string {
+	s = strings.ReplaceAll(s, "\n", " ")
+	s = strings.TrimSpace(s)
+	return sanitizeDocComment(s)
 }
 
 // hasComment reports whether any file in the package contains a comment
