@@ -1130,7 +1130,6 @@ func oneLineDoc(s string) string {
 	return sanitizeDocComment(s)
 }
 
-
 // hasComment reports whether any file in the package contains a comment
 // matching the given tag (e.g. "mage:multiline").
 func hasComment(pkg *ast.Package, tag string) bool {
