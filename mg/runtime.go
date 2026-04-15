@@ -42,6 +42,13 @@ const HashFastEnv = "MAGEFILE_HASHFAST"
 // mage targets will be displayed in the default colors (e.g. black and white).
 const EnableColorEnv = "MAGEFILE_ENABLE_COLOR"
 
+// MultilineEnv is the environment variable that indicates the user has
+// requested to preserve line breaks in help text generated from mage package
+// and target documentation comments. The default is false for backwards
+// compatibility. When the value is true, newline characters in those
+// descriptions are retained in mage's help and list output.
+const MultilineEnv = "MAGEFILE_MULTILINE"
+
 // TargetColorEnv is the environment variable that indicates which ANSI color
 // should be used to colorize mage targets. This is only applicable when
 // the MAGEFILE_ENABLE_COLOR environment variable is true.
@@ -89,6 +96,13 @@ func GoCmd() string {
 // mechanism rather than rely on go's rebuilding mechanism.
 func HashFast() bool {
 	b, _ := strconv.ParseBool(os.Getenv(HashFastEnv))
+	return b
+}
+
+// Multiline reports whether the user has requested to retain line returns
+// in help text for the generated main file.
+func Multiline() bool {
+	b, _ := strconv.ParseBool(os.Getenv(MultilineEnv))
 	return b
 }
 

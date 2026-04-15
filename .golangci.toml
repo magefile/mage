@@ -116,6 +116,9 @@ disable = [
 ]
 enable-all = true
 
+[linters.settings.modernize]
+disable = ["any"]
+
 [linters.settings.nestif]
 min-complexity = 9
 
@@ -204,6 +207,10 @@ disabled = true
 [[linters.settings.revive.rules]]
 name = 'optimize-operands-order'
 disabled = false
+
+[[linters.settings.revive.rules]]
+name = 'redundant-test-main-exit'
+disabled = true
 
 [[linters.settings.revive.rules]]
 name = 'use-any'

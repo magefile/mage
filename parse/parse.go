@@ -20,6 +20,8 @@ import (
 
 const importTag = "mage:import"
 
+const multilineTag = "mage:multiline"
+
 var debug = log.New(io.Discard, "DEBUG: ", log.Ltime|log.Lmicroseconds)
 
 // EnableDebug turns on debug logging.
@@ -27,7 +29,7 @@ func EnableDebug() {
 	debug.SetOutput(os.Stderr)
 }
 
-// PkgInfo contains inforamtion about a package of files according to mage's
+// PkgInfo contains information about a package of files according to mage's
 // parsing rules.
 type PkgInfo struct {
 	AstPkg      *ast.Package
@@ -37,6 +39,7 @@ type PkgInfo struct {
 	DefaultFunc *Function
 	Aliases     map[string]*Function
 	Imports     Imports
+	Multiline   bool
 }
 
 // Function represents a job function from a mage file.
@@ -75,6 +78,7 @@ func (s Functions) Swap(i, j int) {
 type Arg struct {
 	Name, Type string
 	Optional   bool
+	Comment    string
 }
 
 // ID returns user-readable information about where this function is defined.
@@ -144,6 +148,71 @@ func (f Function) HasOptionalArgs() bool {
 		}
 	}
 	return false
+}
+
+// MultipleOptionalArgs reports whether the function has more than one optional argument.
+func (f Function) MultipleOptionalArgs() bool {
+	n := 0
+	for _, a := range f.Args {
+		if a.Optional {
+			n++
+			if n > 1 {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// ShowFlagDocs reports whether the Flags section should be displayed.
+// This is true when there are multiple optional args (since they are
+// condensed to [<flags>] in the usage line) or when any optional arg
+// has a doc comment.
+func (f Function) ShowFlagDocs() bool {
+	if f.MultipleOptionalArgs() {
+		return true
+	}
+	for _, a := range f.Args {
+		if a.Optional && a.Comment != "" {
+			return true
+		}
+	}
+	return false
+}
+
+// FlagDocsString returns a formatted string documenting optional arguments.
+// It aligns comments to the same column based on the longest flag name.
+func (f Function) FlagDocsString() string {
+	opts := f.OptionalArgs()
+	if len(opts) == 0 {
+		return ""
+	}
+	// Compute flag labels and find max width for alignment
+	type entry struct {
+		label   string
+		comment string
+	}
+	var entries []entry
+	maxLen := 0
+	for _, a := range opts {
+		label := fmt.Sprintf("-%s=<%s>", a.Name, a.Type)
+		if len(label) > maxLen {
+			maxLen = len(label)
+		}
+		entries = append(entries, entry{label: label, comment: a.Comment})
+	}
+
+	var buf strings.Builder
+	_, _ = buf.WriteString("Flags:\n\n")
+	for _, e := range entries {
+		if e.comment != "" {
+			_, _ = fmt.Fprintf(&buf, "\t%-*s  %s\n", maxLen, e.label, e.comment)
+		} else {
+			_, _ = fmt.Fprintf(&buf, "\t%s\n", e.label)
+		}
+	}
+	_, _ = buf.WriteString("\n")
+	return buf.String()
 }
 
 // ExecCode returns code for the template switch to run the target.
@@ -337,8 +406,8 @@ func (f Function) ExecCode() string {
 }
 
 // PrimaryPackage parses a package.  If files is non-empty, it will only parse the files given.
-func PrimaryPackage(gocmd, path string, files []string) (*PkgInfo, error) {
-	info, err := Package(path, files)
+func PrimaryPackage(gocmd, path string, files []string, multiline bool) (*PkgInfo, error) {
+	info, err := Package(path, files, multiline)
 	if err != nil {
 		return nil, err
 	}
@@ -396,7 +465,7 @@ func checkDupes(info *PkgInfo, imports []*Import) error {
 }
 
 // Package compiles information about a mage package.
-func Package(path string, files []string) (*PkgInfo, error) {
+func Package(path string, files []string, multiline bool) (*PkgInfo, error) {
 	start := time.Now()
 	defer func() {
 		debug.Println("time parse Magefiles:", time.Since(start))
@@ -406,15 +475,40 @@ func Package(path string, files []string) (*PkgInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	p := doc.New(pkg, "./", 0)
-	pi := &PkgInfo{
-		AstPkg:      pkg,
-		DocPkg:      p,
-		Description: oneLineDoc(p.Doc),
+	if hasComment(pkg, multilineTag) {
+		debug.Printf("found %s tag, using multiline descriptions", multilineTag)
+		multiline = true
+	}
+	p := doc.New(pkg, "./", doc.PreserveAST)
+
+	// Build a map from AST fields to their inline comments. We use
+	// ast.NewCommentMap because the Go parser does not populate
+	// ast.Field.Comment for function parameters (only for struct fields).
+	fieldComments := make(map[*ast.Field]string)
+	for _, f := range pkg.Files {
+		cmap := ast.NewCommentMap(fset, f, f.Comments)
+		for node, groups := range cmap {
+			field, ok := node.(*ast.Field)
+			if !ok || len(groups) == 0 {
+				continue
+			}
+			fieldComments[field] = strings.TrimSpace(groups[0].Text())
+		}
 	}
 
-	setNamespaces(pi)
-	setFuncs(pi)
+	pi := &PkgInfo{
+		AstPkg:    pkg,
+		DocPkg:    p,
+		Multiline: multiline,
+	}
+	if multiline {
+		pi.Description = strings.TrimSuffix(p.Doc, "\n")
+	} else {
+		pi.Description = oneLineDoc(p.Doc)
+	}
+
+	setNamespaces(pi, fieldComments)
+	setFuncs(pi, fieldComments)
 
 	hasDupes, names := checkDupeTargets(pi)
 	if hasDupes {
@@ -431,11 +525,11 @@ func Package(path string, files []string) (*PkgInfo, error) {
 	return pi, nil
 }
 
-func getNamedImports(gocmd string, pkgs map[string]string) ([]*Import, error) {
+func getNamedImports(gocmd string, pkgs map[string]string, multiline bool) ([]*Import, error) {
 	var imports []*Import
 	for pkg, alias := range pkgs {
 		debug.Printf("getting import package %q, alias %q", pkg, alias)
-		imp, err := getImport(gocmd, pkg, alias)
+		imp, err := getImport(gocmd, pkg, alias, multiline)
 		if err != nil {
 			return nil, err
 		}
@@ -445,7 +539,7 @@ func getNamedImports(gocmd string, pkgs map[string]string) ([]*Import, error) {
 }
 
 // getImport returns the metadata about a package that has been mage:import'ed.
-func getImport(gocmd, importpath, alias string) (*Import, error) {
+func getImport(gocmd, importpath, alias string, multiline bool) (*Import, error) {
 	out, err := internal.OutputDebug(gocmd, "list", "-f", "{{.Dir}}||{{.Name}}", importpath)
 	if err != nil {
 		return nil, err
@@ -466,7 +560,7 @@ func getImport(gocmd, importpath, alias string) (*Import, error) {
 	}
 	files := strings.Split(out, "||")
 
-	info, err := Package(dir, files)
+	info, err := Package(dir, files, multiline)
 	if err != nil {
 		return nil, err
 	}
@@ -505,55 +599,56 @@ func (s Imports) Swap(i, j int) {
 	s[i], s[j] = s[j], s[i]
 }
 
-func setFuncs(pi *PkgInfo) {
+func setFuncs(pi *PkgInfo, fieldComments map[*ast.Field]string) {
 	for _, f := range pi.DocPkg.Funcs {
 		if f.Recv != "" {
 			debug.Printf("skipping method %s.%s", f.Recv, f.Name)
 			// skip methods
 			continue
 		}
-		if !ast.IsExported(f.Name) {
-			debug.Printf("skipping non-exported function %s", f.Name)
-			// skip non-exported functions
+		fn, ok := funcFromDoc(f, pi.DocPkg.ImportPath, f.Name, pi.Multiline, fieldComments)
+		if !ok {
 			continue
 		}
-		fn, err := funcType(f.Decl.Type)
-		if err != nil {
-			debug.Printf("skipping function with invalid signature func %s: %v", f.Name, err)
-			continue
-		}
-		debug.Printf("found target %v", f.Name)
-		fn.Name = f.Name
-		fn.Comment = oneLineDoc(f.Doc)
-		fn.Synopsis = sanitizeSynopsis(f)
 		pi.Funcs = append(pi.Funcs, fn)
 	}
 }
 
-func setNamespaces(pi *PkgInfo) {
+func setNamespaces(pi *PkgInfo, fieldComments map[*ast.Field]string) {
 	for _, t := range pi.DocPkg.Types {
 		if !isNamespace(t) {
 			continue
 		}
 		debug.Printf("found namespace %s %s", pi.DocPkg.ImportPath, t.Name)
 		for _, f := range t.Methods {
-			if !ast.IsExported(f.Name) {
+			fn, ok := funcFromDoc(f, pi.DocPkg.ImportPath, t.Name+"."+f.Name, pi.Multiline, fieldComments)
+			if !ok {
 				continue
 			}
-			fn, err := funcType(f.Decl.Type)
-			if err != nil {
-				debug.Printf("skipping invalid namespace method %s %s.%s: %v", pi.DocPkg.ImportPath, t.Name, f.Name, err)
-				continue
-			}
-			debug.Printf("found namespace method %s %s.%s", pi.DocPkg.ImportPath, t.Name, f.Name)
-			fn.Name = f.Name
-			fn.Comment = oneLineDoc(f.Doc)
-			fn.Synopsis = sanitizeSynopsis(f)
 			fn.Receiver = t.Name
-
 			pi.Funcs = append(pi.Funcs, fn)
 		}
 	}
+}
+
+func funcFromDoc(f *doc.Func, importpath, funcname string, multiline bool, fieldComments map[*ast.Field]string) (*Function, bool) {
+	if !ast.IsExported(f.Name) {
+		return nil, false
+	}
+	fn, err := funcType(f.Decl.Type, fieldComments)
+	if err != nil {
+		debug.Printf("skipping invalid method %s %s: %v", importpath, funcname, err)
+		return nil, false
+	}
+	debug.Printf("found method %s %s", importpath, funcname)
+	fn.Name = f.Name
+	if multiline {
+		fn.Comment = strings.TrimSuffix(f.Doc, "\n")
+	} else {
+		fn.Comment = oneLineDoc(f.Doc)
+	}
+	fn.Synopsis = sanitizeSynopsis(f)
+	return fn, true
 }
 
 func setImports(gocmd string, pi *PkgInfo) error {
@@ -588,12 +683,12 @@ func setImports(gocmd string, pi *PkgInfo) error {
 			}
 		}
 	}
-	imports, err := getNamedImports(gocmd, importNames)
+	imports, err := getNamedImports(gocmd, importNames, pi.Multiline)
 	if err != nil {
 		return err
 	}
 	for _, s := range rootImports {
-		imp, err := getImport(gocmd, s, "")
+		imp, err := getImport(gocmd, s, "", pi.Multiline)
 		if err != nil {
 			return err
 		}
@@ -657,7 +752,7 @@ func getImportPath(imp *ast.ImportSpec) (path, alias string, ok bool) {
 }
 
 func getImportPathFromCommentGroup(comments *ast.CommentGroup) []string {
-	if comments == nil || len(comments.List) == 9 {
+	if comments == nil || len(comments.List) == 0 {
 		return nil
 	}
 	// import is always the last comment
@@ -751,7 +846,7 @@ func setDefault(pi *PkgInfo) {
 
 			f, err := getFunction(spec.Values[0], pi)
 			if err != nil {
-				log.Println("warning, default declaration malformed:", err)
+				log.Println("warning: default declaration malformed:", err)
 				return
 			}
 			pi.DefaultFunc = f
@@ -980,7 +1075,7 @@ func hasErrorReturn(ft *ast.FuncType) (bool, error) {
 	return false, errors.New("EBADRETURNTYPE")
 }
 
-func funcType(ft *ast.FuncType) (*Function, error) {
+func funcType(ft *ast.FuncType, fieldComments map[*ast.Field]string) (*Function, error) {
 	var err error
 	f := &Function{}
 	f.IsContext, err = hasContextParam(ft)
@@ -991,6 +1086,7 @@ func funcType(ft *ast.FuncType) (*Function, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	x := 0
 	if f.IsContext {
 		x++
@@ -1012,9 +1108,10 @@ func funcType(ft *ast.FuncType) (*Function, error) {
 			}
 			return nil, fmt.Errorf("unsupported argument type: %s", t)
 		}
+		comment := fieldComments[param]
 		// support for foo, bar string
 		for _, name := range param.Names {
-			f.Args = append(f.Args, Arg{Name: name.Name, Type: typ, Optional: optional})
+			f.Args = append(f.Args, Arg{Name: name.Name, Type: typ, Optional: optional, Comment: comment})
 		}
 	}
 	return f, nil
@@ -1032,6 +1129,23 @@ func oneLineDoc(s string) string {
 	s = strings.ReplaceAll(s, "\n", " ")
 	s = strings.TrimSpace(s)
 	return sanitizeDocComment(s)
+}
+
+
+// hasComment reports whether any file in the package contains a comment
+// matching the given tag (e.g. "mage:multiline").
+func hasComment(pkg *ast.Package, tag string) bool {
+	for _, f := range pkg.Files {
+		for _, cg := range f.Comments {
+			for _, c := range cg.List {
+				vals := strings.Fields(strings.ToLower(c.Text[2:]))
+				if len(vals) > 0 && vals[0] == tag {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 var argTypes = map[string]string{

@@ -40,7 +40,7 @@ func TestMain(m *testing.M) {
 	if helperCmd {
 		_, _ = fmt.Fprintln(os.Stderr, stderr)
 		_, _ = fmt.Fprintln(os.Stdout, stdout)
-		os.Exit(exitCode) //nolint:revive // sub-process test helper requires explicit exit
+		os.Exit(exitCode)
 	}
-	os.Exit(m.Run()) //nolint:revive // TestMain with branching logic needs explicit exit
+	os.Exit(m.Run())
 }

@@ -28,8 +28,14 @@ magefiles based on OS, arch, etc, whether in the filename or in the +build line.
 //go:build mage
 
 // A comment on the package will be output when you list the targets of a
-// magefile.
+// magefile. 
+// 
+// If you set MAGEFILE_MULTILINE=true or have the //mage:multiline comment
+// in the file, mage will retain line returns in comments it outputs as help docs.
+// If you don't include those, it will convert line returns into spaces.
 package main
+
+//mage:multiline // enable retention of line returns in doc output.
 
 import (
     "log"
@@ -73,7 +79,11 @@ func Build(ctx context.Context) {
 ```plain
 $ mage -l
 A comment on the package will be output when you list the targets of a
-magefile.
+magefile. 
+ 
+If you set MAGEFILE_MULTILINE=true or have the //mage:multiline comment
+in the file, mage will retain line returns in comments it outputs as help docs.
+If you don't include those, it will convert line returns into spaces.
 
 Targets:
   install*   Build target is any exported function with zero args with no return or an error return.

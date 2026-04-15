@@ -1,6 +1,8 @@
 package parse
 
 import (
+	"go/ast"
+	"go/doc"
 	"log"
 	"os"
 	"reflect"
@@ -14,7 +16,7 @@ func init() { //nolint:gochecknoinits // required for test setup
 }
 
 func TestParse(t *testing.T) {
-	info, err := PrimaryPackage("go", "./testdata", []string{"func.go", "command.go", "alias.go", "repeating_synopsis.go", "subcommands.go"})
+	info, err := PrimaryPackage("go", "./testdata", []string{"func.go", "command.go", "alias.go", "repeating_synopsis.go", "subcommands.go"}, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -111,8 +113,164 @@ func TestParse(t *testing.T) {
 	}
 }
 
+func TestGetImportPathFromCommentGroupNil(t *testing.T) {
+	// nil comments should return nil
+	result := getImportPathFromCommentGroup(nil)
+	if result != nil {
+		t.Fatalf("expected nil for nil comments, got %v", result)
+	}
+}
+
+func TestGetImportPathFromCommentGroupEmpty(t *testing.T) {
+	// empty comment list should return nil
+	cg := &ast.CommentGroup{List: []*ast.Comment{}}
+	result := getImportPathFromCommentGroup(cg)
+	if result != nil {
+		t.Fatalf("expected nil for empty comments, got %v", result)
+	}
+}
+
+func TestGetImportPathFromCommentGroupNoImportTag(t *testing.T) {
+	cg := &ast.CommentGroup{List: []*ast.Comment{
+		{Text: "// just a regular comment"},
+	}}
+	result := getImportPathFromCommentGroup(cg)
+	if result != nil {
+		t.Fatalf("expected nil for non-import comment, got %v", result)
+	}
+}
+
+func TestGetImportPathFromCommentGroupWithImportTag(t *testing.T) {
+	cg := &ast.CommentGroup{List: []*ast.Comment{
+		{Text: "// mage:import"},
+	}}
+	result := getImportPathFromCommentGroup(cg)
+	if result == nil {
+		t.Fatal("expected non-nil result for mage:import comment")
+	}
+	if len(result) != 1 || result[0] != "mage:import" {
+		t.Fatalf("expected [mage:import], got %v", result)
+	}
+}
+
+func TestGetImportPathFromCommentGroupWithAlias(t *testing.T) {
+	cg := &ast.CommentGroup{List: []*ast.Comment{
+		{Text: "// mage:import foo"},
+	}}
+	result := getImportPathFromCommentGroup(cg)
+	if result == nil {
+		t.Fatal("expected non-nil result")
+	}
+	if len(result) != 2 || result[0] != "mage:import" || result[1] != "foo" {
+		t.Fatalf("expected [mage:import foo], got %v", result)
+	}
+}
+
+func TestGetImportPathFromCommentGroupMultipleComments(t *testing.T) {
+	// import tag should be read from the last comment
+	cg := &ast.CommentGroup{List: []*ast.Comment{
+		{Text: "// a preceding comment"},
+		{Text: "// another comment"},
+		{Text: "// mage:import myalias"},
+	}}
+	result := getImportPathFromCommentGroup(cg)
+	if result == nil {
+		t.Fatal("expected non-nil result for mage:import in last comment")
+	}
+	if len(result) != 2 || result[0] != "mage:import" || result[1] != "myalias" {
+		t.Fatalf("expected [mage:import myalias], got %v", result)
+	}
+}
+
+func TestCheckDupeTargetsNoDupes(t *testing.T) {
+	info := &PkgInfo{
+		Funcs: Functions{
+			{Name: "Build"},
+			{Name: "Test"},
+			{Name: "Clean"},
+		},
+	}
+	hasDupes, _ := checkDupeTargets(info)
+	if hasDupes {
+		t.Fatal("expected no duplicates")
+	}
+}
+
+func TestCheckDupeTargetsCaseInsensitive(t *testing.T) {
+	info := &PkgInfo{
+		Funcs: Functions{
+			{Name: "Build"},
+			{Name: "build"},
+		},
+	}
+	hasDupes, names := checkDupeTargets(info)
+	if !hasDupes {
+		t.Fatal("expected duplicates for case-insensitive match")
+	}
+	if len(names["build"]) != 2 {
+		t.Fatalf("expected 2 entries for 'build', got %d", len(names["build"]))
+	}
+}
+
+func TestCheckDupeTargetsWithReceiver(t *testing.T) {
+	info := &PkgInfo{
+		Funcs: Functions{
+			{Name: "Build", Receiver: "Deploy"},
+			{Name: "Build", Receiver: "Test"},
+		},
+	}
+	hasDupes, _ := checkDupeTargets(info)
+	if hasDupes {
+		t.Fatal("expected no duplicates - different receivers")
+	}
+}
+
+func TestSanitizeSynopsis(t *testing.T) {
+	tests := []struct {
+		name     string
+		funcName string
+		doc      string
+		want     string
+	}{
+		{
+			name:     "removes function name prefix",
+			funcName: "Clean",
+			doc:      "Clean removes all generated files.",
+			want:     "removes all generated files.",
+		},
+		{
+			name:     "case insensitive prefix removal",
+			funcName: "Build",
+			doc:      "build compiles the project.",
+			want:     "compiles the project.",
+		},
+		{
+			name:     "no prefix to remove",
+			funcName: "Build",
+			doc:      "Compiles the project.",
+			want:     "Compiles the project.",
+		},
+		{
+			name:     "empty doc",
+			funcName: "Build",
+			doc:      "",
+			want:     "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := &doc.Func{Name: tt.funcName, Doc: tt.doc}
+			got := sanitizeSynopsis(f)
+			if got != tt.want {
+				t.Errorf("sanitizeSynopsis() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestGetImportSelf(t *testing.T) {
-	imp, err := getImport("go", "github.com/magefile/mage/parse/testdata/importself", "")
+	imp, err := getImport("go", "github.com/magefile/mage/parse/testdata/importself", "", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -122,7 +280,7 @@ func TestGetImportSelf(t *testing.T) {
 }
 
 func TestOptionalArgs(t *testing.T) {
-	info, err := PrimaryPackage("go", "./testdata", []string{"optargs.go"})
+	info, err := PrimaryPackage("go", "./testdata", []string{"optargs.go"}, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -133,6 +291,14 @@ func TestOptionalArgs(t *testing.T) {
 			Args: []Arg{
 				{Name: "a", Type: "string", Optional: true},
 				{Name: "b", Type: "int", Optional: true},
+			},
+		},
+		{
+			Name: "FlagDocFunc",
+			Args: []Arg{
+				{Name: "name", Type: "string"},
+				{Name: "greeting", Type: "string", Optional: true, Comment: "the greeting message"},
+				{Name: "count", Type: "int", Optional: true, Comment: "how many times"},
 			},
 		},
 		{

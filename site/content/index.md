@@ -11,18 +11,10 @@ and Mage automatically uses them as Makefile-like runnable targets.
 
 ### From GitHub source (any OS)
 
-Mage has no dependencies outside the Go standard library, and builds with Go 1.7
-and above (possibly even lower versions, but they're not regularly tested).
+Mage has no dependencies outside the Go standard library, and builds with Go 1.18
+and above.
 
-#### Using Go Modules (With go version < 1.17)
-
-```plain
-git clone https://github.com/magefile/mage
-cd mage
-go run bootstrap.go
-```
-
-#### Using Go Install (With go version >= [1.17](https://go.dev/doc/go-get-install-deprecation))
+#### Using Go Install
 
 ```plain
 go install github.com/magefile/mage@latest
@@ -31,26 +23,8 @@ mage -init
 Instead of the @latest tag, you can specify the desired version, for example:
 
 ```plain
-go install github.com/magefile/mage@v1.15.0
+go install github.com/magefile/mage@v1.16.0
 ```
-
-#### Using GOPATH
-
-```plain
-go get -u -d github.com/magefile/mage
-cd $GOPATH/src/github.com/magefile/mage
-go run bootstrap.go
-```
-
-This will download the code into your GOPATH, and then run the bootstrap script
-to build mage with version information embedded in it.  A normal `go get`
-(without -d) will build the binary correctly, but no version info will be
-embedded.  If you've done this, no worries, just go to
-`$GOPATH/src/github.com/magefile/mage` and run `mage install` or `go run
-bootstrap.go` and a new binary will be created with the correct version
-information.
-
-The mage binary will be created in your $GOPATH/bin directory.
 
 ### From GitHub releases (any OS)
 
@@ -92,12 +66,16 @@ asdf global mage latest
 
 package main
 
+//mage:multiline // enable line return retention in doc output.
+
 import (
     "github.com/magefile/mage/sh"
 )
 
 // Runs go mod download and then installs the binary.
-func Build() error {
+func Deploy(env string,
+    dryrun *bool, // if set to true, only builds the artifacts
+) error {
     if err := sh.Run("go", "mod", "download"); err != nil {
         return err
     }
@@ -105,7 +83,58 @@ func Build() error {
 }
 ```
 
-Run the above `Build` target by simply running `mage build` in the same directory as the magefile.
+
+## Comments as Help Text
+
+Comments on targets (functions) get converted into help text output. The first
+sentence becomes the brief comment for the target on `mage -l`. The full comment
+is printed out when you run `mage -h <target>`.  Comments on flag arguments are
+printed as docs on the flags.
+
+For example:
+
+```go
+//go:build mage
+
+// These docs will become the main help text when you run `mage` or `mage -l`.
+// This is where you talk about what the thing does.
+package main
+
+//mage:multiline // enable line return retention in doc output.
+
+import (
+    "github.com/any-go-packge/youwant"
+)
+
+// Deploy runs the build and then uploads the artifacts to the server.
+// It deploys to the given environment.
+func Deploy(ctx context.Context, env string,
+    version *string, // git tag for the build, defaults to the next minor build if not set
+    dryRun *bool,    // if set to true, just outputs the build artifacts
+) error {
+    return youwant.ToCallGoCode()
+}
+```
+
+```plain
+$ mage -l
+These docs will become the main help text when you run `mage` or `mage -l`.
+
+Targets:
+  deploy  runs the build and then uploads the artifacts to the server.
+
+$ mage -h deploy
+Deploy runs the build and then uploads the artifacts to the server.
+It deploys to the given environment.
+
+Usage:
+	mage deploy <env> [<flags>]
+
+Flags:
+
+    -version=<string>  git tag for the build, defaults to the next minor build if not set
+    -dryrun=<bool>     if set to true, just outputs the build artifacts
+```
 
 ## Magefiles directory
 

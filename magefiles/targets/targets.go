@@ -9,7 +9,6 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
-	"time"
 
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
@@ -17,6 +16,7 @@ import (
 
 // Install runs "go install" for mage. This generates the version info the binary.
 func Install() error {
+	fmt.Println("`mage install` is deprecated. Just use `go install` now.")
 	name := "mage"
 	if runtime.GOOS == "windows" {
 		name += ".exe"
@@ -48,17 +48,29 @@ func Install() error {
 	// install` turns into a no-op, and `go install -a` fails on people's
 	// machines that have go installed in a non-writeable directory (such as
 	// normal OS installs in /usr/bin)
-	return sh.RunV(gocmd, "build", "-o", path, "-ldflags="+flags(), "github.com/magefile/mage")
+	return sh.RunV(gocmd, "build", "-o", path, "github.com/magefile/mage")
 }
 
 var releaseTag = regexp.MustCompile(`^v1\.\d+\.\d+$`)
 
 // Release generates a new release. Expects a version tag in v1.x.x format.
-func Release(tag string) (err error) {
-	mg.Deps(Tools)
+// If dryRun is true, it creates a local tag and runs goreleaser without
+// publishing, then deletes the tag. This can be used to verify release artifacts.
+func Release(tag string, dryRun *bool) (err error) {
+	if err := installTool("goreleaser"); err != nil {
+		return err
+	}
 
 	if !releaseTag.MatchString(tag) {
 		return errors.New("TAG environment variable must be in semver v1.x.x format, but was " + tag)
+	}
+
+	if dryRun != nil && *dryRun {
+		if err := sh.RunV("git", "tag", "-a", tag, "-m", tag); err != nil {
+			return err
+		}
+		defer func() { _ = sh.RunV("git", "tag", "--delete", tag) }()
+		return sh.RunV("goreleaser", "release", "--skip=publish", "--skip=validate", "--clean")
 	}
 
 	if err := sh.RunV("git", "tag", "-a", tag, "-m", tag); err != nil {
@@ -73,7 +85,7 @@ func Release(tag string) (err error) {
 			_ = sh.RunV("git", "push", "--delete", "origin", tag)
 		}
 	}()
-	return sh.RunV("goreleaser", "release")
+	return sh.RunV("goreleaser", "release", "--clean")
 }
 
 // Clean removes the temporarily generated files from Release.
@@ -81,45 +93,38 @@ func Clean() error {
 	return sh.Rm("dist")
 }
 
-func flags() string {
-	timestamp := time.Now().Format(time.RFC3339)
-	hash := hash()
-	tag := tag()
-	if tag == "" {
-		tag = "dev"
-	}
-	return fmt.Sprintf(`-X "github.com/magefile/mage/mage.timestamp=%s" -X "github.com/magefile/mage/mage.commitHash=%s" -X "github.com/magefile/mage/mage.gitTag=%s"`, timestamp, hash, tag)
-}
-
-// tag returns the git tag for the current branch or "" if none.
-func tag() string {
-	s, _ := sh.Output("git", "describe", "--tags")
-	return s
-}
-
-// hash returns the git hash for the current repo or "" if none.
-func hash() string {
-	hash, _ := sh.Output("git", "rev-parse", "--short", "HEAD")
-	return hash
-}
-
-var goTools = []string{
-	"github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.11.2",
-	"github.com/goreleaser/goreleaser/v2@v2.14.3",
+var goTools = map[string]string{
+	"lint":       "github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.11.2",
+	"goreleaser": "github.com/goreleaser/goreleaser/v2@v2.14.3",
 }
 
 // Tools installs the dev tools used by mage, such as golangci-lint.
 func Tools() error {
 	for _, tool := range goTools {
-		if err := sh.Run("go", "install", tool); err != nil {
-			return fmt.Errorf("failed to install %s: %w", tool, err)
+		if err := installTool(tool); err != nil {
+			return err
 		}
+	}
+	return nil
+}
+
+func installTool(tool string) error {
+	version, ok := goTools[tool]
+	if !ok {
+		return fmt.Errorf("unknown tool %q", tool)
+	}
+	if err := sh.Run("go", "install", version); err != nil {
+		return fmt.Errorf("failed to install %s: %w", version, err)
 	}
 	return nil
 }
 
 // Lint runs golangci-lint on the codebase.
 func Lint() error {
-	mg.Deps(Tools)
+	err := installTool("lint")
+	if err != nil {
+		return err
+	}
+
 	return sh.RunV("golangci-lint", "run")
 }

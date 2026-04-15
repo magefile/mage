@@ -10,7 +10,7 @@ release:
 builds:
   - binary: mage
     main: .
-    ldflags: -s -w -X github.com/magefile/mage/mage.timestamp={{.Date}} -X github.com/magefile/mage/mage.commitHash={{.Commit}} -X github.com/magefile/mage/mage.gitTag={{.Version}}
+    ldflags: -s -w
     goos:
       - darwin
       - linux
@@ -35,7 +35,7 @@ builds:
 archives:
 -
   name_template: >-
-    {{.Binary}}_{{.Version}}_{{.Os}}_{{.Arch}}
+    {{.Binary}}_{{.Version}}_
     {{- if eq .Os "darwin"}}macOS
     {{- else if eq .Os "linux"}}Linux
     {{- else if eq .Os "windows"}}Windows

@@ -16,6 +16,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	dbg "runtime/debug"
 	"sort"
 	"strings"
 	"syscall"
@@ -69,13 +70,6 @@ const (
 
 var debug = log.New(io.Discard, "DEBUG: ", log.Ltime|log.Lmicroseconds)
 
-// set by ldflags when you "mage build".
-var (
-	commitHash = "<not set>"
-	timestamp  = "<not set>"
-	gitTag     = "<not set>"
-)
-
 //go:generate stringer -type=Command
 
 // Command tracks invocations of mage that run without targets or other flags.
@@ -119,6 +113,7 @@ type Invocation struct {
 	GoCmd      string        // the go binary command to run
 	CacheDir   string        // the directory where we should store compiled binaries
 	HashFast   bool          // don't rely on GOCACHE, just hash the magefiles
+	Multiline  bool          // whether to retain line returns in help text for the generated main file
 }
 
 // MagefilesDirName is the name of the default folder to look for if no directory was specified,
@@ -149,10 +144,7 @@ func ParseAndRun(stdout, stderr io.Writer, stdin io.Reader, args []string) int {
 
 	switch cmd {
 	case Version:
-		out.Println("Mage Build Tool", gitTag)
-		out.Println("Build Date:", timestamp)
-		out.Println("Commit:", commitHash)
-		out.Println("built with:", runtime.Version())
+		doVersion(out)
 		return 0
 	case Init:
 		if err := generateInit(inv.Dir); err != nil {
@@ -171,8 +163,38 @@ func ParseAndRun(stdout, stderr io.Writer, stdin io.Reader, args []string) int {
 	case CompileStatic, None:
 		return Invoke(inv)
 	default:
-		panic(fmt.Errorf("unknown command type: %v", cmd))
+		errlog.Printf("unknown command type: %v", cmd)
+		return 1
 	}
+}
+
+func doVersion(out *log.Logger) {
+	var (
+		commitHash = "<not set>"
+		timestamp  = "<not set>"
+		gitTag     = ""
+	)
+
+	info, ok := dbg.ReadBuildInfo()
+	if ok {
+		if info.Main.Version != "" {
+			gitTag = info.Main.Version
+		}
+		for _, kv := range info.Settings {
+			switch kv.Key {
+			case "vcs.revision":
+				commitHash = kv.Value
+			case "vcs.time":
+				timestamp = kv.Value
+			default:
+				continue
+			}
+		}
+	}
+	out.Println("Mage Build Tool", gitTag)
+	out.Println("Build Date:", timestamp)
+	out.Println("Commit:", commitHash)
+	out.Println("built with:", runtime.Version())
 }
 
 // Parse parses the given args and returns structured data.  If parse returns
@@ -187,6 +209,7 @@ func Parse(stderr, stdout io.Writer, args []string) (inv Invocation, cmd Command
 	fs.BoolVar(&inv.Force, "f", false, "force recreation of compiled magefile")
 	fs.BoolVar(&inv.Debug, "debug", mg.Debug(), "turn on debug messages")
 	fs.BoolVar(&inv.Verbose, "v", mg.Verbose(), "show verbose output when running mage targets")
+	fs.BoolVar(&inv.Multiline, "multiline", mg.Multiline(), "retain line returns in help text")
 	fs.BoolVar(&inv.Help, "h", false, "show this help")
 	fs.DurationVar(&inv.Timeout, "t", 0, "timeout in duration parsable format (e.g. 5m30s)")
 	fs.BoolVar(&inv.Keep, "keep", false, "keep intermediate mage files around after running")
@@ -226,21 +249,22 @@ Commands:
 
 Options:
   -d <string> 
-            directory to read magefiles from (default "." or "magefiles" if exists)
-  -debug    turn on debug messages
-  -f        force recreation of compiled magefile
-  -goarch   sets the GOARCH for the binary created by -compile (default: current arch)
+              directory to read magefiles from (default "." or "magefiles" if exists)
+  -debug      turn on debug messages
+  -f          force recreation of compiled magefile
+  -goarch     sets the GOARCH for the binary created by -compile (default: current arch)
   -gocmd <string>
-		    use the given go binary to compile the output (default: "go")
-  -goos     sets the GOOS for the binary created by -compile (default: current OS)
-  -ldflags  sets the ldflags for the binary created by -compile (default: "")
-  -h        show description of a target
-  -keep     keep intermediate mage files around after running
+		      use the given go binary to compile the output (default: "go")
+  -goos       sets the GOOS for the binary created by -compile (default: current OS)
+  -ldflags    sets the ldflags for the binary created by -compile (default: "")
+  -multiline  retain line returns in help docs (default: convert to spaces)
+  -h          show description of a target
+  -keep       keep intermediate mage files around after running
   -t <string>
-            timeout in duration parsable format (e.g. 5m30s)
-  -v        show verbose output when running mage targets
+              timeout in duration parsable format (e.g. 5m30s)
+  -v          show verbose output when running mage targets
   -w <string>
-            working directory where magefiles will run (default -d value)
+              working directory where magefiles will run (default -d value)
 `[1:])
 	}
 	err = fs.Parse(args)
@@ -410,7 +434,7 @@ func Invoke(inv Invocation) int {
 		parse.EnableDebug()
 	}
 	debug.Println("parsing files")
-	info, err := parse.PrimaryPackage(inv.GoCmd, inv.Dir, fnames)
+	info, err := parse.PrimaryPackage(inv.GoCmd, inv.Dir, fnames, inv.Multiline)
 	if err != nil {
 		errlog.Println("Error parsing magefiles:", err)
 		return 1
@@ -616,6 +640,7 @@ func GenerateMainfile(binaryName, path string, info *parse.PkgInfo) error {
 		return fmt.Errorf("error creating generated mainfile: %w", err)
 	}
 	defer f.Close()
+
 	data := mainfileTemplateData{
 		Description: info.Description,
 		Funcs:       info.Funcs,
