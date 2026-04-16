@@ -84,6 +84,7 @@ const (
 	Init                  // create a starting template for mage
 	Clean                 // clean out old compiled mage binaries from the cache
 	CompileStatic         // compile a static binary of the current directory
+	Install               // install shell tab completion
 )
 
 // Main is the entrypoint for running mage.  It exists external to mage's main
@@ -117,6 +118,7 @@ type Invocation struct {
 	HashFast     bool          // don't rely on GOCACHE, just hash the magefiles
 	Multiline    bool          // whether to retain line returns in help text for the generated main file
 	Autocomplete bool          // parse magefiles and print target names for shell completion
+	InstallShell string        // shell to install tab completion for (bash, zsh, fish, powershell)
 }
 
 // MagefilesDirName is the name of the default folder to look for if no directory was specified,
@@ -162,6 +164,12 @@ func ParseAndRun(stdout, stderr io.Writer, stdin io.Reader, args []string) int {
 			return 1
 		}
 		out.Println(inv.CacheDir, "cleaned")
+		return 0
+	case Install:
+		if err := installCompletion(stdout, inv.InstallShell); err != nil {
+			errlog.Println("Error:", err)
+			return 1
+		}
 		return 0
 	case CompileStatic, None:
 		return Invoke(inv)
@@ -235,6 +243,8 @@ func Parse(stderr, stdout io.Writer, args []string) (inv Invocation, cmd Command
 	fs.BoolVar(&clean, "clean", false, "clean out old generated binaries from CACHE_DIR")
 	var compileOutPath string
 	fs.StringVar(&compileOutPath, "compile", "", "output a static binary to the given path")
+	var installShell string
+	fs.StringVar(&installShell, "install", "", "install shell tab completion (bash, zsh, fish, powershell)")
 
 	fs.Usage = func() {
 		_, _ = fmt.Fprint(stdout, `
@@ -248,6 +258,8 @@ Commands:
             output a static binary to the given path
   -h        show this help
   -init     create a starting template if no mage files exist
+  -install <string>
+            install shell tab completion (bash, zsh, fish, powershell)
   -l        list mage targets in this directory
   -version  show version info for the mage binary
 
@@ -294,6 +306,10 @@ Options:
 		cmd = CompileStatic
 		inv.CompileOut = compileOutPath
 		inv.Force = true
+	case installShell != "":
+		numCommands++
+		cmd = Install
+		inv.InstallShell = installShell
 	case showVersion:
 		numCommands++
 		cmd = Version
@@ -301,7 +317,7 @@ Options:
 		numCommands++
 		cmd = Clean
 		if fs.NArg() > 0 {
-			return inv, cmd, errors.New("-h, -init, -clean, -compile, -autocomplete and -version cannot be used simultaneously")
+			return inv, cmd, errors.New("-h, -init, -clean, -compile, -install, -autocomplete and -version cannot be used simultaneously")
 		}
 	default:
 		// no command flags set
@@ -321,7 +337,7 @@ Options:
 
 	if numCommands > 1 {
 		debug.Printf("%d commands defined", numCommands)
-		return inv, cmd, errors.New("-h, -init, -clean, -compile, -autocomplete and -version cannot be used simultaneously")
+		return inv, cmd, errors.New("-h, -init, -clean, -compile, -install, -autocomplete and -version cannot be used simultaneously")
 	}
 
 	if cmd != CompileStatic && (inv.GOARCH != "" || inv.GOOS != "") {

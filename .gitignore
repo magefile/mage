@@ -36,3 +36,6 @@ Session.vim
 
 # Hugo build lock
 .hugo_build.lock
+
+# Release output
+/dist

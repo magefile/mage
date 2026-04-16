@@ -197,7 +197,7 @@ func (f Function) ExecCode() string {
 					_os.Exit(2)
 				}
 				x++`, x)
-		case "_time.Duration":
+		case "time.Duration":
 			_, _ = fmt.Fprintf(&parseargs, `
 				arg%d, err := _time.ParseDuration(args.Args[x])
 				if err != nil {
@@ -216,7 +216,7 @@ func (f Function) ExecCode() string {
 			continue
 		}
 		_, _ = fmt.Fprintf(&parseargs, `
-				var arg%d *%s`, x, arg.Type)
+				var arg%d *%s`, x, genType(arg.Type))
 	}
 
 	// Phase 3: Parse optional arguments from -name=value flags
@@ -1051,6 +1051,14 @@ var argTypes = map[string]string{
 	"string":           "string",
 	"int":              "int",
 	"float64":          "float64",
-	"&{time Duration}": "_time.Duration",
+	"&{time Duration}": "time.Duration",
 	"bool":             "bool",
+}
+
+// genType converts a logical type name to the type name used in generated code.
+func genType(typ string) string {
+	if typ == "time.Duration" {
+		return "_time.Duration"
+	}
+	return typ
 }

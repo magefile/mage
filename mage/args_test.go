@@ -186,7 +186,6 @@ func TestOptionalArgs(t *testing.T) {
 		Dir:    "./testdata/optargs",
 		Stderr: stderr,
 		Stdout: stdout,
-		Keep:   true,
 		Args:   []string{"greet", "World", "-greeting=Hi"},
 	}
 	code := Invoke(inv)
