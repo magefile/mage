@@ -103,7 +103,7 @@ func addGuardedBlock(path, content string) error {
 	return err
 }
 
-func writef(w io.Writer, format string, args ...interface{}) error {
+func writef(w io.Writer, format string, args ...any) error {
 	_, err := fmt.Fprintf(w, format, args...)
 	return err
 }
