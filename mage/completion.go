@@ -56,11 +56,11 @@ func completionConfigDir() (string, error) {
 // creating parent directories as needed.
 func writeCompletionFile(path, content string) error {
 	dir := filepath.Dir(path)
-	// #nosec G703 -- path is constructed internally from trusted locations.
+	// #nosec -- path is constructed internally from trusted locations.
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return fmt.Errorf("could not create directory %s: %w", dir, err)
 	}
-	// #nosec G703 -- path is constructed internally from trusted locations.
+	// #nosec -- path is constructed internally from trusted locations.
 	return os.WriteFile(path, []byte(content), 0o600)
 }
 
@@ -81,7 +81,7 @@ func addGuardedBlock(path, content string) error {
 		_, afterEnd, foundEnd := strings.Cut(afterStart, mageCompletionMarkerEnd)
 		if foundEnd {
 			newContent := beforeStart + block + afterEnd
-			// #nosec G703 -- path is constructed internally from trusted locations.
+			// #nosec -- path is constructed internally from trusted locations.
 			return os.WriteFile(path, []byte(newContent), 0o600)
 		}
 	}
