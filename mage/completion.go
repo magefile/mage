@@ -229,18 +229,14 @@ func installPowerShellCompletion(stdout io.Writer) error {
 	if _, err := fmt.Fprintf(stdout, "Installed PowerShell completion to %s\n", scriptPath); err != nil {
 		return err
 	}
-	if _, err := fmt.Fprintln(stdout, ""); err != nil {
-		return err
-	}
+	_, _ = fmt.Fprintln(stdout, "")
 	if _, err := fmt.Fprintln(stdout, "To enable, add the following line to your PowerShell profile"); err != nil {
 		return err
 	}
 	if _, err := fmt.Fprintln(stdout, "(run '$PROFILE' in PowerShell to see the profile path):"); err != nil {
 		return err
 	}
-	if _, err := fmt.Fprintln(stdout, ""); err != nil {
-		return err
-	}
+	_, _ = fmt.Fprintln(stdout, "")
 	_, err = fmt.Fprintf(stdout, "  . %q\n", scriptPath)
 	return err
 }
