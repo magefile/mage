@@ -56,10 +56,12 @@ func completionConfigDir() (string, error) {
 // creating parent directories as needed.
 func writeCompletionFile(path, content string) error {
 	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	// #nosec G703 -- path is constructed internally from trusted locations.
+	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return fmt.Errorf("could not create directory %s: %w", dir, err)
 	}
-	return os.WriteFile(path, []byte(content), 0644)
+	// #nosec G703 -- path is constructed internally from trusted locations.
+	return os.WriteFile(path, []byte(content), 0o600)
 }
 
 // addGuardedBlock adds a guarded block of content to the given file.
@@ -74,17 +76,18 @@ func addGuardedBlock(path, content string) error {
 	block := mageCompletionMarker + "\n" + content + "\n" + mageCompletionMarkerEnd
 
 	existingStr := string(existing)
-	if start := strings.Index(existingStr, mageCompletionMarker); start != -1 {
-		end := strings.Index(existingStr, mageCompletionMarkerEnd)
-		if end != -1 {
-			end += len(mageCompletionMarkerEnd)
-			newContent := existingStr[:start] + block + existingStr[end:]
-			return os.WriteFile(path, []byte(newContent), 0644)
+	beforeStart, afterStart, foundStart := strings.Cut(existingStr, mageCompletionMarker)
+	if foundStart {
+		_, afterEnd, foundEnd := strings.Cut(afterStart, mageCompletionMarkerEnd)
+		if foundEnd {
+			newContent := beforeStart + block + afterEnd
+			// #nosec G703 -- path is constructed internally from trusted locations.
+			return os.WriteFile(path, []byte(newContent), 0o600)
 		}
 	}
 
 	// Append to file
-	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o600)
 	if err != nil {
 		return err
 	}
@@ -97,6 +100,16 @@ func addGuardedBlock(path, content string) error {
 		}
 	}
 	_, err = f.WriteString(block + "\n")
+	return err
+}
+
+func writef(w io.Writer, format string, args ...interface{}) error {
+	_, err := fmt.Fprintf(w, format, args...)
+	return err
+}
+
+func writeln(w io.Writer, line string) error {
+	_, err := fmt.Fprintln(w, line)
 	return err
 }
 
@@ -128,10 +141,13 @@ func installBashCompletion(stdout io.Writer) error {
 		return fmt.Errorf("could not update %s: %w", rcFile, err)
 	}
 
-	fmt.Fprintf(stdout, "Installed bash completion to %s\n", scriptPath)
-	fmt.Fprintf(stdout, "Updated %s\n", rcFile)
-	fmt.Fprintf(stdout, "Run 'source %s' or restart your shell to enable completions.\n", rcFile)
-	return nil
+	if err := writef(stdout, "Installed bash completion to %s\n", scriptPath); err != nil {
+		return err
+	}
+	if err := writef(stdout, "Updated %s\n", rcFile); err != nil {
+		return err
+	}
+	return writef(stdout, "Run 'source %s' or restart your shell to enable completions.\n", rcFile)
 }
 
 func installZshCompletion(stdout io.Writer) error {
@@ -162,10 +178,13 @@ func installZshCompletion(stdout io.Writer) error {
 		return fmt.Errorf("could not update %s: %w", rcFile, err)
 	}
 
-	fmt.Fprintf(stdout, "Installed zsh completion to %s\n", scriptPath)
-	fmt.Fprintf(stdout, "Updated %s\n", rcFile)
-	fmt.Fprintf(stdout, "Run 'source %s' or restart your shell to enable completions.\n", rcFile)
-	return nil
+	if err := writef(stdout, "Installed zsh completion to %s\n", scriptPath); err != nil {
+		return err
+	}
+	if err := writef(stdout, "Updated %s\n", rcFile); err != nil {
+		return err
+	}
+	return writef(stdout, "Run 'source %s' or restart your shell to enable completions.\n", rcFile)
 }
 
 func installFishCompletion(stdout io.Writer) error {
@@ -191,9 +210,10 @@ func installFishCompletion(stdout io.Writer) error {
 		return fmt.Errorf("could not write completion script: %w", err)
 	}
 
-	fmt.Fprintf(stdout, "Installed fish completion to %s\n", scriptPath)
-	fmt.Fprintln(stdout, "Fish loads completions automatically. Restart your shell or run 'source "+scriptPath+"' to enable.")
-	return nil
+	if err := writef(stdout, "Installed fish completion to %s\n", scriptPath); err != nil {
+		return err
+	}
+	return writeln(stdout, "Fish loads completions automatically. Restart your shell or run 'source "+scriptPath+"' to enable.")
 }
 
 func installPowerShellCompletion(stdout io.Writer) error {
@@ -213,13 +233,22 @@ func installPowerShellCompletion(stdout io.Writer) error {
 		return fmt.Errorf("could not write completion script: %w", err)
 	}
 
-	fmt.Fprintf(stdout, "Installed PowerShell completion to %s\n", scriptPath)
-	fmt.Fprintln(stdout, "")
-	fmt.Fprintln(stdout, "To enable, add the following line to your PowerShell profile")
-	fmt.Fprintln(stdout, "(run '$PROFILE' in PowerShell to see the profile path):")
-	fmt.Fprintln(stdout, "")
-	fmt.Fprintf(stdout, "  . %q\n", scriptPath)
-	return nil
+	if err := writef(stdout, "Installed PowerShell completion to %s\n", scriptPath); err != nil {
+		return err
+	}
+	if err := writeln(stdout, ""); err != nil {
+		return err
+	}
+	if err := writeln(stdout, "To enable, add the following line to your PowerShell profile"); err != nil {
+		return err
+	}
+	if err := writeln(stdout, "(run '$PROFILE' in PowerShell to see the profile path):"); err != nil {
+		return err
+	}
+	if err := writeln(stdout, ""); err != nil {
+		return err
+	}
+	return writef(stdout, "  . %q\n", scriptPath)
 }
 
 // bashCompletionScript returns a bash completion script that uses mage -autocomplete.

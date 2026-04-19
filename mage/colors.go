@@ -134,7 +134,7 @@ var printName = func(str string) string {
 
 	if enableColorValue {
 		return _fmt.Sprintf("%s%s%s", targetColorValue, str, ansiColorReset)
-	} else {
-		return str
 	}
+
+	return str
 }

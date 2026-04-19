@@ -197,7 +197,9 @@ func TestAddGuardedBlockExisting(t *testing.T) {
 	path := filepath.Join(dir, "testrc")
 
 	// Write initial content
-	os.WriteFile(path, []byte("existing stuff\n"), 0644)
+	if err := os.WriteFile(path, []byte("existing stuff\n"), 0o600); err != nil {
+		t.Fatal("could not write initial content:", err)
+	}
 
 	err := addGuardedBlock(path, "test content")
 	if err != nil {
