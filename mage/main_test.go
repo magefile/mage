@@ -691,6 +691,176 @@ func TestMultilineTag(t *testing.T) {
 	}
 }
 
+// TestHelpNoCompile verifies that -h works without compilation by using a
+// fixture whose function bodies reference an undefined package. The AST parser
+// can still extract targets, but go build would fail.
+func TestHelpNoCompile(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		target string
+		output string
+		code   int
+		stderr bool
+	}{
+		{
+			name:   "known target",
+			target: "build",
+			output: "Build compiles the project.\n\nUsage:\n\n\tmage build\n\n",
+			code:   0,
+		},
+		{
+			name:   "multiline comment",
+			target: "deploy",
+			output: "Deploy pushes to production. This is the extended description.\n\nUsage:\n\n\tmage deploy\n\n",
+			code:   0,
+		},
+		{
+			name:   "namespace target",
+			target: "ns:run",
+			output: "Run runs within the namespace.\n\nUsage:\n\n\tmage ns:run\n\n",
+			code:   0,
+		},
+		{
+			name:   "unknown target",
+			target: "doesnotexist",
+			output: "Unknown target: \"doesnotexist\"\n",
+			code:   2,
+			stderr: true,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			stdout := &bytes.Buffer{}
+			stderr := &bytes.Buffer{}
+			inv := Invocation{
+				Dir:    "testdata/help_no_compile",
+				Stdout: stdout,
+				Stderr: stderr,
+				Help:   true,
+				Args:   []string{tc.target},
+			}
+			code := Invoke(inv)
+			if code != tc.code {
+				t.Fatalf("expected exit code %d, got %d\nstdout: %s\nstderr: %s", tc.code, code, stdout, stderr)
+			}
+			var got string
+			if tc.stderr {
+				got = stderr.String()
+			} else {
+				got = stdout.String()
+			}
+			if got != tc.output {
+				t.Errorf("expected output %q, got %q", tc.output, got)
+			}
+		})
+	}
+}
+
+// TestHelpNoTarget verifies that -h without a target name prints an error.
+func TestHelpNoTarget(t *testing.T) {
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:    "testdata/multiline",
+		Stdout: stdout,
+		Stderr: stderr,
+		Help:   true,
+		Args:   []string{},
+	}
+	code := Invoke(inv)
+	if code != 2 {
+		t.Fatalf("expected exit code 2, got %d\nstdout: %s\nstderr: %s", code, stdout, stderr)
+	}
+	got := stderr.String()
+	want := "no target specified\n"
+	if got != want {
+		t.Errorf("expected %q, got %q", want, got)
+	}
+}
+
+// TestHelpAliases verifies that -h shows sorted aliases.
+func TestHelpAliases(t *testing.T) {
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:    "testdata/alias",
+		Stdout: stdout,
+		Stderr: stderr,
+		Help:   true,
+		Args:   []string{"status"},
+	}
+	code := Invoke(inv)
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d\nstdout: %s\nstderr: %s", code, stdout, stderr)
+	}
+	got := stdout.String()
+	want := "Prints status.\n\nUsage:\n\n\tmage status\n\nAliases: st, stat\n\n"
+	if got != want {
+		t.Errorf("expected %q, got %q", want, got)
+	}
+}
+
+// TestHelpMatchesCompiledBinary verifies that mage -h and a compiled binary's
+// -h produce identical output for the same target.
+func TestHelpMatchesCompiledBinary(t *testing.T) {
+	dir := "./testdata/compiled"
+	compileDir := t.TempDir()
+	name := filepath.Join(compileDir, "mage_help_test")
+	if runtime.GOOS == "windows" {
+		name += ".exe"
+	}
+
+	// Compile the binary.
+	stderr := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:        dir,
+		Stdout:     io.Discard,
+		Stderr:     stderr,
+		CompileOut: name,
+	}
+	code := Invoke(inv)
+	if code != 0 {
+		t.Fatalf("compile failed with code %d: %s", code, stderr)
+	}
+
+	// Get help from mage directly (no compilation path).
+	stdout := &bytes.Buffer{}
+	stderr.Reset()
+	inv = Invocation{
+		Dir:    dir,
+		Stdout: stdout,
+		Stderr: stderr,
+		Help:   true,
+		Args:   []string{"deploy"},
+	}
+	code = Invoke(inv)
+	if code != 0 {
+		t.Fatalf("mage -h deploy failed with code %d: %s", code, stderr)
+	}
+	mageOutput := stdout.String()
+
+	// Get help from the compiled binary.
+	stdout.Reset()
+	stderr.Reset()
+	cmd := exec.CommandContext(context.Background(), name, "-h", "deploy")
+	cmd.Env = os.Environ()
+	cmd.Stdout = stdout
+	cmd.Stderr = stderr
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("compiled binary -h deploy failed: %v\nstderr: %s", err, stderr)
+	}
+	compiledOutput := stdout.String()
+
+	// The binary name differs (compiled binary uses its own filename), so
+	// normalize both outputs by replacing the binary name with a placeholder.
+	binaryBase := filepath.Base(name)
+	normalizedMage := strings.ReplaceAll(mageOutput, "\tmage ", "\tBINARY ")
+	normalizedCompiled := strings.ReplaceAll(compiledOutput, "\t"+binaryBase+" ", "\tBINARY ")
+
+	if normalizedMage != normalizedCompiled {
+		t.Errorf("help output mismatch (after normalizing binary name):\nmage -h:    %q\ncompiled -h: %q", mageOutput, compiledOutput)
+	}
+}
+
 func TestList(t *testing.T) {
 	stdout := &bytes.Buffer{}
 	inv := Invocation{

@@ -493,6 +493,20 @@ func Invoke(inv Invocation) int {
 		return 0
 	}
 
+	if inv.Help {
+		if len(inv.Args) < 1 {
+			_, _ = fmt.Fprintln(inv.Stderr, "no target specified")
+			return 2
+		}
+		output, code := mageHelpOutput(data, inv.Args[0])
+		if code != 0 {
+			_, _ = fmt.Fprint(inv.Stderr, output)
+		} else {
+			_, _ = fmt.Fprint(inv.Stdout, output)
+		}
+		return code
+	}
+
 	// ensure we use the same color output code in the generated mainfile as we do in mage's own output.
 	idx := strings.Index(colorsFile, "var printName =")
 	if idx == -1 {
@@ -584,6 +598,71 @@ func mageListOutput(data mainfileTemplateData, info *parse.PkgInfo) string {
 		_, _ = fmt.Fprintln(&list, "\n* default target")
 	}
 	return list.String()
+}
+
+// mageHelpOutput generates help text for a single target without compiling.
+// It returns the formatted output string and an exit code (0 for success, 2 for errors).
+// The output matches what a compiled binary produces for -h.
+func mageHelpOutput(data mainfileTemplateData, target string) (output string, code int) {
+	target = strings.ToLower(target)
+
+	// Collect all functions from main package and imports.
+	var allFuncs []*parse.Function
+	allFuncs = append(allFuncs, data.Funcs...)
+	for _, imp := range data.Imports {
+		allFuncs = append(allFuncs, imp.Info.Funcs...)
+	}
+
+	// Find the matching function.
+	var fn *parse.Function
+	for _, f := range allFuncs {
+		if strings.ToLower(f.TargetName()) == target {
+			fn = f
+			break
+		}
+	}
+	if fn == nil {
+		return fmt.Sprintf("Unknown target: %q\n", target), 2
+	}
+
+	var buf strings.Builder
+
+	if fn.Comment != "" {
+		_, _ = fmt.Fprintln(&buf, fn.Comment)
+		_, _ = fmt.Fprintln(&buf)
+	}
+
+	// Build usage line matching template format.
+	_, _ = fmt.Fprintf(&buf, "Usage:\n\n\t%s %s", data.BinaryName, strings.ToLower(fn.TargetName()))
+	for _, a := range fn.RequiredArgs() {
+		_, _ = fmt.Fprintf(&buf, " <%s>", a.Name)
+	}
+	if fn.MultipleOptionalArgs() {
+		_, _ = fmt.Fprint(&buf, " [<flags>]")
+	} else {
+		for _, a := range fn.OptionalArgs() {
+			_, _ = fmt.Fprintf(&buf, " [-%s=<%s>]", a.Name, a.Type)
+		}
+	}
+	_, _ = fmt.Fprint(&buf, "\n\n")
+
+	if fn.ShowFlagDocs() {
+		_, _ = fmt.Fprint(&buf, fn.FlagDocsString())
+	}
+
+	// Collect and sort aliases for deterministic output.
+	var aliases []string
+	for alias, af := range data.Aliases {
+		if af.Name == fn.Name && af.Receiver == fn.Receiver {
+			aliases = append(aliases, alias)
+		}
+	}
+	if len(aliases) > 0 {
+		sort.Strings(aliases)
+		_, _ = fmt.Fprintf(&buf, "Aliases: %s\n\n", strings.Join(aliases, ", "))
+	}
+
+	return buf.String(), 0
 }
 
 // printAutocompleteTargets outputs target names one per line for shell completion.
