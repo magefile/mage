@@ -27,10 +27,10 @@ func installCompletion(stdout io.Writer, shell string) error {
 		return installZshCompletion(stdout)
 	case "fish":
 		return installFishCompletion(stdout)
-	case "powershell":
+	case "powershell", "pwsh":
 		return installPowerShellCompletion(stdout)
 	default:
-		return fmt.Errorf("unsupported shell %q; supported shells: bash, zsh, fish, powershell", shell)
+		return fmt.Errorf("unsupported shell %q; supported shells: bash, zsh, fish, powershell (or pwsh)", shell)
 	}
 }
 
@@ -374,7 +374,7 @@ complete -c mage -l goos -r -d 'set GOOS for binary produced with -compile'
 complete -c mage -l goarch -r -d 'set GOARCH for binary produced with -compile'
 complete -c mage -l ldflags -r -d 'set ldflags for binary produced with -compile'
 complete -c mage -l autocomplete -d 'print target names for shell completion'
-complete -c mage -l install -r -a 'bash zsh fish powershell' -d 'install shell completion'
+complete -c mage -l install -r -a 'bash zsh fish powershell pwsh' -d 'install shell completion'
 complete -c mage -l multiline -d 'retain line returns in help text'
 `
 }

@@ -118,7 +118,7 @@ type Invocation struct {
 	HashFast     bool          // don't rely on GOCACHE, just hash the magefiles
 	Multiline    bool          // whether to retain line returns in help text for the generated main file
 	Autocomplete bool          // parse magefiles and print target names for shell completion
-	InstallShell string        // shell to install tab completion for (bash, zsh, fish, powershell)
+	InstallShell string        // shell to install tab completion for (bash, zsh, fish, powershell/pwsh)
 }
 
 // MagefilesDirName is the name of the default folder to look for if no directory was specified,
@@ -244,7 +244,7 @@ func Parse(stderr, stdout io.Writer, args []string) (inv Invocation, cmd Command
 	var compileOutPath string
 	fs.StringVar(&compileOutPath, "compile", "", "output a static binary to the given path")
 	var installShell string
-	fs.StringVar(&installShell, "install", "", "install shell tab completion (bash, zsh, fish, powershell)")
+	fs.StringVar(&installShell, "install", "", "install shell tab completion (bash, zsh, fish, powershell/pwsh)")
 
 	fs.Usage = func() {
 		_, _ = fmt.Fprint(stdout, `
@@ -261,7 +261,7 @@ Commands:
   -h        show this help
   -init     create a starting template if no mage files exist
   -install <string>
-            install shell tab completion (bash, zsh, fish, powershell)
+            install shell tab completion (bash, zsh, fish, powershell/pwsh)
   -l        list mage targets in this directory
   -version  show version info for the mage binary
 
