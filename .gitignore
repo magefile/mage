@@ -37,5 +37,7 @@ Session.vim
 # Hugo build lock
 .hugo_build.lock
 
+/site/public/
+
 # Release output
 /dist
