@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
 
@@ -30,17 +32,16 @@ func installCompletion(stdout io.Writer, shell string) error {
 	}
 }
 
-// mageExePath returns the resolved path of the running mage executable.
+// mageExePath returns the path to use for the mage executable in generated
+// completion scripts. It prefers the unresolved executable path (preserving
+// symlinks) so completions survive package-manager upgrades. Falls back to
+// "mage" if the path cannot be determined.
 func mageExePath() (string, error) {
 	exe, err := os.Executable()
 	if err != nil {
-		return "", err
+		return "mage", nil
 	}
-	resolved, err := filepath.EvalSymlinks(exe)
-	if err != nil {
-		return "", err
-	}
-	return resolved, nil
+	return exe, nil
 }
 
 // completionConfigDir returns the directory for mage completion config files.
@@ -83,7 +84,10 @@ func addGuardedBlock(path, content string) error {
 		}
 	}
 
-	// Append to file
+	// Append to file, creating parent directories if needed
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return err
+	}
 	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
 	if err != nil {
 		return err
@@ -122,10 +126,23 @@ func installBashCompletion(stdout io.Writer) error {
 		return err
 	}
 
+	// On macOS, bash reads .bash_profile for login shells (the default
+	// terminal behavior) rather than .bashrc. Use .bashrc if it exists,
+	// otherwise fall back to .bash_profile.
 	rcFile := filepath.Join(home, ".bashrc")
-	sourceLine := fmt.Sprintf(`[ -f %q ] && source %q`, scriptPath, scriptPath)
+	if _, err := os.Stat(rcFile); os.IsNotExist(err) {
+		rcFile = filepath.Join(home, ".bash_profile")
+	}
+
+	sourceLine := fmt.Sprintf(`[ -f '%s' ] && source '%s'`, scriptPath, scriptPath)
 	if err := addGuardedBlock(rcFile, sourceLine); err != nil {
-		return fmt.Errorf("could not update %s: %w", rcFile, err)
+		fmt.Fprintf(stdout, "Installed bash completion to %s\n", scriptPath)
+		fmt.Fprintln(stdout, "")
+		fmt.Fprintf(stdout, "Could not update %s: %v\n", rcFile, err)
+		fmt.Fprintln(stdout, "To enable, add the following line to your shell profile:")
+		fmt.Fprintln(stdout, "")
+		fmt.Fprintf(stdout, "  source '%s'\n", scriptPath)
+		return nil
 	}
 
 	fmt.Fprintf(stdout, "Installed bash completion to %s\n", scriptPath)
@@ -151,15 +168,26 @@ func installZshCompletion(stdout io.Writer) error {
 		return fmt.Errorf("could not write completion script: %w", err)
 	}
 
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return err
+	// Honor ZDOTDIR if set, otherwise use $HOME
+	zdotdir := os.Getenv("ZDOTDIR")
+	if zdotdir == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return err
+		}
+		zdotdir = home
 	}
 
-	rcFile := filepath.Join(home, ".zshrc")
-	sourceLine := fmt.Sprintf(`[ -f %q ] && source %q`, scriptPath, scriptPath)
+	rcFile := filepath.Join(zdotdir, ".zshrc")
+	sourceLine := fmt.Sprintf(`[ -f '%s' ] && source '%s'`, scriptPath, scriptPath)
 	if err := addGuardedBlock(rcFile, sourceLine); err != nil {
-		return fmt.Errorf("could not update %s: %w", rcFile, err)
+		fmt.Fprintf(stdout, "Installed zsh completion to %s\n", scriptPath)
+		fmt.Fprintln(stdout, "")
+		fmt.Fprintf(stdout, "Could not update %s: %v\n", rcFile, err)
+		fmt.Fprintln(stdout, "To enable, add the following line to your .zshrc:")
+		fmt.Fprintln(stdout, "")
+		fmt.Fprintf(stdout, "  source '%s'\n", scriptPath)
+		return nil
 	}
 
 	fmt.Fprintf(stdout, "Installed zsh completion to %s\n", scriptPath)
@@ -175,14 +203,13 @@ func installFishCompletion(stdout io.Writer) error {
 	}
 	script := fishCompletionScript(bin)
 
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return err
-	}
-
-	// Honor XDG_CONFIG_HOME if set
+	// Honor XDG_CONFIG_HOME if set, otherwise use ~/.config
 	configDir := os.Getenv("XDG_CONFIG_HOME")
 	if configDir == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return err
+		}
 		configDir = filepath.Join(home, ".config")
 	}
 
@@ -192,7 +219,7 @@ func installFishCompletion(stdout io.Writer) error {
 	}
 
 	fmt.Fprintf(stdout, "Installed fish completion to %s\n", scriptPath)
-	fmt.Fprintln(stdout, "Fish loads completions automatically. Restart your shell or run 'source "+scriptPath+"' to enable.")
+	fmt.Fprintf(stdout, "Fish loads completions automatically. Restart your shell or run 'source %s' to enable.\n", scriptPath)
 	return nil
 }
 
@@ -214,12 +241,60 @@ func installPowerShellCompletion(stdout io.Writer) error {
 	}
 
 	fmt.Fprintf(stdout, "Installed PowerShell completion to %s\n", scriptPath)
-	fmt.Fprintln(stdout, "")
-	fmt.Fprintln(stdout, "To enable, add the following line to your PowerShell profile")
-	fmt.Fprintln(stdout, "(run '$PROFILE' in PowerShell to see the profile path):")
-	fmt.Fprintln(stdout, "")
-	fmt.Fprintf(stdout, "  . %q\n", scriptPath)
+
+	profilePath := discoverPowerShellProfile()
+	if profilePath == "" {
+		fmt.Fprintln(stdout, "")
+		fmt.Fprintln(stdout, "Could not detect your PowerShell profile path.")
+		fmt.Fprintln(stdout, "To enable, add the following line to your PowerShell profile")
+		fmt.Fprintln(stdout, "(run 'echo $PROFILE' in PowerShell to see the profile path):")
+		fmt.Fprintln(stdout, "")
+		fmt.Fprintf(stdout, "  . %q\n", scriptPath)
+		return nil
+	}
+
+	sourceLine := fmt.Sprintf(". %q", scriptPath)
+	if err := addGuardedBlock(profilePath, sourceLine); err != nil {
+		// Fall back to manual instructions if we can't write the profile
+		fmt.Fprintln(stdout, "")
+		fmt.Fprintf(stdout, "Could not update %s: %v\n", profilePath, err)
+		fmt.Fprintln(stdout, "To enable, add the following line to your PowerShell profile:")
+		fmt.Fprintln(stdout, "")
+		fmt.Fprintf(stdout, "  . %q\n", scriptPath)
+		return nil
+	}
+
+	fmt.Fprintf(stdout, "Updated %s\n", profilePath)
+	fmt.Fprintln(stdout, "Restart PowerShell to enable completions.")
 	return nil
+}
+
+// discoverPowerShellProfile attempts to find the PowerShell profile path.
+// It tries running pwsh/powershell to query $PROFILE, then falls back to
+// well-known default locations.
+func discoverPowerShellProfile() string {
+	// Try querying pwsh (PowerShell Core) first, then powershell (Windows PowerShell)
+	for _, shell := range []string{"pwsh", "powershell"} {
+		out, err := exec.Command(shell, "-NoProfile", "-NonInteractive", "-Command", "echo $PROFILE").Output()
+		if err == nil {
+			if p := strings.TrimSpace(string(out)); p != "" {
+				return p
+			}
+		}
+	}
+
+	// Fall back to well-known default locations
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+
+	if runtime.GOOS == "windows" {
+		// Windows PowerShell default
+		return filepath.Join(home, "Documents", "WindowsPowerShell", "Microsoft.PowerShell_profile.ps1")
+	}
+	// PowerShell Core on macOS/Linux
+	return filepath.Join(home, ".config", "powershell", "Microsoft.PowerShell_profile.ps1")
 }
 
 // bashCompletionScript returns a bash completion script that uses mage -autocomplete.
@@ -232,7 +307,7 @@ func bashCompletionScript(mageBin string) string {
         return
     fi
     local IFS=$'\n'
-    COMPREPLY=($(compgen -W "$(` + mageBin + ` -autocomplete 2>/dev/null)" -- "$cur"))
+    COMPREPLY=($(compgen -W "$('` + mageBin + `' -autocomplete 2>/dev/null)" -- "$cur"))
 }
 complete -F _mage_completions mage
 `
@@ -270,10 +345,15 @@ _mage() {
         _describe 'flag' flags
         return
     fi
-    targets=(${(f)"$(` + mageBin + ` -autocomplete 2>/dev/null)"})
+    targets=(${(f)"$('` + mageBin + `' -autocomplete 2>/dev/null)"})
     _describe 'target' targets
 }
-compdef _mage mage
+if (( $+functions[compdef] )); then
+    compdef _mage mage
+else
+    autoload -Uz compinit && compinit
+    compdef _mage mage
+fi
 `
 }
 
@@ -281,7 +361,7 @@ compdef _mage mage
 func fishCompletionScript(mageBin string) string {
 	return `# mage tab completion for fish
 complete -c mage -f
-complete -c mage -a '(` + mageBin + ` -autocomplete 2>/dev/null)' -d 'mage target'
+complete -c mage -a '('` + mageBin + `' -autocomplete 2>/dev/null)' -d 'mage target'
 complete -c mage -s l -d 'list mage targets in this directory'
 complete -c mage -s h -d 'show this help'
 complete -c mage -s v -d 'show verbose output when running mage targets'

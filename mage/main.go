@@ -253,6 +253,8 @@ mage [options] [target]
 Mage is a make-like command runner.  See https://magefile.org for full docs.
 
 Commands:
+  -autocomplete
+            print target names for shell completion, without compiling
   -clean    clean out old generated binaries from CACHE_DIR
   -compile <string>
             output a static binary to the given path
@@ -264,8 +266,6 @@ Commands:
   -version  show version info for the mage binary
 
 Options:
-  -autocomplete
-              print target names for shell completion, without compiling
   -d <string> 
               directory to read magefiles from (default "." or "magefiles" if exists)
   -debug      turn on debug messages

@@ -32,24 +32,53 @@ func TestInstallCompletionBash(t *testing.T) {
 		t.Error("completion script missing complete command")
 	}
 
-	// Verify .bashrc was updated
-	rcPath := filepath.Join(home, ".bashrc")
+	// Since neither .bashrc nor .bash_profile exist, it falls back to
+	// .bash_profile and creates it.
+	rcPath := filepath.Join(home, ".bash_profile")
 	rc, err := os.ReadFile(rcPath)
 	if err != nil {
-		t.Fatal(".bashrc not found:", err)
+		t.Fatal("rc file not found:", err)
 	}
 	rcStr := string(rc)
 	if !strings.Contains(rcStr, mageCompletionMarker) {
-		t.Error(".bashrc missing completion marker")
+		t.Error("rc file missing completion marker")
 	}
 	if !strings.Contains(rcStr, "source") {
-		t.Error(".bashrc missing source line")
+		t.Error("rc file missing source line")
+	}
+}
+
+func TestInstallCompletionBashPrefersBashrc(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	// Create .bashrc so it's preferred over .bash_profile
+	os.WriteFile(filepath.Join(home, ".bashrc"), []byte("# existing\n"), 0644)
+
+	stdout := &bytes.Buffer{}
+	err := installCompletion(stdout, "bash")
+	if err != nil {
+		t.Fatal("unexpected error:", err)
+	}
+
+	rc, err := os.ReadFile(filepath.Join(home, ".bashrc"))
+	if err != nil {
+		t.Fatal(".bashrc not found:", err)
+	}
+	if !strings.Contains(string(rc), mageCompletionMarker) {
+		t.Error(".bashrc missing completion marker")
+	}
+
+	// .bash_profile should not have been created
+	if _, err := os.Stat(filepath.Join(home, ".bash_profile")); !os.IsNotExist(err) {
+		t.Error(".bash_profile should not exist when .bashrc is present")
 	}
 }
 
 func TestInstallCompletionZsh(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
+	t.Setenv("ZDOTDIR", "")
 
 	stdout := &bytes.Buffer{}
 	err := installCompletion(stdout, "zsh")
@@ -76,6 +105,34 @@ func TestInstallCompletionZsh(t *testing.T) {
 	}
 	if !strings.Contains(string(rc), mageCompletionMarker) {
 		t.Error(".zshrc missing completion marker")
+	}
+}
+
+func TestInstallCompletionZshZDOTDIR(t *testing.T) {
+	home := t.TempDir()
+	zdotdir := filepath.Join(home, "custom-zsh")
+	t.Setenv("HOME", home)
+	t.Setenv("ZDOTDIR", zdotdir)
+
+	stdout := &bytes.Buffer{}
+	err := installCompletion(stdout, "zsh")
+	if err != nil {
+		t.Fatal("unexpected error:", err)
+	}
+
+	// .zshrc should be in ZDOTDIR, not HOME
+	rcPath := filepath.Join(zdotdir, ".zshrc")
+	rc, err := os.ReadFile(rcPath)
+	if err != nil {
+		t.Fatal(".zshrc in ZDOTDIR not found:", err)
+	}
+	if !strings.Contains(string(rc), mageCompletionMarker) {
+		t.Error(".zshrc in ZDOTDIR missing completion marker")
+	}
+
+	// HOME/.zshrc should not exist
+	if _, err := os.Stat(filepath.Join(home, ".zshrc")); !os.IsNotExist(err) {
+		t.Error("$HOME/.zshrc should not exist when ZDOTDIR is set")
 	}
 }
 
@@ -137,10 +194,10 @@ func TestInstallCompletionPowerShell(t *testing.T) {
 		t.Error("completion script missing Register-ArgumentCompleter")
 	}
 
-	// PowerShell should print instructions, not modify files
+	// Should have either updated a profile or printed instructions
 	output := stdout.String()
-	if !strings.Contains(output, "$PROFILE") {
-		t.Error("output should contain instructions mentioning $PROFILE")
+	if !strings.Contains(output, "Installed PowerShell completion") {
+		t.Error("output should confirm installation")
 	}
 }
 
@@ -167,6 +224,57 @@ func TestInstallCompletionCaseInsensitive(t *testing.T) {
 	scriptPath := filepath.Join(home, ".config", "mage", "completion.bash")
 	if _, err := os.Stat(scriptPath); err != nil {
 		t.Fatal("completion script not found:", err)
+	}
+}
+
+func TestInstallBashFallbackOnRcFailure(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	// Create .bash_profile as a directory to force addGuardedBlock to fail
+	os.MkdirAll(filepath.Join(home, ".bash_profile"), 0755)
+
+	stdout := &bytes.Buffer{}
+	err := installCompletion(stdout, "bash")
+	if err != nil {
+		t.Fatal("should not return error, should fall back to instructions:", err)
+	}
+
+	output := stdout.String()
+	if !strings.Contains(output, "Could not update") {
+		t.Error("should mention failed update")
+	}
+	if !strings.Contains(output, "source") {
+		t.Error("should print manual source instructions")
+	}
+
+	// Script itself should still have been written
+	scriptPath := filepath.Join(home, ".config", "mage", "completion.bash")
+	if _, err := os.Stat(scriptPath); err != nil {
+		t.Fatal("completion script should still be installed:", err)
+	}
+}
+
+func TestInstallZshFallbackOnRcFailure(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("ZDOTDIR", "")
+
+	// Create .zshrc as a directory to force addGuardedBlock to fail
+	os.MkdirAll(filepath.Join(home, ".zshrc"), 0755)
+
+	stdout := &bytes.Buffer{}
+	err := installCompletion(stdout, "zsh")
+	if err != nil {
+		t.Fatal("should not return error, should fall back to instructions:", err)
+	}
+
+	output := stdout.String()
+	if !strings.Contains(output, "Could not update") {
+		t.Error("should mention failed update")
+	}
+	if !strings.Contains(output, "source") {
+		t.Error("should print manual source instructions")
 	}
 }
 
