@@ -257,6 +257,7 @@ Options:
 				{{if and (eq $name $func.Name) (eq $recv $func.Receiver)}}aliases = append(aliases, "{{$alias}}"){{end -}}
 				{{- end}}
 				if len(aliases) > 0 {
+					_sort.Strings(aliases)
 					_fmt.Printf("Aliases: %s\n\n", _strings.Join(aliases, ", "))
 				}
 				return
@@ -278,6 +279,7 @@ Options:
 				{{if and (eq $name $func.Name) (eq $recv $func.Receiver)}}aliases = append(aliases, "{{$alias}}"){{end -}}
 				{{- end}}
 				if len(aliases) > 0 {
+					_sort.Strings(aliases)
 					_fmt.Printf("Aliases: %s\n\n", _strings.Join(aliases, ", "))
 				}
 				return
