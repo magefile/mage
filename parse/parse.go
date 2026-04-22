@@ -51,8 +51,8 @@ type Function struct {
 	Receiver   string
 	IsError    bool
 	IsContext  bool
-	Synopsis   string
-	Comment    string
+	Synopsis   string // Synopsis is a one sentence description of the function, without its leading function name.
+	Comment    string // Comment is the full comment on the function, with newlines replaced by spaces and trimmed.
 	Args       []Arg
 }
 
@@ -78,6 +78,7 @@ func (s Functions) Swap(i, j int) {
 type Arg struct {
 	Name, Type string
 	Optional   bool
+	Comment    string
 }
 
 // ID returns user-readable information about where this function is defined.
@@ -147,6 +148,71 @@ func (f Function) HasOptionalArgs() bool {
 		}
 	}
 	return false
+}
+
+// MultipleOptionalArgs reports whether the function has more than one optional argument.
+func (f Function) MultipleOptionalArgs() bool {
+	n := 0
+	for _, a := range f.Args {
+		if a.Optional {
+			n++
+			if n > 1 {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// ShowFlagDocs reports whether the Flags section should be displayed.
+// This is true when there are multiple optional args (since they are
+// condensed to [<flags>] in the usage line) or when any optional arg
+// has a doc comment.
+func (f Function) ShowFlagDocs() bool {
+	if f.MultipleOptionalArgs() {
+		return true
+	}
+	for _, a := range f.Args {
+		if a.Optional && a.Comment != "" {
+			return true
+		}
+	}
+	return false
+}
+
+// FlagDocsString returns a formatted string documenting optional arguments.
+// It aligns comments to the same column based on the longest flag name.
+func (f Function) FlagDocsString() string {
+	opts := f.OptionalArgs()
+	if len(opts) == 0 {
+		return ""
+	}
+	// Compute flag labels and find max width for alignment
+	type entry struct {
+		label   string
+		comment string
+	}
+	var entries []entry
+	maxLen := 0
+	for _, a := range opts {
+		label := fmt.Sprintf("-%s=<%s>", a.Name, a.Type)
+		if len(label) > maxLen {
+			maxLen = len(label)
+		}
+		entries = append(entries, entry{label: label, comment: a.Comment})
+	}
+
+	var buf strings.Builder
+	_, _ = buf.WriteString("Flags:\n\n")
+	for _, e := range entries {
+		if e.comment != "" {
+			_, _ = fmt.Fprintf(&buf, "\t%-*s  %s\n", maxLen, e.label, e.comment)
+		} else {
+			_, _ = fmt.Fprintf(&buf, "\t%s\n", e.label)
+		}
+	}
+	_, _ = buf.WriteString("\n")
+	return buf.String()
 }
 
 // ExecCode returns code for the template switch to run the target.
@@ -413,7 +479,23 @@ func Package(path string, files []string, multiline bool) (*PkgInfo, error) {
 		debug.Printf("found %s tag, using multiline descriptions", multilineTag)
 		multiline = true
 	}
-	p := doc.New(pkg, "./", 0)
+	p := doc.New(pkg, "./", doc.PreserveAST)
+
+	// Build a map from AST fields to their inline comments. We use
+	// ast.NewCommentMap because the Go parser does not populate
+	// ast.Field.Comment for function parameters (only for struct fields).
+	fieldComments := make(map[*ast.Field]string)
+	for _, f := range pkg.Files {
+		cmap := ast.NewCommentMap(fset, f, f.Comments)
+		for node, groups := range cmap {
+			field, ok := node.(*ast.Field)
+			if !ok || len(groups) == 0 {
+				continue
+			}
+			fieldComments[field] = strings.TrimSpace(groups[0].Text())
+		}
+	}
+
 	pi := &PkgInfo{
 		AstPkg:    pkg,
 		DocPkg:    p,
@@ -422,11 +504,11 @@ func Package(path string, files []string, multiline bool) (*PkgInfo, error) {
 	if multiline {
 		pi.Description = strings.TrimSuffix(p.Doc, "\n")
 	} else {
-		pi.Description = toOneLine(p.Doc)
+		pi.Description = oneLineDoc(p.Doc)
 	}
 
-	setNamespaces(pi)
-	setFuncs(pi)
+	setNamespaces(pi, fieldComments)
+	setFuncs(pi, fieldComments)
 
 	hasDupes, names := checkDupeTargets(pi)
 	if hasDupes {
@@ -517,14 +599,14 @@ func (s Imports) Swap(i, j int) {
 	s[i], s[j] = s[j], s[i]
 }
 
-func setFuncs(pi *PkgInfo) {
+func setFuncs(pi *PkgInfo, fieldComments map[*ast.Field]string) {
 	for _, f := range pi.DocPkg.Funcs {
 		if f.Recv != "" {
 			debug.Printf("skipping method %s.%s", f.Recv, f.Name)
 			// skip methods
 			continue
 		}
-		fn, ok := funcFromDoc(f, pi.DocPkg.ImportPath, f.Name, pi.Multiline)
+		fn, ok := funcFromDoc(f, pi.DocPkg.ImportPath, f.Name, pi.Multiline, fieldComments)
 		if !ok {
 			continue
 		}
@@ -532,14 +614,14 @@ func setFuncs(pi *PkgInfo) {
 	}
 }
 
-func setNamespaces(pi *PkgInfo) {
+func setNamespaces(pi *PkgInfo, fieldComments map[*ast.Field]string) {
 	for _, t := range pi.DocPkg.Types {
 		if !isNamespace(t) {
 			continue
 		}
 		debug.Printf("found namespace %s %s", pi.DocPkg.ImportPath, t.Name)
 		for _, f := range t.Methods {
-			fn, ok := funcFromDoc(f, pi.DocPkg.ImportPath, t.Name+"."+f.Name, pi.Multiline)
+			fn, ok := funcFromDoc(f, pi.DocPkg.ImportPath, t.Name+"."+f.Name, pi.Multiline, fieldComments)
 			if !ok {
 				continue
 			}
@@ -549,11 +631,11 @@ func setNamespaces(pi *PkgInfo) {
 	}
 }
 
-func funcFromDoc(f *doc.Func, importpath, funcname string, multiline bool) (*Function, bool) {
+func funcFromDoc(f *doc.Func, importpath, funcname string, multiline bool, fieldComments map[*ast.Field]string) (*Function, bool) {
 	if !ast.IsExported(f.Name) {
 		return nil, false
 	}
-	fn, err := funcType(f.Decl.Type)
+	fn, err := funcType(f.Decl.Type, fieldComments)
 	if err != nil {
 		debug.Printf("skipping invalid method %s %s: %v", importpath, funcname, err)
 		return nil, false
@@ -563,7 +645,7 @@ func funcFromDoc(f *doc.Func, importpath, funcname string, multiline bool) (*Fun
 	if multiline {
 		fn.Comment = strings.TrimSuffix(f.Doc, "\n")
 	} else {
-		fn.Comment = toOneLine(f.Doc)
+		fn.Comment = oneLineDoc(f.Doc)
 	}
 	fn.Synopsis = sanitizeSynopsis(f)
 	return fn, true
@@ -728,6 +810,7 @@ func checkDupeTargets(info *PkgInfo) (hasDupes bool, names map[string][]string) 
 // sanitizeSynopsis sanitizes function Doc to create a summary.
 func sanitizeSynopsis(f *doc.Func) string {
 	synopsis := doc.Synopsis(f.Doc)
+	synopsis = sanitizeDocComment(synopsis)
 
 	// If the synopsis begins with the function name, remove it. This is done to
 	// not repeat the text.
@@ -735,8 +818,12 @@ func sanitizeSynopsis(f *doc.Func) string {
 	// clean	Clean removes the temporarily generated files
 	// To:
 	// clean 	removes the temporarily generated files
-	if syns := strings.Split(synopsis, " "); strings.EqualFold(f.Name, syns[0]) {
-		return strings.Join(syns[1:], " ")
+	start, rest, found := strings.Cut(synopsis, " ")
+	if !found {
+		return synopsis
+	}
+	if strings.EqualFold(f.Name, start) {
+		return rest
 	}
 
 	return synopsis
@@ -987,7 +1074,7 @@ func hasErrorReturn(ft *ast.FuncType) (bool, error) {
 	return false, errors.New("EBADRETURNTYPE")
 }
 
-func funcType(ft *ast.FuncType) (*Function, error) {
+func funcType(ft *ast.FuncType, fieldComments map[*ast.Field]string) (*Function, error) {
 	var err error
 	f := &Function{}
 	f.IsContext, err = hasContextParam(ft)
@@ -998,6 +1085,7 @@ func funcType(ft *ast.FuncType) (*Function, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	x := 0
 	if f.IsContext {
 		x++
@@ -1019,16 +1107,27 @@ func funcType(ft *ast.FuncType) (*Function, error) {
 			}
 			return nil, fmt.Errorf("unsupported argument type: %s", t)
 		}
+		comment := fieldComments[param]
 		// support for foo, bar string
 		for _, name := range param.Names {
-			f.Args = append(f.Args, Arg{Name: name.Name, Type: typ, Optional: optional})
+			f.Args = append(f.Args, Arg{Name: name.Name, Type: typ, Optional: optional, Comment: comment})
 		}
 	}
 	return f, nil
 }
 
-func toOneLine(s string) string {
-	return strings.TrimSpace(strings.ReplaceAll(s, "\n", " "))
+// sanitizeDocComment sanitizes a doc comment by replacing characters that would screw up formatting
+// in the output file.
+func sanitizeDocComment(s string) string {
+	s = strings.ReplaceAll(s, "`", "'")
+	return s
+}
+
+// oneLineDoc converts a doc comment to a single line, and sanitizes it for output.
+func oneLineDoc(s string) string {
+	s = strings.ReplaceAll(s, "\n", " ")
+	s = strings.TrimSpace(s)
+	return sanitizeDocComment(s)
 }
 
 // hasComment reports whether any file in the package contains a comment

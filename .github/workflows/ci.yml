@@ -11,6 +11,10 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v5
+    - name: Configure git identity
+      run: |
+        git config user.name "CI"
+        git config user.email "ci@localhost"
     - name: Set up Go ${{ matrix.go-version }}
       uses: actions/setup-go@v6
       with:

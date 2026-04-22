@@ -456,6 +456,73 @@ Usage:
 	}
 }
 
+func TestOptionalArgsFlagDocs(t *testing.T) {
+	stderr := &bytes.Buffer{}
+	stdout := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:    "./testdata/optargs",
+		Stderr: stderr,
+		Stdout: stdout,
+		Help:   true,
+		Args:   []string{"flagdocs"},
+	}
+	code := Invoke(inv)
+	if code != 0 {
+		t.Log("stderr:", stderr)
+		t.Log("stdout:", stdout)
+		t.Fatalf("expected code 0, but got %v", code)
+	}
+	actual := stdout.String()
+	expected := `FlagDocs tests that docs on flags are properly displayed when you run mage -h FlagDocs.
+
+Usage:
+
+	mage flagdocs <name> [<flags>]
+
+Flags:
+
+	-greeting=<string>  the message to append to the name
+	-repeat=<int>       the number of times to repeat
+
+`
+	if actual != expected {
+		t.Fatalf("output is not expected:\ngot:  %q\nwant: %q", actual, expected)
+	}
+}
+
+func TestOptionalArgsSingleFlagDoc(t *testing.T) {
+	stderr := &bytes.Buffer{}
+	stdout := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:    "./testdata/optargs",
+		Stderr: stderr,
+		Stdout: stdout,
+		Help:   true,
+		Args:   []string{"singleflagdoc"},
+	}
+	code := Invoke(inv)
+	if code != 0 {
+		t.Log("stderr:", stderr)
+		t.Log("stdout:", stdout)
+		t.Fatalf("expected code 0, but got %v", code)
+	}
+	actual := stdout.String()
+	expected := `SingleFlagDoc tests that a single documented flag shows the Flags section.
+
+Usage:
+
+	mage singleflagdoc <name> [-greeting=<string>]
+
+Flags:
+
+	-greeting=<string>  the greeting to use
+
+`
+	if actual != expected {
+		t.Fatalf("output is not expected:\ngot:  %q\nwant: %q", actual, expected)
+	}
+}
+
 func TestOptionalArgsCaseInsensitive(t *testing.T) {
 	stderr := &bytes.Buffer{}
 	stdout := &bytes.Buffer{}
