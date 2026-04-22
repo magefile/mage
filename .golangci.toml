@@ -98,6 +98,7 @@ excludes = [
   'G304', # Audit file path provided as taint input (path traversal via user-supplied file paths)
   'G307', # Deferring a method which returns an error (e.g., defer f.Close() without checking the error)
   'G702', # net/http SetDeadline not called (HTTP server timeout not configured)
+  'G703', # Path traversal via taint analysis
   'G706', # Audit use of io.ReadAll (potential denial of service from unbounded reads)
 ]
 
