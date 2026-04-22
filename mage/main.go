@@ -376,19 +376,15 @@ func Invoke(inv Invocation) int {
 	magefilesDir := filepath.Join(inv.Dir, MagefilesDirName)
 	// . will be default unless we find a mage folder.
 	mfSt, err := os.Stat(magefilesDir)
-	if err == nil {
-		if mfSt.IsDir() {
-			originalDir := inv.Dir
-			inv.Dir = magefilesDir // preemptive assignment
-			// TODO: Remove this fallback and the above Magefiles invocation when the bw compatibility is removed.
-			files, err := Magefiles(originalDir, inv.GOOS, inv.GOARCH, inv.Debug)
-			if err == nil {
-				if len(files) != 0 {
-					errlog.Println("[WARNING] You have both a magefiles directory and mage files in the " +
-						"current directory, in future versions the files will be ignored in favor of the directory")
-					inv.Dir = originalDir
-				}
-			}
+	if err == nil && mfSt.IsDir() {
+		originalDir := inv.Dir
+		inv.Dir = magefilesDir // preemptive assignment
+		// TODO: Remove this fallback and the above Magefiles invocation when the bw compatibility is removed.
+		existingFiles, mfErr := Magefiles(originalDir, inv.GOOS, inv.GOARCH, inv.Debug)
+		if mfErr == nil && len(existingFiles) != 0 {
+			errlog.Println("[WARNING] You have both a magefiles directory and mage files in the " +
+				"current directory, in future versions the files will be ignored in favor of the directory")
+			inv.Dir = originalDir
 		}
 	}
 
@@ -421,15 +417,15 @@ func Invoke(inv Invocation) int {
 	if inv.HashFast {
 		debug.Println("user has set MAGEFILE_HASHFAST, so we'll ignore GOCACHE")
 	} else {
-		s, err := internal.OutputDebug(inv.GoCmd, "env", "GOCACHE")
-		if err != nil {
-			errlog.Printf("failed to run %s env GOCACHE: %s", inv.GoCmd, err)
+		gocache, gocacheErr := internal.OutputDebug(inv.GoCmd, "env", "GOCACHE")
+		if gocacheErr != nil {
+			errlog.Printf("failed to run %s env GOCACHE: %s", inv.GoCmd, gocacheErr)
 			return 1
 		}
 
 		// if GOCACHE exists, always rebuild, so we catch transitive
 		// dependencies that have changed.
-		if s != "" {
+		if gocache != "" {
 			debug.Println("go build cache exists, will ignore any compiled binary")
 			useCache = true
 		}
@@ -511,7 +507,7 @@ func Invoke(inv Invocation) int {
 		return 1
 	}
 	if !inv.Keep {
-		defer os.RemoveAll(main)
+		defer func() { _ = os.RemoveAll(main) }()
 	}
 	files = append(files, main)
 	if err := Compile(inv.GOOS, inv.GOARCH, inv.Ldflags, inv.Dir, inv.GoCmd, exePath, files, inv.Debug, inv.Stderr, inv.Stdout); err != nil {
@@ -779,7 +775,7 @@ func GenerateMainfile(data mainfileTemplateData, path string) error {
 	if err != nil {
 		return fmt.Errorf("error creating generated mainfile: %w", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	debug.Println("writing new file at", path)
 	if err := mainfileTemplate.Execute(f, data); err != nil {
@@ -831,7 +827,7 @@ func hashFile(fn string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("can't open input file for hashing: %w", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	h := sha256.New()
 	if _, err := io.Copy(h, f); err != nil {
@@ -846,7 +842,7 @@ func generateInit(dir string) error {
 	if err != nil {
 		return fmt.Errorf("could not create mage template: %w", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	if err := initOutput.Execute(f, nil); err != nil {
 		return fmt.Errorf("can't execute magefile template: %w", err)

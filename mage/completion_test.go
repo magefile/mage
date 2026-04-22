@@ -53,7 +53,9 @@ func TestInstallCompletionBashPrefersBashrc(t *testing.T) {
 	t.Setenv("HOME", home)
 
 	// Create .bashrc so it's preferred over .bash_profile
-	os.WriteFile(filepath.Join(home, ".bashrc"), []byte("# existing\n"), 0644)
+	if err := os.WriteFile(filepath.Join(home, ".bashrc"), []byte("# existing\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
 
 	stdout := &bytes.Buffer{}
 	err := installCompletion(stdout, "bash")
@@ -232,7 +234,9 @@ func TestInstallBashFallbackOnRcFailure(t *testing.T) {
 	t.Setenv("HOME", home)
 
 	// Create .bash_profile as a directory to force addGuardedBlock to fail
-	os.MkdirAll(filepath.Join(home, ".bash_profile"), 0755)
+	if err := os.MkdirAll(filepath.Join(home, ".bash_profile"), 0o750); err != nil {
+		t.Fatal(err)
+	}
 
 	stdout := &bytes.Buffer{}
 	err := installCompletion(stdout, "bash")
@@ -261,7 +265,9 @@ func TestInstallZshFallbackOnRcFailure(t *testing.T) {
 	t.Setenv("ZDOTDIR", "")
 
 	// Create .zshrc as a directory to force addGuardedBlock to fail
-	os.MkdirAll(filepath.Join(home, ".zshrc"), 0755)
+	if err := os.MkdirAll(filepath.Join(home, ".zshrc"), 0o750); err != nil {
+		t.Fatal(err)
+	}
 
 	stdout := &bytes.Buffer{}
 	err := installCompletion(stdout, "zsh")

@@ -61,10 +61,10 @@ func Release(tag string) (err error) {
 		return errors.New("TAG environment variable must be in semver v1.x.x format, but was " + tag)
 	}
 
-	if err := sh.RunV("git", "tag", "-a", tag, "-m", tag); err != nil {
+	if err = sh.RunV("git", "tag", "-a", tag, "-m", tag); err != nil { //nolint:gocritic // using = to assign named return for deferred cleanup
 		return err
 	}
-	if err := sh.RunV("git", "push", "origin", tag); err != nil {
+	if err = sh.RunV("git", "push", "origin", tag); err != nil { //nolint:gocritic // using = to assign named return for deferred cleanup
 		return err
 	}
 	defer func() {

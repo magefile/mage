@@ -1,5 +1,4 @@
 //go:build CI
-// +build CI
 
 package main
 

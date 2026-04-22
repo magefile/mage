@@ -22,11 +22,11 @@ func TestNewestModTime(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error opening file to append: %s", err.Error())
 	}
-	if _, err := outfh.WriteString("\nbye!\n"); err != nil {
-		t.Fatalf("error appending to file: %s", err.Error())
+	if _, writeErr := outfh.WriteString("\nbye!\n"); writeErr != nil {
+		t.Fatalf("error appending to file: %s", writeErr.Error())
 	}
-	if err := outfh.Close(); err != nil {
-		t.Fatalf("error closing file: %s", err.Error())
+	if closeErr := outfh.Close(); closeErr != nil {
+		t.Fatalf("error closing file: %s", closeErr.Error())
 	}
 
 	afi, err := os.Stat(filepath.Join(dir, "a"))

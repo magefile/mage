@@ -50,7 +50,7 @@ func runmain(m *testing.M) error {
 	if err != nil {
 		return err
 	}
-	defer os.RemoveAll(dir)
+	defer func() { _ = os.RemoveAll(dir) }()
 	if err := os.Setenv(mg.CacheEnv, dir); err != nil {
 		return err
 	}
@@ -125,11 +125,11 @@ func TestTransitiveDepCache(t *testing.T) {
 	if err := os.Rename("testdata/transitiveDeps/dep/dog.go", "testdata/transitiveDeps/dep/dog.notgo"); err != nil {
 		t.Fatal(err)
 	}
-	defer os.Rename("testdata/transitiveDeps/dep/dog.notgo", "testdata/transitiveDeps/dep/dog.go")
+	defer func() { _ = os.Rename("testdata/transitiveDeps/dep/dog.notgo", "testdata/transitiveDeps/dep/dog.go") }()
 	if err := os.Rename("testdata/transitiveDeps/dep/cat.notgo", "testdata/transitiveDeps/dep/cat.go"); err != nil {
 		t.Fatal(err)
 	}
-	defer os.Rename("testdata/transitiveDeps/dep/cat.go", "testdata/transitiveDeps/dep/cat.notgo")
+	defer func() { _ = os.Rename("testdata/transitiveDeps/dep/cat.go", "testdata/transitiveDeps/dep/cat.notgo") }()
 	stderr.Reset()
 	stdout.Reset()
 	code = Invoke(inv)
@@ -177,11 +177,11 @@ func TestTransitiveHashFast(t *testing.T) {
 	if err := os.Rename("testdata/transitiveDeps/dep/dog.go", "testdata/transitiveDeps/dep/dog.notgo"); err != nil {
 		t.Fatal(err)
 	}
-	defer os.Rename("testdata/transitiveDeps/dep/dog.notgo", "testdata/transitiveDeps/dep/dog.go")
+	defer func() { _ = os.Rename("testdata/transitiveDeps/dep/dog.notgo", "testdata/transitiveDeps/dep/dog.go") }()
 	if err := os.Rename("testdata/transitiveDeps/dep/cat.notgo", "testdata/transitiveDeps/dep/cat.go"); err != nil {
 		t.Fatal(err)
 	}
-	defer os.Rename("testdata/transitiveDeps/dep/cat.go", "testdata/transitiveDeps/dep/cat.notgo")
+	defer func() { _ = os.Rename("testdata/transitiveDeps/dep/cat.go", "testdata/transitiveDeps/dep/cat.notgo") }()
 	stderr.Reset()
 	stdout.Reset()
 	inv.HashFast = true
@@ -355,7 +355,7 @@ func TestMagefilesFolder(t *testing.T) {
 		t.Fatalf("changing to magefolders tests data: %v", err)
 	}
 	// restore previous state
-	defer os.Chdir(wd)
+	defer func() { _ = os.Chdir(wd) }()
 
 	stderr := &bytes.Buffer{}
 	stdout := &bytes.Buffer{}
@@ -387,7 +387,7 @@ func TestMagefilesFolderMixedWithMagefiles(t *testing.T) {
 		t.Fatalf("changing to magefolders tests data: %v", err)
 	}
 	// restore previous state
-	defer os.Chdir(wd)
+	defer func() { _ = os.Chdir(wd) }()
 
 	stderr := &bytes.Buffer{}
 	stdout := &bytes.Buffer{}
@@ -425,7 +425,7 @@ func TestUntaggedMagefilesFolder(t *testing.T) {
 		t.Fatalf("changing to magefolders tests data: %v", err)
 	}
 	// restore previous state
-	defer os.Chdir(wd)
+	defer func() { _ = os.Chdir(wd) }()
 
 	stderr := &bytes.Buffer{}
 	stdout := &bytes.Buffer{}
@@ -457,7 +457,7 @@ func TestMixedTaggingMagefilesFolder(t *testing.T) {
 		t.Fatalf("changing to magefolders tests data: %v", err)
 	}
 	// restore previous state
-	defer os.Chdir(wd)
+	defer func() { _ = os.Chdir(wd) }()
 
 	stderr := &bytes.Buffer{}
 	stdout := &bytes.Buffer{}
@@ -1689,7 +1689,7 @@ func TestCompiledDeterministic(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer f.Close()
+			defer func() { _ = f.Close() }()
 
 			hasher := sha256.New()
 			if _, err := io.Copy(hasher, f); err != nil {
@@ -1971,7 +1971,7 @@ func fileData(file string) (exeType, archSize, error) {
 	if err != nil {
 		return -1, -1, err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	data := make([]byte, 16)
 	if _, err := io.ReadFull(f, data); err != nil {
 		return -1, -1, err

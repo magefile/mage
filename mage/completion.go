@@ -1,6 +1,7 @@
 package mage
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -8,6 +9,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 )
 
 const (
@@ -36,12 +38,12 @@ func installCompletion(stdout io.Writer, shell string) error {
 // completion scripts. It prefers the unresolved executable path (preserving
 // symlinks) so completions survive package-manager upgrades. Falls back to
 // "mage" if the path cannot be determined.
-func mageExePath() (string, error) {
+func mageExePath() string {
 	exe, err := os.Executable()
 	if err != nil {
-		return "mage", nil
+		return "mage"
 	}
-	return exe, nil
+	return exe
 }
 
 // completionConfigDir returns the directory for mage completion config files.
@@ -88,30 +90,27 @@ func addGuardedBlock(path, content string) error {
 	}
 
 	// Append to file, creating parent directories if needed
-	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
-		return err
+	if mkdirErr := os.MkdirAll(filepath.Dir(path), 0o750); mkdirErr != nil {
+		return mkdirErr
 	}
-	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o600)
-	if err != nil {
-		return err
+	f, openErr := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o600)
+	if openErr != nil {
+		return openErr
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	// Add a newline before the block if the file is non-empty and doesn't end with one
 	if len(existing) > 0 && existing[len(existing)-1] != '\n' {
-		if _, err := f.WriteString("\n"); err != nil {
-			return err
+		if _, writeErr := f.WriteString("\n"); writeErr != nil {
+			return writeErr
 		}
 	}
-	_, err = f.WriteString(block + "\n")
-	return err
+	_, writeErr := f.WriteString(block + "\n")
+	return writeErr
 }
 
 func installBashCompletion(stdout io.Writer) error {
-	bin, err := mageExePath()
-	if err != nil {
-		return err
-	}
+	bin := mageExePath()
 	script := bashCompletionScript(bin)
 
 	dir, err := completionConfigDir()
@@ -120,8 +119,8 @@ func installBashCompletion(stdout io.Writer) error {
 	}
 
 	scriptPath := filepath.Join(dir, "completion.bash")
-	if err := writeCompletionFile(scriptPath, script); err != nil {
-		return fmt.Errorf("could not write completion script: %w", err)
+	if writeErr := writeCompletionFile(scriptPath, script); writeErr != nil {
+		return fmt.Errorf("could not write completion script: %w", writeErr)
 	}
 
 	home, err := os.UserHomeDir()
@@ -139,30 +138,23 @@ func installBashCompletion(stdout io.Writer) error {
 
 	sourceLine := fmt.Sprintf(`[ -f '%s' ] && source '%s'`, scriptPath, scriptPath)
 	if err := addGuardedBlock(rcFile, sourceLine); err != nil {
-		fmt.Fprintf(stdout, "Installed bash completion to %s\n", scriptPath)
-		fmt.Fprintln(stdout, "")
-		fmt.Fprintf(stdout, "Could not update %s: %v\n", rcFile, err)
-		fmt.Fprintln(stdout, "To enable, add the following line to your shell profile:")
-		fmt.Fprintln(stdout, "")
-		fmt.Fprintf(stdout, "  source '%s'\n", scriptPath)
+		_, _ = fmt.Fprintf(stdout, "Installed bash completion to %s\n", scriptPath)
+		_, _ = fmt.Fprintln(stdout, "")
+		_, _ = fmt.Fprintf(stdout, "Could not update %s: %v\n", rcFile, err)
+		_, _ = fmt.Fprintln(stdout, "To enable, add the following line to your shell profile:")
+		_, _ = fmt.Fprintln(stdout, "")
+		_, _ = fmt.Fprintf(stdout, "  source '%s'\n", scriptPath)
 		return nil
 	}
 
-	if _, err := fmt.Fprintf(stdout, "Installed bash completion to %s\n", scriptPath); err != nil {
-		return err
-	}
-	if _, err := fmt.Fprintf(stdout, "Updated %s\n", rcFile); err != nil {
-		return err
-	}
-	_, err = fmt.Fprintf(stdout, "Run 'source %s' or restart your shell to enable completions.\n", rcFile)
-	return err
+	_, _ = fmt.Fprintf(stdout, "Installed bash completion to %s\n", scriptPath)
+	_, _ = fmt.Fprintf(stdout, "Updated %s\n", rcFile)
+	_, _ = fmt.Fprintf(stdout, "Run 'source %s' or restart your shell to enable completions.\n", rcFile)
+	return nil
 }
 
 func installZshCompletion(stdout io.Writer) error {
-	bin, err := mageExePath()
-	if err != nil {
-		return err
-	}
+	bin := mageExePath()
 	script := zshCompletionScript(bin)
 
 	dir, err := completionConfigDir()
@@ -188,30 +180,23 @@ func installZshCompletion(stdout io.Writer) error {
 	rcFile := filepath.Join(zdotdir, ".zshrc")
 	sourceLine := fmt.Sprintf(`[ -f '%s' ] && source '%s'`, scriptPath, scriptPath)
 	if err := addGuardedBlock(rcFile, sourceLine); err != nil {
-		fmt.Fprintf(stdout, "Installed zsh completion to %s\n", scriptPath)
-		fmt.Fprintln(stdout, "")
-		fmt.Fprintf(stdout, "Could not update %s: %v\n", rcFile, err)
-		fmt.Fprintln(stdout, "To enable, add the following line to your .zshrc:")
-		fmt.Fprintln(stdout, "")
-		fmt.Fprintf(stdout, "  source '%s'\n", scriptPath)
+		_, _ = fmt.Fprintf(stdout, "Installed zsh completion to %s\n", scriptPath)
+		_, _ = fmt.Fprintln(stdout, "")
+		_, _ = fmt.Fprintf(stdout, "Could not update %s: %v\n", rcFile, err)
+		_, _ = fmt.Fprintln(stdout, "To enable, add the following line to your .zshrc:")
+		_, _ = fmt.Fprintln(stdout, "")
+		_, _ = fmt.Fprintf(stdout, "  source '%s'\n", scriptPath)
 		return nil
 	}
 
-	if _, err := fmt.Fprintf(stdout, "Installed zsh completion to %s\n", scriptPath); err != nil {
-		return err
-	}
-	if _, err := fmt.Fprintf(stdout, "Updated %s\n", rcFile); err != nil {
-		return err
-	}
-	_, err = fmt.Fprintf(stdout, "Run 'source %s' or restart your shell to enable completions.\n", rcFile)
-	return err
+	_, _ = fmt.Fprintf(stdout, "Installed zsh completion to %s\n", scriptPath)
+	_, _ = fmt.Fprintf(stdout, "Updated %s\n", rcFile)
+	_, _ = fmt.Fprintf(stdout, "Run 'source %s' or restart your shell to enable completions.\n", rcFile)
+	return nil
 }
 
 func installFishCompletion(stdout io.Writer) error {
-	bin, err := mageExePath()
-	if err != nil {
-		return err
-	}
+	bin := mageExePath()
 	script := fishCompletionScript(bin)
 
 	// Honor XDG_CONFIG_HOME if set, otherwise use ~/.config
@@ -229,15 +214,13 @@ func installFishCompletion(stdout io.Writer) error {
 		return fmt.Errorf("could not write completion script: %w", err)
 	}
 
-	_, _ = fmt.Fprintln(stdout, "Fish loads completions automatically. Restart your shell or run 'source "+scriptPath+"' to enable.")
-	return err
+	_, _ = fmt.Fprintf(stdout, "Installed fish completion to %s\n", scriptPath)
+	_, _ = fmt.Fprintf(stdout, "Fish loads completions automatically. Restart your shell or run 'source %s' to enable.\n", scriptPath)
+	return nil
 }
 
 func installPowerShellCompletion(stdout io.Writer) error {
-	bin, err := mageExePath()
-	if err != nil {
-		return err
-	}
+	bin := mageExePath()
 	script := powerShellCompletionScript(bin)
 
 	dir, err := completionConfigDir()
@@ -250,32 +233,31 @@ func installPowerShellCompletion(stdout io.Writer) error {
 		return fmt.Errorf("could not write completion script: %w", err)
 	}
 
-	fmt.Fprintf(stdout, "Installed PowerShell completion to %s\n", scriptPath)
+	_, _ = fmt.Fprintf(stdout, "Installed PowerShell completion to %s\n", scriptPath)
 
 	profilePath := discoverPowerShellProfile()
 	if profilePath == "" {
-		fmt.Fprintln(stdout, "")
-		fmt.Fprintln(stdout, "Could not detect your PowerShell profile path.")
-		fmt.Fprintln(stdout, "To enable, add the following line to your PowerShell profile")
-		fmt.Fprintln(stdout, "(run 'echo $PROFILE' in PowerShell to see the profile path):")
-		fmt.Fprintln(stdout, "")
-		fmt.Fprintf(stdout, "  . %q\n", scriptPath)
+		_, _ = fmt.Fprintln(stdout, "")
+		_, _ = fmt.Fprintln(stdout, "Could not detect your PowerShell profile path.")
+		_, _ = fmt.Fprintln(stdout, "To enable, add the following line to your PowerShell profile")
+		_, _ = fmt.Fprintln(stdout, "(run 'echo $PROFILE' in PowerShell to see the profile path):")
+		_, _ = fmt.Fprintln(stdout, "")
+		_, _ = fmt.Fprintf(stdout, "  . %q\n", scriptPath)
 		return nil
 	}
 
 	sourceLine := fmt.Sprintf(". %q", scriptPath)
 	if err := addGuardedBlock(profilePath, sourceLine); err != nil {
-		// Fall back to manual instructions if we can't write the profile
-		fmt.Fprintln(stdout, "")
-		fmt.Fprintf(stdout, "Could not update %s: %v\n", profilePath, err)
-		fmt.Fprintln(stdout, "To enable, add the following line to your PowerShell profile:")
-		fmt.Fprintln(stdout, "")
-		fmt.Fprintf(stdout, "  . %q\n", scriptPath)
+		_, _ = fmt.Fprintln(stdout, "")
+		_, _ = fmt.Fprintf(stdout, "Could not update %s: %v\n", profilePath, err)
+		_, _ = fmt.Fprintln(stdout, "To enable, add the following line to your PowerShell profile:")
+		_, _ = fmt.Fprintln(stdout, "")
+		_, _ = fmt.Fprintf(stdout, "  . %q\n", scriptPath)
 		return nil
 	}
 
-	fmt.Fprintf(stdout, "Updated %s\n", profilePath)
-	fmt.Fprintln(stdout, "Restart PowerShell to enable completions.")
+	_, _ = fmt.Fprintf(stdout, "Updated %s\n", profilePath)
+	_, _ = fmt.Fprintln(stdout, "Restart PowerShell to enable completions.")
 	return nil
 }
 
@@ -285,7 +267,9 @@ func installPowerShellCompletion(stdout io.Writer) error {
 func discoverPowerShellProfile() string {
 	// Try querying pwsh (PowerShell Core) first, then powershell (Windows PowerShell)
 	for _, shell := range []string{"pwsh", "powershell"} {
-		out, err := exec.Command(shell, "-NoProfile", "-NonInteractive", "-Command", "echo $PROFILE").Output()
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		out, err := exec.CommandContext(ctx, shell, "-NoProfile", "-NonInteractive", "-Command", "echo $PROFILE").Output()
+		cancel()
 		if err == nil {
 			if p := strings.TrimSpace(string(out)); p != "" {
 				return p

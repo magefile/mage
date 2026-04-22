@@ -19,9 +19,11 @@ go test -race ./mage/ -run TestGoCmd
 
 # CI runs tests with: go test -v -vet=all -tags CI -race ./...
 
-# Lint (requires golangci-lint)
+# Lint (requires golangci-lint) — run after any code changes
 golangci-lint run ./...
 ```
+
+After making changes, always run `golangci-lint run ./...` before committing to catch lint issues early.
 
 Mage builds itself with mage. The bootstrap path (`go run bootstrap.go`) is for building mage when mage isn't installed yet. The project's own build targets live in `magefiles/`.
 
@@ -51,5 +53,6 @@ Mage works by **parsing user Go source files and generating a temporary CLI bina
 - **Target function signatures** follow strict rules enforced by `parse/parse.go` (`funcType`): optional leading `context.Context` parameter, supported arg types (`string`, `int`, `bool`, `time.Duration`), and must return either nothing or `error`. Pointer args become optional CLI arguments.
 - **`//mage:import`** comments on blank imports cause mage to recursively parse imported packages and surface their exported functions as targets.
 - **Namespace targets** are methods on types that embed `mg.Namespace`. The type name becomes a CLI prefix (e.g., `mage ns:target`).
+- **Documentation** — All functions, methods, types, package variables, and package constants must have Go doc comments describing their purpose, including unexported ones. Every package must have a detailed package-level doc comment explaining what the package is for and how to use it.
 - **Formatting** uses `goimports` (configured in `.golangci.toml`).
 - **Tests** are primarily integration-style: `mage/main_test.go` calls `Invoke()` against fixture directories under `testdata/`. Table-driven unit tests are used in `parse/`, `sh/`, `internal/`, and `target/`. Always run tests with `-race`.
