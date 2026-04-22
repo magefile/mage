@@ -4,9 +4,9 @@ package mage
 
 import "strconv"
 
-const _Command_name = "NoneVersionInitCleanCompileStatic"
+const _Command_name = "NoneVersionInitCleanCompileStaticInstall"
 
-var _Command_index = [...]uint8{0, 4, 11, 15, 20, 33}
+var _Command_index = [...]uint8{0, 4, 11, 15, 20, 33, 40}
 
 func (i Command) String() string {
 	if i < 0 || i >= Command(len(_Command_index)-1) {

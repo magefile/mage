@@ -50,7 +50,7 @@ func runmain(m *testing.M) error {
 	if err != nil {
 		return err
 	}
-	defer os.RemoveAll(dir)
+	defer func() { _ = os.RemoveAll(dir) }()
 	if err := os.Setenv(mg.CacheEnv, dir); err != nil {
 		return err
 	}
@@ -125,11 +125,11 @@ func TestTransitiveDepCache(t *testing.T) {
 	if err := os.Rename("testdata/transitiveDeps/dep/dog.go", "testdata/transitiveDeps/dep/dog.notgo"); err != nil {
 		t.Fatal(err)
 	}
-	defer os.Rename("testdata/transitiveDeps/dep/dog.notgo", "testdata/transitiveDeps/dep/dog.go")
+	defer func() { _ = os.Rename("testdata/transitiveDeps/dep/dog.notgo", "testdata/transitiveDeps/dep/dog.go") }()
 	if err := os.Rename("testdata/transitiveDeps/dep/cat.notgo", "testdata/transitiveDeps/dep/cat.go"); err != nil {
 		t.Fatal(err)
 	}
-	defer os.Rename("testdata/transitiveDeps/dep/cat.go", "testdata/transitiveDeps/dep/cat.notgo")
+	defer func() { _ = os.Rename("testdata/transitiveDeps/dep/cat.go", "testdata/transitiveDeps/dep/cat.notgo") }()
 	stderr.Reset()
 	stdout.Reset()
 	code = Invoke(inv)
@@ -177,11 +177,11 @@ func TestTransitiveHashFast(t *testing.T) {
 	if err := os.Rename("testdata/transitiveDeps/dep/dog.go", "testdata/transitiveDeps/dep/dog.notgo"); err != nil {
 		t.Fatal(err)
 	}
-	defer os.Rename("testdata/transitiveDeps/dep/dog.notgo", "testdata/transitiveDeps/dep/dog.go")
+	defer func() { _ = os.Rename("testdata/transitiveDeps/dep/dog.notgo", "testdata/transitiveDeps/dep/dog.go") }()
 	if err := os.Rename("testdata/transitiveDeps/dep/cat.notgo", "testdata/transitiveDeps/dep/cat.go"); err != nil {
 		t.Fatal(err)
 	}
-	defer os.Rename("testdata/transitiveDeps/dep/cat.go", "testdata/transitiveDeps/dep/cat.notgo")
+	defer func() { _ = os.Rename("testdata/transitiveDeps/dep/cat.go", "testdata/transitiveDeps/dep/cat.notgo") }()
 	stderr.Reset()
 	stdout.Reset()
 	inv.HashFast = true
@@ -355,7 +355,7 @@ func TestMagefilesFolder(t *testing.T) {
 		t.Fatalf("changing to magefolders tests data: %v", err)
 	}
 	// restore previous state
-	defer os.Chdir(wd)
+	defer func() { _ = os.Chdir(wd) }()
 
 	stderr := &bytes.Buffer{}
 	stdout := &bytes.Buffer{}
@@ -387,7 +387,7 @@ func TestMagefilesFolderMixedWithMagefiles(t *testing.T) {
 		t.Fatalf("changing to magefolders tests data: %v", err)
 	}
 	// restore previous state
-	defer os.Chdir(wd)
+	defer func() { _ = os.Chdir(wd) }()
 
 	stderr := &bytes.Buffer{}
 	stdout := &bytes.Buffer{}
@@ -425,7 +425,7 @@ func TestUntaggedMagefilesFolder(t *testing.T) {
 		t.Fatalf("changing to magefolders tests data: %v", err)
 	}
 	// restore previous state
-	defer os.Chdir(wd)
+	defer func() { _ = os.Chdir(wd) }()
 
 	stderr := &bytes.Buffer{}
 	stdout := &bytes.Buffer{}
@@ -457,7 +457,7 @@ func TestMixedTaggingMagefilesFolder(t *testing.T) {
 		t.Fatalf("changing to magefolders tests data: %v", err)
 	}
 	// restore previous state
-	defer os.Chdir(wd)
+	defer func() { _ = os.Chdir(wd) }()
 
 	stderr := &bytes.Buffer{}
 	stdout := &bytes.Buffer{}
@@ -722,6 +722,90 @@ Targets:
 	}
 }
 
+func TestAutocomplete(t *testing.T) {
+	stdout := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:          "./testdata/list",
+		Stdout:       stdout,
+		Stderr:       io.Discard,
+		Autocomplete: true,
+	}
+
+	code := Invoke(inv)
+	if code != 0 {
+		t.Errorf("expected to exit with code 0, but got %v", code)
+	}
+	actual := stdout.String()
+	expected := "somepig\ntestverbose\n"
+	if actual != expected {
+		t.Logf("expected: %q", expected)
+		t.Logf("  actual: %q", actual)
+		t.Fatalf("expected:\n%v\n\ngot:\n%v", expected, actual)
+	}
+}
+
+func TestAutocompleteNamespaces(t *testing.T) {
+	stdout := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:          "./testdata/namespaces",
+		Stdout:       stdout,
+		Stderr:       io.Discard,
+		Autocomplete: true,
+	}
+
+	code := Invoke(inv)
+	if code != 0 {
+		t.Errorf("expected to exit with code 0, but got %v", code)
+	}
+	actual := stdout.String()
+	expected := "ns:bare\nns:barectx\nns:ctxerr\nns:error\ntestnamespacedep\n"
+	if actual != expected {
+		t.Logf("expected: %q", expected)
+		t.Logf("  actual: %q", actual)
+		t.Fatalf("expected:\n%v\n\ngot:\n%v", expected, actual)
+	}
+}
+
+func TestAutocompleteAliases(t *testing.T) {
+	stdout := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:          "./testdata/alias",
+		Stdout:       stdout,
+		Stderr:       io.Discard,
+		Autocomplete: true,
+	}
+
+	code := Invoke(inv)
+	if code != 0 {
+		t.Errorf("expected to exit with code 0, but got %v", code)
+	}
+	actual := stdout.String()
+	// aliases (co, st, stat) plus the actual targets (checkout, status)
+	expected := "checkout\nco\nst\nstat\nstatus\n"
+	if actual != expected {
+		t.Logf("expected: %q", expected)
+		t.Logf("  actual: %q", actual)
+		t.Fatalf("expected:\n%v\n\ngot:\n%v", expected, actual)
+	}
+}
+
+func TestParseAutocomplete(t *testing.T) {
+	inv, _, err := Parse(io.Discard, io.Discard, []string{"-autocomplete"})
+	if err != nil {
+		t.Fatal("unexpected error", err)
+	}
+	if !inv.Autocomplete {
+		t.Error("autocomplete should be true but was false")
+	}
+}
+
+func TestParseAutocompleteConflictsWithOtherCommands(t *testing.T) {
+	_, _, err := Parse(io.Discard, io.Discard, []string{"-autocomplete", "-version"})
+	if err == nil {
+		t.Fatal("expected error when using -autocomplete with -version")
+	}
+}
+
 var terminals = []struct {
 	code          string
 	supportsColor bool
@@ -958,14 +1042,14 @@ func TestHashTemplate(t *testing.T) {
 func TestKeepFlag(t *testing.T) {
 	buildFile := fmt.Sprintf("./testdata/keep_flag/%s", mainfile)
 	_ = os.Remove(buildFile)
-	defer func() { _ = os.Remove(buildFile) }()
+	t.Cleanup(func() { _ = os.Remove(buildFile) })
 	w := tLogWriter{t}
 
 	inv := Invocation{
 		Dir:    "./testdata/keep_flag",
 		Stdout: w,
 		Stderr: w,
-		List:   true,
+		Args:   []string{"noop"},
 		Keep:   true,
 		Force:  true, // need force so we always regenerate
 	}
@@ -992,7 +1076,7 @@ func (t tLogWriter) Write(b []byte) (n int, err error) {
 func TestOnlyStdLib(t *testing.T) {
 	buildFile := fmt.Sprintf("./testdata/onlyStdLib/%s", mainfile)
 	_ = os.Remove(buildFile)
-	defer func() { _ = os.Remove(buildFile) }()
+	t.Cleanup(func() { _ = os.Remove(buildFile) })
 
 	w := tLogWriter{t}
 
@@ -1000,7 +1084,7 @@ func TestOnlyStdLib(t *testing.T) {
 		Dir:     "./testdata/onlyStdLib",
 		Stdout:  w,
 		Stderr:  w,
-		List:    true,
+		Args:    []string{"noop"},
 		Keep:    true,
 		Force:   true, // need force so we always regenerate
 		Verbose: true,
@@ -1605,7 +1689,7 @@ func TestCompiledDeterministic(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer f.Close()
+			defer func() { _ = f.Close() }()
 
 			hasher := sha256.New()
 			if _, err := io.Copy(hasher, f); err != nil {
@@ -1887,7 +1971,7 @@ func fileData(file string) (exeType, archSize, error) {
 	if err != nil {
 		return -1, -1, err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	data := make([]byte, 16)
 	if _, err := io.ReadFull(f, data); err != nil {
 		return -1, -1, err

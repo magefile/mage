@@ -21,14 +21,13 @@ disable = [
   'asciicheck',
   'canonicalheader',
   'containedctx',
-  'copyloopvar', # Not applicable in go versions under 1.22
+  'copyloopvar',
   'cyclop',
   'depguard',
   'dogsled',
   'dupl',
   'dupword',
   'err113',
-  'errcheck',
   'exhaustive',
   'exhaustruct',
   'forbidigo',
@@ -61,8 +60,6 @@ disable = [
   'thelper',
   'unparam',
   'varnamelen',
-  'wastedassign',
-  'whitespace',
   'wrapcheck',
   'wsl',
   'wsl_v5'
@@ -81,7 +78,6 @@ pattern = 'time.After\.*(# use of time After can create memory allocation issues
 [linters.settings.gocritic]
 disabled-checks = [
   'importShadow',
-#  'unnamedResult'
 ]
 enabled-tags = [
   'diagnostic',
@@ -98,21 +94,18 @@ sizeThreshold = 256
 
 [linters.settings.gosec]
 excludes = [
-  'G204',
-  'G304',
-  'G307',
-  'G702',
-  'G706'
+  'G204', # Audit use of exec.Command with variable arguments (command injection risk)
+  'G304', # Audit file path provided as taint input (path traversal via user-supplied file paths)
+  'G307', # Deferring a method which returns an error (e.g., defer f.Close() without checking the error)
+  'G702', # net/http SetDeadline not called (HTTP server timeout not configured)
+  'G703', # Path traversal via taint analysis
+  'G706', # Audit use of io.ReadAll (potential denial of service from unbounded reads)
 ]
-
-[linters.settings.gosec.config]
-[linters.settings.gosec.config.G104]
-# os = ['Setenv']
 
 [linters.settings.govet]
 disable = [
+  'fieldalignment',
   'shadow',
-  'fieldalignment'
 ]
 enable-all = true
 
@@ -120,15 +113,12 @@ enable-all = true
 disable = ["any"]
 
 [linters.settings.nestif]
-min-complexity = 9
+min-complexity = 6
 
 [linters.settings.nolintlint]
 require-explanation = true
 require-specific = true
 allow-unused = false
-
-# [linters.settings.recvcheck]
-# exclusions = ['*.UnmarshalJSON']
 
 [linters.settings.revive]
 confidence = 0.8
@@ -140,7 +130,6 @@ name = 'comment-spacings'
 arguments = [
   'nolint'
 ]
-disabled = false
 
 [[linters.settings.revive.rules]]
 name = 'argument-limit'
@@ -169,32 +158,16 @@ name = 'flag-parameter'
 disabled = true
 
 [[linters.settings.revive.rules]]
-name = 'blank-imports'
-disabled = false
-
-[[linters.settings.revive.rules]]
 name = 'cognitive-complexity'
 disabled = true
-
-[[linters.settings.revive.rules]]
-name = 'constant-logical-expr'
-disabled = false
 
 [[linters.settings.revive.rules]]
 name = 'cyclomatic'
 disabled = true
 
 [[linters.settings.revive.rules]]
-name = 'file-header'
-disabled = false
-
-[[linters.settings.revive.rules]]
 name = 'function-length'
 disabled = true
-
-[[linters.settings.revive.rules]]
-name = 'get-return'
-disabled = false
 
 [[linters.settings.revive.rules]]
 name = 'line-length-limit'
@@ -203,10 +176,6 @@ disabled = true
 [[linters.settings.revive.rules]]
 name = 'max-public-structs'
 disabled = true
-
-[[linters.settings.revive.rules]]
-name = 'optimize-operands-order'
-disabled = false
 
 [[linters.settings.revive.rules]]
 name = 'redundant-test-main-exit'

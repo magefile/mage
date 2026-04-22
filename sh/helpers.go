@@ -22,7 +22,7 @@ func Copy(dst, src string) error {
 	if err != nil {
 		return fmt.Errorf(`can't copy %s: %w`, src, err)
 	}
-	defer from.Close()
+	defer func() { _ = from.Close() }()
 	finfo, err := from.Stat()
 	if err != nil {
 		return fmt.Errorf(`can't stat %s: %w`, src, err)

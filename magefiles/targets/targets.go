@@ -66,7 +66,8 @@ func Release(tag string, dryRun *bool) (err error) {
 	}
 
 	if dryRun != nil && *dryRun {
-		if err := sh.RunV("git", "tag", "-a", tag, "-m", tag); err != nil {
+		err := sh.RunV("git", "tag", "-a", tag, "-m", tag)
+		if err != nil {
 			return err
 		}
 		defer func() { _ = sh.RunV("git", "tag", "--delete", tag) }()
@@ -76,7 +77,7 @@ func Release(tag string, dryRun *bool) (err error) {
 	if err := sh.RunV("git", "tag", "-a", tag, "-m", tag); err != nil {
 		return err
 	}
-	if err := sh.RunV("git", "push", "origin", tag); err != nil {
+	if err = sh.RunV("git", "push", "origin", tag); err != nil { //nolint:gocritic // using = to assign named return for deferred cleanup
 		return err
 	}
 	defer func() {
