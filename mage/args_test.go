@@ -207,7 +207,6 @@ func TestOptionalArgsOmitted(t *testing.T) {
 		Dir:    "./testdata/optargs",
 		Stderr: stderr,
 		Stdout: stdout,
-		Keep:   true,
 		Args:   []string{"greet", "World"},
 	}
 	code := Invoke(inv)
