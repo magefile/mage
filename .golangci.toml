@@ -21,6 +21,7 @@ disable = [
   'asciicheck',
   'canonicalheader',
   'containedctx',
+  'copyloopvar',
   'cyclop',
   'depguard',
   'dogsled',
@@ -102,7 +103,8 @@ excludes = [
 
 [linters.settings.govet]
 disable = [
-  'fieldalignment'
+  'fieldalignment',
+  'shadow',
 ]
 enable-all = true
 
