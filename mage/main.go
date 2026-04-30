@@ -53,7 +53,7 @@ func lowerFirstWord(s string) string {
 	return strings.ToLower(s)
 }
 
-var mainfileTemplate = template.Must(template.New("").Funcs(map[string]interface{}{
+var mainfileTemplate = template.Must(template.New("").Funcs(map[string]any{
 	"lower": strings.ToLower,
 	"lowerFirst": func(s string) string {
 		parts := strings.Split(s, ":")
