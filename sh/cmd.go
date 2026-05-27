@@ -2,17 +2,10 @@
 package sh
 
 import (
-	"bytes"
 	"context"
-	"errors"
-	"fmt"
 	"io"
-	"log"
-	"os"
-	"os/exec"
-	"strings"
 
-	"github.com/magefile/mage/mg"
+	"github.com/magefile/mage/shctx"
 )
 
 // RunCmd returns a function that will call Run with the given command. This is
@@ -50,13 +43,12 @@ func OutCmd(cmd string, args ...string) func(args ...string) (string, error) {
 
 // Run is like RunWith, but doesn't specify any environment variables.
 func Run(cmd string, args ...string) error {
-	return RunWith(nil, cmd, args...)
+	return shctx.Run(context.Background(), cmd, args...)
 }
 
 // RunV is like Run, but always sends the command's stdout to os.Stdout.
 func RunV(cmd string, args ...string) error {
-	_, err := Exec(nil, os.Stdout, os.Stderr, cmd, args...)
-	return err
+	return shctx.RunV(context.Background(), cmd, args...)
 }
 
 // RunWith runs the given command, directing stderr to this program's stderr and
@@ -64,32 +56,22 @@ func RunV(cmd string, args ...string) error {
 // environment variables for the command being run. Environment variables should
 // be in the format name=value.
 func RunWith(env map[string]string, cmd string, args ...string) error {
-	var output io.Writer
-	if mg.Verbose() {
-		output = os.Stdout
-	}
-	_, err := Exec(env, output, os.Stderr, cmd, args...)
-	return err
+	return shctx.RunWith(context.Background(), env, cmd, args...)
 }
 
 // RunWithV is like RunWith, but always sends the command's stdout to os.Stdout.
 func RunWithV(env map[string]string, cmd string, args ...string) error {
-	_, err := Exec(env, os.Stdout, os.Stderr, cmd, args...)
-	return err
+	return shctx.RunWithV(context.Background(), env, cmd, args...)
 }
 
 // Output runs the command and returns the text from stdout.
 func Output(cmd string, args ...string) (string, error) {
-	buf := &bytes.Buffer{}
-	_, err := Exec(nil, buf, os.Stderr, cmd, args...)
-	return strings.TrimSuffix(buf.String(), "\n"), err
+	return shctx.Output(context.Background(), cmd, args...)
 }
 
 // OutputWith is like RunWith, but returns what is written to stdout.
 func OutputWith(env map[string]string, cmd string, args ...string) (string, error) {
-	buf := &bytes.Buffer{}
-	_, err := Exec(env, buf, os.Stderr, cmd, args...)
-	return strings.TrimSuffix(buf.String(), "\n"), err
+	return shctx.OutputWith(context.Background(), env, cmd, args...)
 }
 
 // Exec executes the command, piping its stdout and stderr to the given
@@ -105,47 +87,7 @@ func OutputWith(env map[string]string, cmd string, args ...string) (string, erro
 // Code reports the exit code the command returned if it ran. If err == nil, ran
 // is always true and code is always 0.
 func Exec(env map[string]string, stdout, stderr io.Writer, cmd string, args ...string) (ran bool, err error) {
-	expand := func(s string) string {
-		s2, ok := env[s]
-		if ok {
-			return s2
-		}
-		return os.Getenv(s)
-	}
-	cmd = os.Expand(cmd, expand)
-	for i := range args {
-		args[i] = os.Expand(args[i], expand)
-	}
-	ran, code, err := doRun(env, stdout, stderr, cmd, args...)
-	if err == nil {
-		return true, nil
-	}
-	if ran {
-		return ran, mg.Fatalf(code, `running "%s %s" failed with exit code %d`, cmd, strings.Join(args, " "), code)
-	}
-	return ran, fmt.Errorf(`failed to run "%s %s: %w"`, cmd, strings.Join(args, " "), err)
-}
-
-func doRun(env map[string]string, stdout, stderr io.Writer, cmd string, args ...string) (ran bool, code int, err error) {
-	c := exec.CommandContext(context.Background(), cmd, args...)
-	c.Env = os.Environ()
-	for k, v := range env {
-		c.Env = append(c.Env, k+"="+v)
-	}
-	c.Stderr = stderr
-	c.Stdout = stdout
-	c.Stdin = os.Stdin
-
-	var quoted []string
-	for i := range args {
-		quoted = append(quoted, fmt.Sprintf("%q", args[i]))
-	}
-	// To protect against logging from doing exec in global variables
-	if mg.Verbose() {
-		log.Println("exec:", cmd, strings.Join(quoted, " "))
-	}
-	err = c.Run()
-	return CmdRan(err), ExitStatus(err), err
+	return shctx.Exec(context.Background(), env, stdout, stderr, cmd, args...)
 }
 
 // CmdRan examines the error to determine if it was generated as a result of a
@@ -155,35 +97,12 @@ func doRun(env map[string]string, stdout, stderr io.Writer, cmd string, args ...
 // the command failed to run (usually due to the command not existing or not
 // being executable), it reports false.
 func CmdRan(err error) bool {
-	if err == nil {
-		return true
-	}
-	var ee *exec.ExitError
-	if errors.As(err, &ee) {
-		return ee.Exited()
-	}
-	return false
-}
-
-type exitStatus interface {
-	ExitStatus() int
+	return shctx.CmdRan(err)
 }
 
 // ExitStatus returns the exit status of the error if it is an exec.ExitError
 // or if it implements ExitStatus() int.
 // 0 if it is nil or 1 if it is a different error.
 func ExitStatus(err error) int {
-	if err == nil {
-		return 0
-	}
-	if e, ok := err.(exitStatus); ok {
-		return e.ExitStatus()
-	}
-	var e *exec.ExitError
-	if errors.As(err, &e) {
-		if ex, ok := e.Sys().(exitStatus); ok {
-			return ex.ExitStatus()
-		}
-	}
-	return 1
+	return shctx.ExitStatus(err)
 }
