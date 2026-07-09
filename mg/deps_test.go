@@ -29,6 +29,25 @@ func TestDepsRunOnce(t *testing.T) {
 	}
 }
 
+func TestResetDepsAllowsDependenciesToRunAgain(t *testing.T) {
+	var calls int64
+	f := func() {
+		atomic.AddInt64(&calls, 1)
+	}
+
+	Deps(f)
+	Deps(f)
+	if calls != 1 {
+		t.Fatalf("expected dependency to run once before reset, ran %d times", calls)
+	}
+
+	ResetDeps()
+	Deps(f)
+	if calls != 2 {
+		t.Fatalf("expected dependency to run again after reset, ran %d times", calls)
+	}
+}
+
 func TestDepsOfDeps(t *testing.T) {
 	ch := make(chan string, 3)
 	// this->f->g->h
