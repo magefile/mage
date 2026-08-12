@@ -428,3 +428,19 @@ func TestVariadicStringArgs(t *testing.T) {
 		}
 	}
 }
+
+// TestFixedTargetAliasCollisionRemainsSupported verifies that variadic target
+// discovery does not reject an existing fixed-target alias configuration.
+func TestFixedTargetAliasCollisionRemainsSupported(t *testing.T) {
+	info, err := PrimaryPackage("go", "./testdata", []string{"fixed_alias_collision.go"}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	alias, ok := info.Aliases["BUILD"]
+	if !ok {
+		t.Fatal("expected BUILD alias")
+	}
+	if alias.Name != "Existing" {
+		t.Fatalf("expected BUILD to alias Existing, got %s", alias.Name)
+	}
+}

@@ -484,7 +484,7 @@ func PrimaryPackage(gocmd, path string, files []string, multiline bool) (*PkgInf
 
 	setDefault(info)
 	setAliases(info)
-	if err := checkDupes(info, info.Imports); err != nil {
+	if err := checkVariadicAliasDupes(info); err != nil {
 		return nil, err
 	}
 	return info, nil
@@ -500,17 +500,6 @@ func checkDupes(info *PkgInfo, imports []*Import) error {
 			target := strings.ToLower(f.TargetName())
 			funcs[target] = append(funcs[target], f)
 		}
-	}
-	for alias, f := range info.Aliases {
-		target := strings.ToLower(alias)
-		if len(funcs[target]) != 0 {
-			var ids []string
-			for _, f := range funcs[target] {
-				ids = append(ids, f.ID())
-			}
-			return fmt.Errorf("alias %q duplicates existing target(s): %s", alias, strings.Join(ids, ", "))
-		}
-		funcs[target] = append(funcs[target], f)
 	}
 	var dupes []string
 	for target, list := range funcs {
@@ -532,6 +521,43 @@ func checkDupes(info *PkgInfo, imports []*Import) error {
 	}
 	sort.Strings(errs)
 	return errors.New(strings.Join(errs, "\n"))
+}
+
+// checkVariadicAliasDupes reports aliases that conflict with targets made
+// discoverable by variadic argument support. Fixed-arity alias collisions keep
+// their historical behavior.
+func checkVariadicAliasDupes(info *PkgInfo) error {
+	variadicTargets := map[string][]*Function{}
+	addVariadicTargets := func(funcs Functions) {
+		for _, f := range funcs {
+			if len(f.VariadicArgs()) > 0 {
+				target := strings.ToLower(f.TargetName())
+				variadicTargets[target] = append(variadicTargets[target], f)
+			}
+		}
+	}
+	addVariadicTargets(info.Funcs)
+	for _, imp := range info.Imports {
+		addVariadicTargets(imp.Info.Funcs)
+	}
+	aliases := make([]string, 0, len(info.Aliases))
+	for alias := range info.Aliases {
+		aliases = append(aliases, alias)
+	}
+	sort.Strings(aliases)
+	for _, alias := range aliases {
+		funcs := variadicTargets[strings.ToLower(alias)]
+		if len(funcs) == 0 {
+			continue
+		}
+		ids := make([]string, 0, len(funcs))
+		for _, f := range funcs {
+			ids = append(ids, f.ID())
+		}
+		sort.Strings(ids)
+		return fmt.Errorf("alias %q duplicates existing target(s): %s", alias, strings.Join(ids, ", "))
+	}
+	return nil
 }
 
 // Package compiles information about a mage package.
