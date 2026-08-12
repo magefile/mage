@@ -33,6 +33,154 @@ not coughing
 	}
 }
 
+func TestVariadicArgs(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		args []string
+		want string
+	}{
+		{
+			name: "empty",
+			args: []string{"variadic"},
+			want: "variadic:[]\n",
+		},
+		{
+			name: "all remaining tokens",
+			args: []string{"variadic", "first", "-flag", "variadic", "--"},
+			want: "variadic:[\"first\" \"-flag\" \"variadic\" \"--\"]\n",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			stderr := &bytes.Buffer{}
+			stdout := &bytes.Buffer{}
+			inv := Invocation{
+				Dir:    "./testdata/variadic",
+				Stderr: stderr,
+				Stdout: stdout,
+				Args:   tc.args,
+			}
+			code := Invoke(inv)
+			if code != 0 {
+				t.Fatalf("expected code 0, got %d; stderr: %s", code, stderr)
+			}
+			if got := stdout.String(); got != tc.want {
+				t.Fatalf("expected output %q, got %q", tc.want, got)
+			}
+		})
+	}
+}
+
+func TestVariadicArgsHelp(t *testing.T) {
+	stderr := &bytes.Buffer{}
+	stdout := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:    "./testdata/variadic",
+		Stderr: stderr,
+		Stdout: stdout,
+		Help:   true,
+		Args:   []string{"variadic"},
+	}
+	code := Invoke(inv)
+	if code != 0 {
+		t.Fatalf("expected code 0, got %d; stderr: %s", code, stderr)
+	}
+	want := `Variadic prints all remaining arguments.
+
+Usage:
+
+	mage variadic [<args>...]
+
+Aliases: v
+
+`
+	if got := stdout.String(); got != want {
+		t.Fatalf("expected output %q, got %q", want, got)
+	}
+}
+
+func TestVariadicDefaultTarget(t *testing.T) {
+	stderr := &bytes.Buffer{}
+	stdout := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:    "./testdata/variadic",
+		Stderr: stderr,
+		Stdout: stdout,
+	}
+	code := Invoke(inv)
+	if code != 0 {
+		t.Fatalf("expected code 0, got %d; stderr: %s", code, stderr)
+	}
+	if got, want := stdout.String(), "variadic:[]\n"; got != want {
+		t.Fatalf("expected output %q, got %q", want, got)
+	}
+}
+
+func TestVariadicArgsWithFixedPrefixAndPreviousTarget(t *testing.T) {
+	stderr := &bytes.Buffer{}
+	stdout := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:    "./testdata/variadic",
+		Stderr: stderr,
+		Stdout: stdout,
+		Args:   []string{"fixed", "before", "collect", "prefix", "-flag", "fixed", "after"},
+	}
+	code := Invoke(inv)
+	if code != 0 {
+		t.Fatalf("expected code 0, got %d; stderr: %s", code, stderr)
+	}
+	want := "fixed:before\ncollect:prefix:[\"-flag\" \"fixed\" \"after\"]\n"
+	if got := stdout.String(); got != want {
+		t.Fatalf("expected output %q, got %q", want, got)
+	}
+}
+
+func TestVariadicTargetForms(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		args []string
+		want string
+	}{
+		{
+			name: "alias",
+			args: []string{"v", "one", "two"},
+			want: "variadic:[\"one\" \"two\"]\n",
+		},
+		{
+			name: "namespace",
+			args: []string{"tools:collect", "prefix", "one", "two"},
+			want: "tools:collect:prefix:[\"one\" \"two\"]\n",
+		},
+		{
+			name: "imported",
+			args: []string{"shared:collect", "prefix", "one", "two"},
+			want: "shared:collect:prefix:[\"one\" \"two\"]\n",
+		},
+		{
+			name: "fixed argument types",
+			args: []string{"types", "3", "1.5", "true", "25ms", "one", "two"},
+			want: "types:3:1.5:true:25ms:[\"one\" \"two\"]\n",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			stderr := &bytes.Buffer{}
+			stdout := &bytes.Buffer{}
+			inv := Invocation{
+				Dir:    "./testdata/variadic",
+				Stderr: stderr,
+				Stdout: stdout,
+				Args:   tc.args,
+			}
+			code := Invoke(inv)
+			if code != 0 {
+				t.Fatalf("expected code 0, got %d; stderr: %s", code, stderr)
+			}
+			if got := stdout.String(); got != tc.want {
+				t.Fatalf("expected output %q, got %q", tc.want, got)
+			}
+		})
+	}
+}
+
 func TestBadIntArg(t *testing.T) {
 	stderr := &bytes.Buffer{}
 	stdout := &bytes.Buffer{}

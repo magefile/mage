@@ -247,7 +247,7 @@ Options:
 				_fmt.Println({{printf "%q" .Comment}})
 				_fmt.Println()
 				{{end}}
-				_fmt.Print("Usage:\n\n\t{{$.BinaryName}} {{lower .TargetName}}{{range .RequiredArgs}} <{{.Name}}>{{end}}{{if .MultipleOptionalArgs}} [<flags>]{{else}}{{range .OptionalArgs}} [-{{.Name}}=<{{.Type}}>]{{end}}{{end}}\n\n")
+				_fmt.Print("Usage:\n\n\t{{$.BinaryName}} {{lower .TargetName}}{{.UsageArgs}}\n\n")
 				{{if .ShowFlagDocs}}_fmt.Print({{printf "%q" .FlagDocsString}})
 				{{end -}}
 				var aliases []string
@@ -269,7 +269,7 @@ Options:
 				_fmt.Println({{printf "%q" .Comment}})
 				_fmt.Println()
 				{{end}}
-				_fmt.Print("Usage:\n\n\t{{$.BinaryName}} {{lower .TargetName}}{{range .RequiredArgs}} <{{.Name}}>{{end}}{{if .MultipleOptionalArgs}} [<flags>]{{else}}{{range .OptionalArgs}} [-{{.Name}}=<{{.Type}}>]{{end}}{{end}}\n\n")
+				_fmt.Print("Usage:\n\n\t{{$.BinaryName}} {{lower .TargetName}}{{.UsageArgs}}\n\n")
 				{{if .ShowFlagDocs}}_fmt.Print({{printf "%q" .FlagDocsString}})
 				{{end -}}
 				var aliases []string
@@ -300,6 +300,9 @@ Options:
 			}
 			return
 		}
+		{{- if .DefaultFunc.VariadicArgs}}
+		x := 0
+		{{- end}}
 		{{.DefaultFunc.ExecCode}}
 		handleError(logger, ret)
 		return

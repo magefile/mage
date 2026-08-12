@@ -78,6 +78,7 @@ func (s Functions) Swap(i, j int) {
 type Arg struct {
 	Name, Type string
 	Optional   bool
+	Variadic   bool
 	Comment    string
 }
 
@@ -111,7 +112,7 @@ func (f Function) TargetName() string {
 func (f Function) NumRequiredArgs() int {
 	n := 0
 	for _, a := range f.Args {
-		if !a.Optional {
+		if !a.Optional && !a.Variadic {
 			n++
 		}
 	}
@@ -122,11 +123,41 @@ func (f Function) NumRequiredArgs() int {
 func (f Function) RequiredArgs() []Arg {
 	var out []Arg
 	for _, a := range f.Args {
-		if !a.Optional {
+		if !a.Optional && !a.Variadic {
 			out = append(out, a)
 		}
 	}
 	return out
+}
+
+// VariadicArgs returns the terminal variadic argument, when present.
+func (f Function) VariadicArgs() []Arg {
+	var out []Arg
+	for _, a := range f.Args {
+		if a.Variadic {
+			out = append(out, a)
+		}
+	}
+	return out
+}
+
+// UsageArgs returns the command-line usage suffix for the function's arguments.
+func (f Function) UsageArgs() string {
+	var out strings.Builder
+	for _, a := range f.RequiredArgs() {
+		_, _ = fmt.Fprintf(&out, " <%s>", a.Name)
+	}
+	for _, a := range f.VariadicArgs() {
+		_, _ = fmt.Fprintf(&out, " [<%s>...]", a.Name)
+	}
+	if f.MultipleOptionalArgs() {
+		_, _ = fmt.Fprint(&out, " [<flags>]")
+	} else {
+		for _, a := range f.OptionalArgs() {
+			_, _ = fmt.Fprintf(&out, " [-%s=<%s>]", a.Name, a.Type)
+		}
+	}
+	return out.String()
 }
 
 // OptionalArgs returns only the optional arguments.
@@ -232,6 +263,12 @@ func (f Function) ExecCode() string {
 	// Phase 1: Parse positional (required) arguments
 	for x, arg := range f.Args {
 		if arg.Optional {
+			continue
+		}
+		if arg.Variadic {
+			_, _ = fmt.Fprintf(&parseargs, `
+			arg%d := args.Args[x:]
+			x = len(args.Args)`, x)
 			continue
 		}
 		switch arg.Type {
@@ -391,7 +428,11 @@ func (f Function) ExecCode() string {
 		args = append(args, "ctx")
 	}
 	for x := 0; x < len(f.Args); x++ {
-		args = append(args, fmt.Sprintf("arg%d", x))
+		arg := fmt.Sprintf("arg%d", x)
+		if f.Args[x].Variadic {
+			arg += "..."
+		}
+		args = append(args, arg)
 	}
 	out += strings.Join(args, ", ")
 	out += ")"
@@ -418,6 +459,9 @@ func PrimaryPackage(gocmd, path string, files []string, multiline bool) (*PkgInf
 
 	setDefault(info)
 	setAliases(info)
+	if err := checkDupes(info, info.Imports); err != nil {
+		return nil, err
+	}
 	return info, nil
 }
 
@@ -433,14 +477,15 @@ func checkDupes(info *PkgInfo, imports []*Import) error {
 		}
 	}
 	for alias, f := range info.Aliases {
-		if len(funcs[alias]) != 0 {
+		target := strings.ToLower(alias)
+		if len(funcs[target]) != 0 {
 			var ids []string
-			for _, f := range funcs[alias] {
+			for _, f := range funcs[target] {
 				ids = append(ids, f.ID())
 			}
 			return fmt.Errorf("alias %q duplicates existing target(s): %s", alias, strings.Join(ids, ", "))
 		}
-		funcs[alias] = append(funcs[alias], f)
+		funcs[target] = append(funcs[target], f)
 	}
 	var dupes []string
 	for target, list := range funcs {
@@ -1092,6 +1137,23 @@ func funcType(ft *ast.FuncType, fieldComments map[*ast.Field]string) (*Function,
 	}
 	for ; x < len(ft.Params.List); x++ {
 		param := ft.Params.List[x]
+		if ellipsis, ok := param.Type.(*ast.Ellipsis); ok {
+			if x != len(ft.Params.List)-1 {
+				return nil, errors.New("variadic argument must be last")
+			}
+			if f.HasOptionalArgs() {
+				return nil, errors.New("optional and variadic arguments cannot be combined")
+			}
+			t := fmt.Sprint(ellipsis.Elt)
+			typ, ok := argTypes[t]
+			if !ok || typ != "string" {
+				return nil, fmt.Errorf("unsupported variadic argument type: %s", t)
+			}
+			for _, name := range param.Names {
+				f.Args = append(f.Args, Arg{Name: name.Name, Type: typ, Variadic: true})
+			}
+			continue
+		}
 		optional := false
 		paramType := param.Type
 		// Check for pointer types (optional arguments)

@@ -633,18 +633,7 @@ func mageHelpOutput(data mainfileTemplateData, target string) (output string, co
 	}
 
 	// Build usage line matching template format.
-	_, _ = fmt.Fprintf(&buf, "Usage:\n\n\t%s %s", data.BinaryName, strings.ToLower(fn.TargetName()))
-	for _, a := range fn.RequiredArgs() {
-		_, _ = fmt.Fprintf(&buf, " <%s>", a.Name)
-	}
-	if fn.MultipleOptionalArgs() {
-		_, _ = fmt.Fprint(&buf, " [<flags>]")
-	} else {
-		for _, a := range fn.OptionalArgs() {
-			_, _ = fmt.Fprintf(&buf, " [-%s=<%s>]", a.Name, a.Type)
-		}
-	}
-	_, _ = fmt.Fprint(&buf, "\n\n")
+	_, _ = fmt.Fprintf(&buf, "Usage:\n\n\t%s %s%s\n\n", data.BinaryName, strings.ToLower(fn.TargetName()), fn.UsageArgs())
 
 	if fn.ShowFlagDocs() {
 		_, _ = fmt.Fprint(&buf, fn.FlagDocsString())

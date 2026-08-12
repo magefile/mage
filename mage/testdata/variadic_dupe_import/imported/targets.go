@@ -1,0 +1,3 @@
+package imported
+
+func Build() {}

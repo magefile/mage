@@ -357,3 +357,51 @@ func TestOptionalArgs(t *testing.T) {
 		}
 	}
 }
+
+func TestVariadicStringArgs(t *testing.T) {
+	info, err := PrimaryPackage("go", "./testdata", []string{"variadic.go"}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	expected := []Function{
+		{
+			Name: "Variadic",
+			Args: []Arg{
+				{Name: "args", Type: "string", Variadic: true},
+			},
+		},
+		{
+			Name:      "VariadicWithPrefix",
+			IsError:   true,
+			IsContext: true,
+			Args: []Arg{
+				{Name: "name", Type: "string"},
+				{Name: "args", Type: "string", Variadic: true},
+			},
+		},
+		{
+			Name:     "Run",
+			Receiver: "VariadicNamespace",
+			Args: []Arg{
+				{Name: "args", Type: "string", Variadic: true},
+			},
+		},
+	}
+
+	if len(info.Funcs) != len(expected) {
+		t.Fatalf("expected %d funcs, got %d: %#v", len(expected), len(info.Funcs), info.Funcs)
+	}
+	for _, fn := range expected {
+		found := false
+		for _, infoFn := range info.Funcs {
+			if reflect.DeepEqual(fn, *infoFn) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("expected:\n%#v\n\nto be in parsed funcs", fn)
+		}
+	}
+}
