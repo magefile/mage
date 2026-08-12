@@ -147,15 +147,19 @@ func (f Function) UsageArgs() string {
 	for _, a := range f.RequiredArgs() {
 		_, _ = fmt.Fprintf(&out, " <%s>", a.Name)
 	}
-	for _, a := range f.VariadicArgs() {
-		_, _ = fmt.Fprintf(&out, " [<%s>...]", a.Name)
-	}
 	if f.MultipleOptionalArgs() {
 		_, _ = fmt.Fprint(&out, " [<flags>]")
 	} else {
 		for _, a := range f.OptionalArgs() {
 			_, _ = fmt.Fprintf(&out, " [-%s=<%s>]", a.Name, a.Type)
 		}
+	}
+	variadic := f.VariadicArgs()
+	if f.HasOptionalArgs() && len(variadic) > 0 {
+		_, _ = fmt.Fprint(&out, " [--]")
+	}
+	for _, a := range variadic {
+		_, _ = fmt.Fprintf(&out, " [<%s>...]", a.Name)
 	}
 	return out.String()
 }
@@ -200,7 +204,7 @@ func (f Function) MultipleOptionalArgs() bool {
 // condensed to [<flags>] in the usage line) or when any optional arg
 // has a doc comment.
 func (f Function) ShowFlagDocs() bool {
-	if f.MultipleOptionalArgs() {
+	if f.MultipleOptionalArgs() || (f.HasOptionalArgs() && len(f.VariadicArgs()) > 0) {
 		return true
 	}
 	for _, a := range f.Args {
@@ -211,8 +215,9 @@ func (f Function) ShowFlagDocs() bool {
 	return false
 }
 
-// FlagDocsString returns a formatted string documenting optional arguments.
-// It aligns comments to the same column based on the longest flag name.
+// FlagDocsString returns a formatted string documenting optional arguments
+// and, when combined with a variadic argument, the pass-through boundary. It
+// aligns comments to the same column based on the longest flag name.
 func (f Function) FlagDocsString() string {
 	opts := f.OptionalArgs()
 	if len(opts) == 0 {
@@ -243,6 +248,10 @@ func (f Function) FlagDocsString() string {
 		}
 	}
 	_, _ = buf.WriteString("\n")
+	variadic := f.VariadicArgs()
+	if len(variadic) > 0 {
+		_, _ = fmt.Fprintf(&buf, "Pass-through:\n\n\tThe first non-option token starts <%s>. To start with a \"-\" token, use --; the separator is omitted and all following tokens are passed unchanged.\n\n", variadic[0].Name)
+	}
 	return buf.String()
 }
 
@@ -266,9 +275,6 @@ func (f Function) ExecCode() string {
 			continue
 		}
 		if arg.Variadic {
-			_, _ = fmt.Fprintf(&parseargs, `
-			arg%d := args.Args[x:]
-			x = len(args.Args)`, x)
 			continue
 		}
 		switch arg.Type {
@@ -333,7 +339,15 @@ func (f Function) ExecCode() string {
 		}
 
 		_, _ = fmt.Fprint(&parseargs, `
-				for x < len(args.Args) && _strings.HasPrefix(args.Args[x], "-") {
+				for x < len(args.Args) && _strings.HasPrefix(args.Args[x], "-") {`)
+		if len(f.VariadicArgs()) > 0 {
+			_, _ = fmt.Fprint(&parseargs, `
+					if args.Args[x] == "--" {
+						x++
+						break
+					}`)
+		}
+		_, _ = fmt.Fprint(&parseargs, `
 					_optArg := args.Args[x]
 					_eqIdx := _strings.Index(_optArg, "=")
 					var _optName, _optVal string
@@ -414,6 +428,17 @@ func (f Function) ExecCode() string {
 					}
 					x++
 				}`, f.TargetName())
+	}
+
+	// Phase 4: The terminal variadic argument owns every token left after
+	// required arguments and optional flags have been consumed.
+	for x, arg := range f.Args {
+		if !arg.Variadic {
+			continue
+		}
+		_, _ = fmt.Fprintf(&parseargs, `
+			arg%d := args.Args[x:]
+			x = len(args.Args)`, x)
 	}
 
 	out := parseargs.String() + `
@@ -1140,9 +1165,6 @@ func funcType(ft *ast.FuncType, fieldComments map[*ast.Field]string) (*Function,
 		if ellipsis, ok := param.Type.(*ast.Ellipsis); ok {
 			if x != len(ft.Params.List)-1 {
 				return nil, errors.New("variadic argument must be last")
-			}
-			if f.HasOptionalArgs() {
-				return nil, errors.New("optional and variadic arguments cannot be combined")
 			}
 			t := fmt.Sprint(ellipsis.Elt)
 			typ, ok := argTypes[t]

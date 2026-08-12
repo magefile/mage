@@ -48,6 +48,49 @@ func (Tools) Collect(prefix string, args ...string) {
 	fmt.Printf("tools:collect:%s:%q\n", prefix, args)
 }
 
-func OptionalAndVariadic(prefix *string, args ...string) {}
+// OptionalAndVariadic prints an optional prefix and pass-through arguments.
+func OptionalAndVariadic(prefix *string, args ...string) {
+	value := "<nil>"
+	if prefix != nil {
+		value = *prefix
+	}
+	fmt.Printf("optional:%s:%q\n", value, args)
+}
+
+// OptionalTypes prints fixed, optional, and pass-through arguments.
+func OptionalTypes(
+	ctx context.Context,
+	name string,
+	text *string, // text value
+	count *int, // count value
+	ratio *float64, // ratio value
+	enabled *bool, // enabled value
+	timeout *time.Duration, // timeout value
+	args ...string,
+) error {
+	_ = ctx
+	textValue := "<nil>"
+	countValue := "<nil>"
+	ratioValue := "<nil>"
+	enabledValue := "<nil>"
+	timeoutValue := "<nil>"
+	if text != nil {
+		textValue = *text
+	}
+	if count != nil {
+		countValue = fmt.Sprint(*count)
+	}
+	if ratio != nil {
+		ratioValue = fmt.Sprint(*ratio)
+	}
+	if enabled != nil {
+		enabledValue = fmt.Sprint(*enabled)
+	}
+	if timeout != nil {
+		timeoutValue = timeout.String()
+	}
+	fmt.Printf("optionaltypes:%s:%s:%s:%s:%s:%s:%q\n", name, textValue, countValue, ratioValue, enabledValue, timeoutValue, args)
+	return nil
+}
 
 func VariadicInt(args ...int) {}

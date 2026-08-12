@@ -366,6 +366,29 @@ func TestVariadicStringArgs(t *testing.T) {
 
 	expected := []Function{
 		{
+			Name: "OptionalAndVariadic",
+			Args: []Arg{
+				{Name: "prefix", Type: "string", Optional: true},
+				{Name: "args", Type: "string", Variadic: true},
+			},
+		},
+		{
+			Name:      "OptionalTypes",
+			IsError:   true,
+			IsContext: true,
+			Synopsis:  "exercises every supported pointer-style optional argument type before a terminal variadic string argument.",
+			Comment:   "OptionalTypes exercises every supported pointer-style optional argument type before a terminal variadic string argument.",
+			Args: []Arg{
+				{Name: "name", Type: "string"},
+				{Name: "text", Type: "string", Optional: true},
+				{Name: "count", Type: "int", Optional: true},
+				{Name: "ratio", Type: "float64", Optional: true},
+				{Name: "enabled", Type: "bool", Optional: true},
+				{Name: "timeout", Type: "time.Duration", Optional: true},
+				{Name: "args", Type: "string", Variadic: true},
+			},
+		},
+		{
 			Name: "Variadic",
 			Args: []Arg{
 				{Name: "args", Type: "string", Variadic: true},

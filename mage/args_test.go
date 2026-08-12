@@ -70,6 +70,155 @@ func TestVariadicArgs(t *testing.T) {
 	}
 }
 
+// TestOptionalVariadicArgs verifies implicit and explicit pass-through boundaries
+// across empty, fixed-prefix, and typed optional-argument target signatures.
+func TestOptionalVariadicArgs(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		args []string
+		want string
+	}{
+		{
+			name: "implicit tail preserves later option-like tokens",
+			args: []string{
+				"optionalandvariadic", "-prefix=chosen",
+				"first", "-unknown=value", "--", "fixed",
+			},
+			want: "optional:chosen:[\"first\" \"-unknown=value\" \"--\" \"fixed\"]\n",
+		},
+		{
+			name: "empty options and tail",
+			args: []string{"optionalandvariadic"},
+			want: "optional:<nil>:[]\n",
+		},
+		{
+			name: "required prefix and typed options",
+			args: []string{
+				"optionaltypes", "required",
+				"-text=value", "-count=2", "-ratio=1.5", "-enabled", "-timeout=25ms",
+				"first", "-count=99",
+			},
+			want: "optionaltypes:required:value:2:1.5:true:25ms:[\"first\" \"-count=99\"]\n",
+		},
+		{
+			name: "double dash starts an option-like tail",
+			args: []string{
+				"optionalandvariadic", "-prefix=chosen", "--",
+				"-unknown=value", "--", "fixed",
+			},
+			want: "optional:chosen:[\"-unknown=value\" \"--\" \"fixed\"]\n",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			stderr := &bytes.Buffer{}
+			stdout := &bytes.Buffer{}
+			code := Invoke(Invocation{
+				Dir:    "./testdata/variadic",
+				Stderr: stderr,
+				Stdout: stdout,
+				Args:   tc.args,
+			})
+			if code != 0 {
+				t.Fatalf("expected code 0, got %d; stderr: %s", code, stderr)
+			}
+			if got := stdout.String(); got != tc.want {
+				t.Fatalf("expected output %q, got %q", tc.want, got)
+			}
+		})
+	}
+}
+
+// TestOptionalVariadicArgsRejectInvalidOptionsBeforeTail verifies that option
+// validation remains active until a variadic pass-through boundary is reached.
+func TestOptionalVariadicArgsRejectInvalidOptionsBeforeTail(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		arg  string
+		want string
+	}{
+		{
+			name: "unknown",
+			arg:  "-unknown=value",
+			want: "unknown option \"unknown\" for target \"OptionalAndVariadic\"\n",
+		},
+		{
+			name: "missing equals",
+			arg:  "-prefix",
+			want: "invalid option \"-prefix\" for target \"OptionalAndVariadic\", expected -name=value format\n",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			stderr := &bytes.Buffer{}
+			code := Invoke(Invocation{
+				Dir:    "./testdata/variadic",
+				Stderr: stderr,
+				Stdout: &bytes.Buffer{},
+				Args:   []string{"optionalandvariadic", tc.arg},
+			})
+			if code != 2 {
+				t.Fatalf("expected code 2, got %d; stderr: %s", code, stderr)
+			}
+			if got := stderr.String(); got != tc.want {
+				t.Fatalf("expected error %q, got %q", tc.want, got)
+			}
+		})
+	}
+}
+
+// TestDoubleDashRemainsInvalidForOptionalNonVariadicTarget verifies that the
+// target-level separator does not change optional-only target semantics.
+func TestDoubleDashRemainsInvalidForOptionalNonVariadicTarget(t *testing.T) {
+	stderr := &bytes.Buffer{}
+	code := Invoke(Invocation{
+		Dir:    "./testdata/optargs",
+		Stderr: stderr,
+		Stdout: &bytes.Buffer{},
+		Args:   []string{"greet", "World", "--"},
+	})
+	if code != 2 {
+		t.Fatalf("expected code 2, got %d; stderr: %s", code, stderr)
+	}
+	want := "invalid option \"--\" for target \"Greet\", expected -name=value format\n"
+	if got := stderr.String(); got != want {
+		t.Fatalf("expected error %q, got %q", want, got)
+	}
+}
+
+// TestOptionalVariadicArgsHelp verifies source-parsed help for optional flags
+// followed by the local variadic pass-through boundary.
+func TestOptionalVariadicArgsHelp(t *testing.T) {
+	stderr := &bytes.Buffer{}
+	stdout := &bytes.Buffer{}
+	code := Invoke(Invocation{
+		Dir:    "./testdata/variadic",
+		Stderr: stderr,
+		Stdout: stdout,
+		Help:   true,
+		Args:   []string{"optionalandvariadic"},
+	})
+	if code != 0 {
+		t.Fatalf("expected code 0, got %d; stderr: %s", code, stderr)
+	}
+	want := `OptionalAndVariadic prints an optional prefix and pass-through arguments.
+
+Usage:
+
+	mage optionalandvariadic [-prefix=<string>] [--] [<args>...]
+
+Flags:
+
+	-prefix=<string>
+
+Pass-through:
+
+	The first non-option token starts <args>. To start with a "-" token, use --; the separator is omitted and all following tokens are passed unchanged.
+
+`
+	if got := stdout.String(); got != want {
+		t.Fatalf("expected output %q, got %q", want, got)
+	}
+}
+
 func TestVariadicArgsHelp(t *testing.T) {
 	stderr := &bytes.Buffer{}
 	stdout := &bytes.Buffer{}

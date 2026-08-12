@@ -22,6 +22,21 @@ func (VariadicNamespace) Run(args ...string) {}
 
 func OptionalAndVariadic(prefix *string, args ...string) {}
 
+// OptionalTypes exercises every supported pointer-style optional argument type
+// before a terminal variadic string argument.
+func OptionalTypes(
+	ctx context.Context,
+	name string,
+	text *string,
+	count *int,
+	ratio *float64,
+	enabled *bool,
+	timeout *time.Duration,
+	args ...string,
+) error {
+	return nil
+}
+
 func VariadicInt(args ...int) {}
 
 func VariadicFloat64(args ...float64) {}
