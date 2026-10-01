@@ -44,9 +44,24 @@ func (o *onceMap) LoadOrStore(f Fn) *onceFun {
 	return one
 }
 
+func (o *onceMap) Reset() {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+
+	o.m = map[onceKey]*onceFun{}
+}
+
 var onces = &onceMap{
 	mu: &sync.Mutex{},
 	m:  map[onceKey]*onceFun{},
+}
+
+// ResetDeps clears the dependency cache used by Deps, CtxDeps, SerialDeps, and
+// SerialCtxDeps. It is intended for tests that need to run the same dependencies
+// more than once in a single process. Do not call ResetDeps while dependencies
+// are running.
+func ResetDeps() {
+	onces.Reset()
 }
 
 // SerialDeps is like Deps except it runs each dependency serially, instead of
