@@ -1,4 +1,4 @@
-package sh_test
+package shctx_test
 
 import (
 	"bytes"

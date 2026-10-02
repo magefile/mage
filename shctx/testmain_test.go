@@ -1,19 +1,21 @@
-package sh
+package shctx
 
 import (
 	"flag"
 	"fmt"
 	"os"
 	"testing"
+	"time"
 )
 
 var (
-	helperCmd bool
-	printArgs bool
-	stderr    string
-	stdout    string
-	exitCode  int
-	printVar  string
+	helperCmd        bool
+	printArgs        bool
+	stderr           string
+	stdout           string
+	exitCode         int
+	sleepTimeSeconds int
+	printVar         string
 )
 
 func init() { //nolint:gochecknoinits // required for test flag setup
@@ -22,6 +24,7 @@ func init() { //nolint:gochecknoinits // required for test flag setup
 	flag.StringVar(&stderr, "stderr", "", "")
 	flag.StringVar(&stdout, "stdout", "", "")
 	flag.IntVar(&exitCode, "exit", 0, "")
+	flag.IntVar(&sleepTimeSeconds, "sleep", 0, "")
 	flag.StringVar(&printVar, "printVar", "", "")
 }
 
@@ -35,6 +38,10 @@ func TestMain(m *testing.M) {
 	if printVar != "" {
 		fmt.Println(os.Getenv(printVar))
 		return
+	}
+
+	if sleepTimeSeconds > 0 {
+		time.Sleep(time.Duration(sleepTimeSeconds) * time.Second)
 	}
 
 	if helperCmd {
