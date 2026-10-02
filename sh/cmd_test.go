@@ -126,9 +126,7 @@ func TestOutputWith(t *testing.T) {
 func TestAutoExpandPrecedent(t *testing.T) {
 	// Environment variables passed to OutputWith should take precedence
 	// over any variables set in the actual environment.
-	if err := os.Setenv("MAGE_FOO", "wrong"); err != nil {
-		t.Fatal(err)
-	}
+	t.Setenv("MAGE_FOO", "wrong")
 	s, err := OutputWith(map[string]string{
 		"MAGE_FOO": "right",
 	}, "echo", "$MAGE_FOO")
