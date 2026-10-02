@@ -119,7 +119,7 @@ func IgnoreDefault() bool {
 func CacheDir() string {
 	d := os.Getenv(CacheEnv)
 	if d != "" {
-		return d
+		return filepath.Clean(d)
 	}
 	switch runtime.GOOS {
 	case "windows":

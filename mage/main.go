@@ -370,6 +370,7 @@ func Invoke(inv Invocation) int {
 	if inv.Dir == "" {
 		inv.Dir = dotDirectory
 	}
+	inv.Dir = filepath.Clean(inv.Dir)
 	if inv.WorkDir == "" {
 		inv.WorkDir = inv.Dir
 	}
