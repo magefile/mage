@@ -199,25 +199,21 @@ func Escape(arg string) string {
 	return arg
 }
 
-var varExpr = regexp.MustCompile(`\\.|\$(\w+|[-*#$@!?0-9])|\$\{(\w+|[-*#$@!?0-9])\}|\$\{\}?`)
+var varExpr = regexp.MustCompile(`\\\\|\\\$|\$(\w+|[-*#$@!?0-9])|\$\{(\w+|[-*#$@!?0-9])\}|\$\{\}?`)
 
 // Expand searches the input for segments of the form $var or ${var} and
 // replaces them with the value returned by the given callback function, such
 // as [os.Getenv]. It works just like [os.Expand], except that a backslash
 // preceding the dollar sign will escape it, allowing a literal dollar sign to
 // appear in the output. Escape a backslash with another backslash. A backslash
-// followed by any other character is reserved for future use; it may be
-// omitted from the output or replaced by some other value determined in the
-// future.
+// followed by any other character is preserved verbatim.
 func Expand(s string, mapping func(string) string) string {
 	return varExpr.ReplaceAllStringFunc(s, func(match string) string {
 		switch match[0] {
 		case '\\':
 			// Escaped backslash or dollar expands to itself.
-			// Escaped anything else is reserved and gets removed.
-			if match[1] == '\\' || match[1] == '$' {
-				return match[1:2]
-			}
+			// assert(match[1] == '\\' || match[1] == '$')
+			return match[1:2]
 		case '$':
 			if match[1] != '{' {
 				// We got an ordinary word. Omit the dollar and

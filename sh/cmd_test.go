@@ -152,3 +152,14 @@ func TestEscapeExpand(t *testing.T) {
 		t.Fatalf(`Expected %q but got %q`, expected, s)
 	}
 }
+
+func TestPreserveUnknownEscapes(t *testing.T) {
+	s, err := OutputWith(nil, os.Args[0], "-printArgs", `C:\tools\mage`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected := "[C:\\tools\\mage]"
+	if s != expected {
+		t.Fatalf(`Expected %q but got %q`, expected, s)
+	}
+}
