@@ -5,7 +5,9 @@ weight = 10
 A target is any exported function that has an optional first argument of context.Context, has either
 no return or just an error return, and where the arguments are all of type `string`, `int`, `float64`, `bool`, or
 `time.Duration`. Pointer types of these (`*string`, `*int`, `*float64`, `*bool`, `*time.Duration`) are
-also accepted and treated as optional arguments (see [Optional Arguments](#optional-arguments) below).
+also accepted and treated as optional arguments (see [Optional Arguments](#optional-arguments) below). A target
+may end with one `...string` argument, which receives the remaining command-line tokens. Pointer-style optional
+arguments may precede that variadic argument.
 
 e.g. these are all acceptable targets
 
@@ -15,6 +17,8 @@ func Install(ctx context.Context) error
 func Run(what string) error
 func Exec(ctx context.Context, name string, count int, debug bool, timeout time.Duration) error
 func Greet(name string, greeting *string)
+func RunAll(ctx context.Context, prefix string, args ...string) error
+func RunWithOptions(ctx context.Context, prefix *string, args ...string) error
 ```
 
 A target is effectively a subcommand of mage while running mage in
@@ -35,6 +39,50 @@ All arguments are mandatory and must be specified in the order they appear in th
 You can intersperse multiple targets with arguments as you'd expect:
 
 `mage run foo.exe exec somename 5 true 100ms`
+
+### Variadic arguments
+
+A target may declare one terminal `...string` argument. After Mage consumes the
+target's fixed arguments and any pointer-style optional flags, it passes the
+variadic tail unchanged and in order. The variadic argument may be empty.
+
+```go
+func Run(prefix string, args ...string) {
+    fmt.Printf("prefix=%s args=%q\n", prefix, args)
+}
+```
+
+```plain
+$ mage run go test ./... -race
+prefix=go args=["test" "./..." "-race"]
+```
+
+A variadic target is terminal for that Mage invocation. Fixed-arity targets may
+run before it, but tokens after its name and fixed arguments are never parsed as
+later targets—even when a token matches another target name. Tokens beginning
+with `-`, including `--`, are ordinary values for a variadic target without
+pointer-style optional arguments.
+
+When a variadic target has pointer-style optional arguments, Mage parses its
+optional flags before starting the variadic tail. The first non-option token
+starts the tail implicitly. If the first tail token begins with `-`, use `--` to
+end option parsing explicitly; that separator is omitted, and every later token
+is passed through unchanged. See [Flags](#flags-v1160) for examples and the
+exact scope of this separator.
+
+The function signature is the argument-ownership boundary. Mage does not guess
+the boundary from known target names, require a global `--` separator, or expose
+the remaining values through a global or shared extra-arguments accessor. This
+keeps a command's meaning stable when other targets are added or renamed.
+
+This support makes existing exported functions ending in `...string`, including
+functions that combine pointer-style optional arguments with `...string`,
+visible as targets. Such functions can now appear in `mage -l` and `mage -h`,
+and can expose an existing case-insensitive target or alias name conflict.
+Rename an exported helper or make it unexported if it is not intended to be a
+Mage target.
+
+Variadic arguments of other types are not targets.
 
 ### Flags (v1.16.0+)
 
@@ -72,6 +120,45 @@ signature. Required arguments are always positional, while optional arguments us
 the `-name=value` flag syntax and can appear in any order after the required
 arguments.
 
+An optional target may also end with a terminal `...string` argument:
+
+```go
+func Run(ctx context.Context, name string, verbose *bool, args ...string) error {
+    verboseValue := "<nil>"
+    if verbose != nil {
+        verboseValue = fmt.Sprint(*verbose)
+    }
+    fmt.Printf("name=%s verbose=%s args=%q\n", name, verboseValue, args)
+    return nil
+}
+```
+
+The first non-option token starts the variadic tail, so flags must come first.
+Once the tail starts, Mage preserves every remaining token without trying to
+parse more flags or targets:
+
+```plain
+$ mage run worker -verbose input.txt -literal build
+name=worker verbose=true args=["input.txt" "-literal" "build"]
+```
+
+If the tail itself must start with a token beginning in `-`, place a literal
+`--` before it. The first `--` ends option parsing and is not passed to the
+target; everything after it, including unknown flags, repeated `--` tokens, and
+target names, is passed unchanged:
+
+```plain
+$ mage run worker -- -literal -- build
+name=worker verbose=<nil> args=["-literal" "--" "build"]
+```
+
+Before that boundary, unknown or malformed options retain the usual target
+option errors. This target-level `--` is recognized only while a target that
+combines pointer-style optional arguments and `...string` is parsing options.
+For a variadic target without optional arguments, `--` remains an ordinary
+variadic value. Non-variadic targets retain their existing option-error or
+subsequent-target dispatch behavior.
+
 ## Errors
 
 If the function has an error return, errors returned from the function will
@@ -91,6 +178,8 @@ then once foo is done, bar, then once bar is done, baz).  Dependencies run using
 mg.Deps will still only run once per mage execution, so if each of the targets
 depend on the same function, that function will only be run once for all
 targets.  If any target panics or returns an error, no later targets will be run.
+Because a variadic target consumes every remaining token, it must be the final
+target in a multiple-target invocation.
 
 ## Contexts and Cancellation
 

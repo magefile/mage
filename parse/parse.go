@@ -78,6 +78,7 @@ func (s Functions) Swap(i, j int) {
 type Arg struct {
 	Name, Type string
 	Optional   bool
+	Variadic   bool
 	Comment    string
 }
 
@@ -111,7 +112,7 @@ func (f Function) TargetName() string {
 func (f Function) NumRequiredArgs() int {
 	n := 0
 	for _, a := range f.Args {
-		if !a.Optional {
+		if !a.Optional && !a.Variadic {
 			n++
 		}
 	}
@@ -122,11 +123,45 @@ func (f Function) NumRequiredArgs() int {
 func (f Function) RequiredArgs() []Arg {
 	var out []Arg
 	for _, a := range f.Args {
-		if !a.Optional {
+		if !a.Optional && !a.Variadic {
 			out = append(out, a)
 		}
 	}
 	return out
+}
+
+// VariadicArgs returns the terminal variadic argument, when present.
+func (f Function) VariadicArgs() []Arg {
+	var out []Arg
+	for _, a := range f.Args {
+		if a.Variadic {
+			out = append(out, a)
+		}
+	}
+	return out
+}
+
+// UsageArgs returns the command-line usage suffix for the function's arguments.
+func (f Function) UsageArgs() string {
+	var out strings.Builder
+	for _, a := range f.RequiredArgs() {
+		_, _ = fmt.Fprintf(&out, " <%s>", a.Name)
+	}
+	if f.MultipleOptionalArgs() {
+		_, _ = fmt.Fprint(&out, " [<flags>]")
+	} else {
+		for _, a := range f.OptionalArgs() {
+			_, _ = fmt.Fprintf(&out, " [-%s=<%s>]", a.Name, a.Type)
+		}
+	}
+	variadic := f.VariadicArgs()
+	if f.HasOptionalArgs() && len(variadic) > 0 {
+		_, _ = fmt.Fprint(&out, " [--]")
+	}
+	for _, a := range variadic {
+		_, _ = fmt.Fprintf(&out, " [<%s>...]", a.Name)
+	}
+	return out.String()
 }
 
 // OptionalArgs returns only the optional arguments.
@@ -169,7 +204,7 @@ func (f Function) MultipleOptionalArgs() bool {
 // condensed to [<flags>] in the usage line) or when any optional arg
 // has a doc comment.
 func (f Function) ShowFlagDocs() bool {
-	if f.MultipleOptionalArgs() {
+	if f.MultipleOptionalArgs() || (f.HasOptionalArgs() && len(f.VariadicArgs()) > 0) {
 		return true
 	}
 	for _, a := range f.Args {
@@ -180,8 +215,9 @@ func (f Function) ShowFlagDocs() bool {
 	return false
 }
 
-// FlagDocsString returns a formatted string documenting optional arguments.
-// It aligns comments to the same column based on the longest flag name.
+// FlagDocsString returns a formatted string documenting optional arguments
+// and, when combined with a variadic argument, the pass-through boundary. It
+// aligns comments to the same column based on the longest flag name.
 func (f Function) FlagDocsString() string {
 	opts := f.OptionalArgs()
 	if len(opts) == 0 {
@@ -212,6 +248,10 @@ func (f Function) FlagDocsString() string {
 		}
 	}
 	_, _ = buf.WriteString("\n")
+	variadic := f.VariadicArgs()
+	if len(variadic) > 0 {
+		_, _ = fmt.Fprintf(&buf, "Pass-through:\n\n\tThe first non-option token starts <%s>. To start with a \"-\" token, use --; the separator is omitted and all following tokens are passed unchanged.\n\n", variadic[0].Name)
+	}
 	return buf.String()
 }
 
@@ -232,6 +272,9 @@ func (f Function) ExecCode() string {
 	// Phase 1: Parse positional (required) arguments
 	for x, arg := range f.Args {
 		if arg.Optional {
+			continue
+		}
+		if arg.Variadic {
 			continue
 		}
 		switch arg.Type {
@@ -296,7 +339,15 @@ func (f Function) ExecCode() string {
 		}
 
 		_, _ = fmt.Fprint(&parseargs, `
-				for x < len(args.Args) && _strings.HasPrefix(args.Args[x], "-") {
+				for x < len(args.Args) && _strings.HasPrefix(args.Args[x], "-") {`)
+		if len(f.VariadicArgs()) > 0 {
+			_, _ = fmt.Fprint(&parseargs, `
+					if args.Args[x] == "--" {
+						x++
+						break
+					}`)
+		}
+		_, _ = fmt.Fprint(&parseargs, `
 					_optArg := args.Args[x]
 					_eqIdx := _strings.Index(_optArg, "=")
 					var _optName, _optVal string
@@ -379,6 +430,17 @@ func (f Function) ExecCode() string {
 				}`, f.TargetName())
 	}
 
+	// Phase 4: The terminal variadic argument owns every token left after
+	// required arguments and optional flags have been consumed.
+	for x, arg := range f.Args {
+		if !arg.Variadic {
+			continue
+		}
+		_, _ = fmt.Fprintf(&parseargs, `
+			arg%d := args.Args[x:]
+			x = len(args.Args)`, x)
+	}
+
 	out := parseargs.String() + `
 				wrapFn := func(ctx _context.Context) error {
 					`
@@ -391,7 +453,11 @@ func (f Function) ExecCode() string {
 		args = append(args, "ctx")
 	}
 	for x := 0; x < len(f.Args); x++ {
-		args = append(args, fmt.Sprintf("arg%d", x))
+		arg := fmt.Sprintf("arg%d", x)
+		if f.Args[x].Variadic {
+			arg += "..."
+		}
+		args = append(args, arg)
 	}
 	out += strings.Join(args, ", ")
 	out += ")"
@@ -418,6 +484,9 @@ func PrimaryPackage(gocmd, path string, files []string, multiline bool) (*PkgInf
 
 	setDefault(info)
 	setAliases(info)
+	if err := checkVariadicAliasDupes(info); err != nil {
+		return nil, err
+	}
 	return info, nil
 }
 
@@ -431,16 +500,6 @@ func checkDupes(info *PkgInfo, imports []*Import) error {
 			target := strings.ToLower(f.TargetName())
 			funcs[target] = append(funcs[target], f)
 		}
-	}
-	for alias, f := range info.Aliases {
-		if len(funcs[alias]) != 0 {
-			var ids []string
-			for _, f := range funcs[alias] {
-				ids = append(ids, f.ID())
-			}
-			return fmt.Errorf("alias %q duplicates existing target(s): %s", alias, strings.Join(ids, ", "))
-		}
-		funcs[alias] = append(funcs[alias], f)
 	}
 	var dupes []string
 	for target, list := range funcs {
@@ -462,6 +521,43 @@ func checkDupes(info *PkgInfo, imports []*Import) error {
 	}
 	sort.Strings(errs)
 	return errors.New(strings.Join(errs, "\n"))
+}
+
+// checkVariadicAliasDupes reports aliases that conflict with targets made
+// discoverable by variadic argument support. Fixed-arity alias collisions keep
+// their historical behavior.
+func checkVariadicAliasDupes(info *PkgInfo) error {
+	variadicTargets := map[string][]*Function{}
+	addVariadicTargets := func(funcs Functions) {
+		for _, f := range funcs {
+			if len(f.VariadicArgs()) > 0 {
+				target := strings.ToLower(f.TargetName())
+				variadicTargets[target] = append(variadicTargets[target], f)
+			}
+		}
+	}
+	addVariadicTargets(info.Funcs)
+	for _, imp := range info.Imports {
+		addVariadicTargets(imp.Info.Funcs)
+	}
+	aliases := make([]string, 0, len(info.Aliases))
+	for alias := range info.Aliases {
+		aliases = append(aliases, alias)
+	}
+	sort.Strings(aliases)
+	for _, alias := range aliases {
+		funcs := variadicTargets[strings.ToLower(alias)]
+		if len(funcs) == 0 {
+			continue
+		}
+		ids := make([]string, 0, len(funcs))
+		for _, f := range funcs {
+			ids = append(ids, f.ID())
+		}
+		sort.Strings(ids)
+		return fmt.Errorf("alias %q duplicates existing target(s): %s", alias, strings.Join(ids, ", "))
+	}
+	return nil
 }
 
 // Package compiles information about a mage package.
@@ -1092,6 +1188,20 @@ func funcType(ft *ast.FuncType, fieldComments map[*ast.Field]string) (*Function,
 	}
 	for ; x < len(ft.Params.List); x++ {
 		param := ft.Params.List[x]
+		if ellipsis, ok := param.Type.(*ast.Ellipsis); ok {
+			if x != len(ft.Params.List)-1 {
+				return nil, errors.New("variadic argument must be last")
+			}
+			t := fmt.Sprint(ellipsis.Elt)
+			typ, ok := argTypes[t]
+			if !ok || typ != "string" {
+				return nil, fmt.Errorf("unsupported variadic argument type: %s", t)
+			}
+			for _, name := range param.Names {
+				f.Args = append(f.Args, Arg{Name: name.Name, Type: typ, Variadic: true})
+			}
+			continue
+		}
 		optional := false
 		paramType := param.Type
 		// Check for pointer types (optional arguments)
