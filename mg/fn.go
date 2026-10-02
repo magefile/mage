@@ -31,7 +31,7 @@ type Fn interface {
 // are declared by the function. Note that you do not need to and should not pass a context.Context
 // to F, even if the target takes a context. Compatible args are int, bool, string, and
 // time.Duration.
-func F(target interface{}, args ...interface{}) Fn {
+func F(target any, args ...any) Fn {
 	hasContext, isNamespace, err := checkF(target, args)
 	if err != nil {
 		panic(err)
@@ -103,7 +103,7 @@ func (f fn) Run(ctx context.Context) error {
 	return f.f(ctx)
 }
 
-func checkF(target interface{}, args []interface{}) (hasContext, isNamespace bool, _ error) {
+func checkF(target any, args []any) (hasContext, isNamespace bool, _ error) {
 	t := reflect.TypeOf(target)
 	if t == nil || t.Kind() != reflect.Func {
 		return false, false, fmt.Errorf("non-function passed to mg.F: %T. The mg.F function accepts function names, such as mg.F(TargetA, \"arg1\", \"arg2\")", target)
@@ -181,16 +181,24 @@ var (
 	errType   = reflect.TypeOf(func() error { return nil }).Out(0)
 	emptyType = reflect.TypeOf(struct{}{})
 
-	intType    = reflect.TypeOf(int(0))
-	stringType = reflect.TypeOf(string(""))
-	boolType   = reflect.TypeOf(bool(false))
-	durType    = reflect.TypeOf(time.Second)
+	intType       = reflect.TypeOf(int(0))
+	intPtrType    = reflect.TypeOf((*int)(nil))
+	stringType    = reflect.TypeOf(string(""))
+	stringPtrType = reflect.TypeOf((*string)(nil))
+	boolType      = reflect.TypeOf(bool(false))
+	boolPtrType   = reflect.TypeOf((*bool)(nil))
+	durType       = reflect.TypeOf(time.Second)
+	durPtrType    = reflect.TypeOf((*time.Duration)(nil))
 
 	// don't put ctx in here, this is for non-context types.
 	argTypes = map[reflect.Type]bool{
-		intType:    true,
-		boolType:   true,
-		stringType: true,
-		durType:    true,
+		intType:       true,
+		intPtrType:    true,
+		boolType:      true,
+		boolPtrType:   true,
+		stringType:    true,
+		stringPtrType: true,
+		durType:       true,
+		durPtrType:    true,
 	}
 )

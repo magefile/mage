@@ -95,7 +95,7 @@ func TestFuncCheck(t *testing.T) {
 		t.Error("func is  on a namespace")
 	}
 
-	hasContext, isNamespace, err = checkF(Foo.CtxErrorArgs, []interface{}{1, "s", true, time.Second})
+	hasContext, isNamespace, err = checkF(Foo.CtxErrorArgs, []any{1, "s", true, time.Second})
 	if err != nil {
 		t.Error(err)
 	}
@@ -106,7 +106,7 @@ func TestFuncCheck(t *testing.T) {
 		t.Error("func is on a namespace")
 	}
 
-	hasContext, isNamespace, err = checkF(func(int, bool, string, time.Duration) {}, []interface{}{1, true, "s", time.Second})
+	hasContext, isNamespace, err = checkF(func(int, bool, string, time.Duration) {}, []any{1, true, "s", time.Second})
 	if err != nil {
 		t.Error(err)
 	}
@@ -128,7 +128,7 @@ func TestFuncCheck(t *testing.T) {
 			t.Error("expected a nil function argument to be handled gracefully")
 		}
 	}()
-	_, _, err = checkF(nil, []interface{}{1, 2})
+	_, _, err = checkF(nil, []any{1, 2})
 	if err == nil {
 		t.Error("expected a nil function argument to be invalid")
 	}
@@ -136,7 +136,7 @@ func TestFuncCheck(t *testing.T) {
 
 func TestF(t *testing.T) {
 	var (
-		ctxOut interface{}
+		ctxOut any
 		iOut   int
 		sOut   string
 		bOut   bool
@@ -221,6 +221,20 @@ func TestFNilError(t *testing.T) {
 	}
 }
 
+func TestFPointerArg(t *testing.T) {
+	value := new(int)
+	*value = 1776
+	fn := F(func(i *int) {
+		if *i != 1776 {
+			t.Errorf("Wrong arg, got %d, want 1776", *i)
+		}
+	}, value)
+	err := fn.Run(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestFVariadic(t *testing.T) {
 	fn := F(func(args ...string) {
 		if !reflect.DeepEqual(args, []string{"a", "b"}) {
@@ -299,6 +313,31 @@ func TestFWrongArgType(t *testing.T) {
 	F(func(int) {}, "not an int")
 }
 
+func TestFValueToPointerArg(t *testing.T) {
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Fatal("expected panic for value arg when pointer expected")
+		}
+	}()
+	i := 1776
+	F(func(*int) {}, i)
+}
+
+func TestFPointerToValueArg(t *testing.T) {
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Fatal("expected panic for pointer arg when value expected")
+		}
+	}()
+	i := new(int)
+	*i = 1776
+	F(func(int) {}, i)
+}
+
+type Unsupported struct{}
+
 func TestFUnsupportedArgType(t *testing.T) {
 	defer func() {
 		r := recover()
@@ -306,7 +345,7 @@ func TestFUnsupportedArgType(t *testing.T) {
 			t.Fatal("expected panic for unsupported arg type")
 		}
 	}()
-	F(func(*int) {}, (*int)(nil))
+	F(func(*Unsupported) {}, (*Unsupported)(nil))
 }
 
 func TestFTooManyReturns(t *testing.T) {

@@ -67,7 +67,7 @@ func ResetDeps() {
 // SerialDeps is like Deps except it runs each dependency serially, instead of
 // in parallel. This can be useful for resource intensive dependencies that
 // shouldn't be run at the same time.
-func SerialDeps(fns ...interface{}) {
+func SerialDeps(fns ...any) {
 	funcs := checkFns(fns)
 	ctx := context.Background()
 	for i := range fns {
@@ -78,7 +78,7 @@ func SerialDeps(fns ...interface{}) {
 // SerialCtxDeps is like CtxDeps except it runs each dependency serially,
 // instead of in parallel. This can be useful for resource intensive
 // dependencies that shouldn't be run at the same time.
-func SerialCtxDeps(ctx context.Context, fns ...interface{}) {
+func SerialCtxDeps(ctx context.Context, fns ...any) {
 	funcs := checkFns(fns)
 	for i := range fns {
 		runDeps(ctx, funcs[i:i+1])
@@ -101,7 +101,7 @@ func SerialCtxDeps(ctx context.Context, fns ...interface{}) {
 // their own dependencies using Deps. Each dependency is run in their own
 // goroutines. Each function is given the context provided if the function
 // prototype allows for it.
-func CtxDeps(ctx context.Context, fns ...interface{}) {
+func CtxDeps(ctx context.Context, fns ...any) {
 	funcs := checkFns(fns)
 	runDeps(ctx, funcs)
 }
@@ -144,7 +144,7 @@ func runDeps(ctx context.Context, fns []Fn) {
 	}
 }
 
-func checkFns(fns []interface{}) []Fn {
+func checkFns(fns []any) []Fn {
 	funcs := make([]Fn, len(fns))
 	for i, f := range fns {
 		if fn, ok := f.(Fn); ok {
@@ -177,7 +177,7 @@ func checkFns(fns []interface{}) []Fn {
 // This is a way to build up a tree of dependencies with each dependency
 // defining its own dependencies.  Functions must have the same signature as a
 // Mage target, i.e. optional context argument, optional error return.
-func Deps(fns ...interface{}) {
+func Deps(fns ...any) {
 	CtxDeps(context.Background(), fns...)
 }
 
@@ -197,7 +197,7 @@ func changeExit(old, nw int) int {
 }
 
 // funcName returns the unique name for the function.
-func funcName(i interface{}) string {
+func funcName(i any) string {
 	return runtime.FuncForPC(reflect.ValueOf(i).Pointer()).Name()
 }
 
