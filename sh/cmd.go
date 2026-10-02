@@ -199,7 +199,19 @@ func Escape(arg string) string {
 	return arg
 }
 
-var varExpr = regexp.MustCompile(`\\\\|\\\$|\$(\w+|[-*#$@!?0-9])|\$\{(\w+|[-*#$@!?0-9])\}|\$\{\}?`)
+var varExpr = regexp.MustCompile(strings.Join([]string{
+	// Escaped backslash or dollar
+	`\\\\`, `\\\$`,
+	// Bare word. Either a standalone special character or digit, or a
+	// sequence of word characters. Starting with a digit consumes only
+	// that digit and no subsequent characters.
+	`\$([A-Za-z_]\w*|[-*#$@!?0-9])`,
+	// Brace-surrounded. Accept literally _any_ character up to a closing
+	// brace, including newlines and nuls.
+	`\$\{([^}]+)\}`,
+	// Empty or unterminated brace expression
+	`\$\{\}?`,
+}, "|"))
 
 // Expand searches the input for segments of the form $var or ${var} and
 // replaces them with the value returned by the given callback function, such
