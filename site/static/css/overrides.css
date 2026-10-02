@@ -5,3 +5,8 @@ h1.site_title {
     font-weight: 700;
     text-transform: none;
 }
+
+.logo {
+    max-width: 100px;
+    vertical-align: middle;
+}
