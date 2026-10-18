@@ -294,7 +294,11 @@ func discoverPowerShellProfile() string {
 // bashCompletionScript returns a bash completion script that uses mage -autocomplete.
 func bashCompletionScript(mageBin string) string {
 	return `_mage_completions() {
-    local cur="${COMP_WORDS[COMP_CWORD]}"
+    # Take the word from the line itself: ':' is in COMP_WORDBREAKS by
+    # default, so a namespaced target such as "ns:target" is split across
+    # several COMP_WORDS entries.
+    local line="${COMP_LINE:0:COMP_POINT}"
+    local cur="${line##*[[:space:]]}"
     if [[ "$cur" == -* ]]; then
         local flags="-l -h -v -f -debug -t -d -w -keep -compile -clean -init -version -gocmd -goos -goarch -ldflags -autocomplete -install -multiline"
         COMPREPLY=($(compgen -W "$flags" -- "$cur"))
@@ -302,6 +306,15 @@ func bashCompletionScript(mageBin string) string {
     fi
     local IFS=$'\n'
     COMPREPLY=($(compgen -W "$('` + mageBin + `' -autocomplete 2>/dev/null)" -- "$cur"))
+    # bash replaces only the text after the last word break, so drop the
+    # part of each match up to the last ':' that is already on the line.
+    if [[ "$cur" == *:* && "$COMP_WORDBREAKS" == *:* ]]; then
+        local prefix="${cur%"${cur##*:}"}"
+        local i
+        for i in "${!COMPREPLY[@]}"; do
+            COMPREPLY[$i]="${COMPREPLY[$i]#"$prefix"}"
+        done
+    fi
 }
 complete -F _mage_completions mage
 `
@@ -340,6 +353,9 @@ _mage() {
         return
     fi
     targets=(${(f)"$('` + mageBin + `' -autocomplete 2>/dev/null)"})
+    # _describe splits "name:description" at the first unescaped ':', so
+    # escape the ':' in namespaced targets such as "ns:target".
+    targets=("${(@)targets//:/\\:}")
     _describe 'target' targets
 }
 if (( $+functions[compdef] )); then

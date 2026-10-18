@@ -2,9 +2,12 @@ package mage
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -422,4 +425,96 @@ func TestCompletionScriptContents(t *testing.T) {
 			t.Error("script should have Register-ArgumentCompleter")
 		}
 	})
+}
+
+// fakeMageForCompletion writes an executable that prints the given target
+// names the way `mage -autocomplete` does, and returns its path.
+func fakeMageForCompletion(t *testing.T, targets ...string) string {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("completion scripts are exercised with a shell script stand-in for mage")
+	}
+	bin := filepath.Join(t.TempDir(), "mage")
+	script := "#!/bin/sh\nprintf '%s\\n' " + strings.Join(targets, " ") + "\n"
+	// #nosec -- the stand-in has to be executable for the completion script to run it.
+	if err := os.WriteFile(bin, []byte(script), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	return bin
+}
+
+func TestBashCompletionNamespacedTargets(t *testing.T) {
+	bash, err := exec.LookPath("bash")
+	if err != nil {
+		t.Skip("bash not found")
+	}
+	bin := fakeMageForCompletion(t, "fmt", "migration:create", "migration:down", "migration:up")
+	script := filepath.Join(t.TempDir(), "completion.bash")
+	if err := os.WriteFile(script, []byte(bashCompletionScript(bin)), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	// words is what bash puts in COMP_WORDS: with ':' in COMP_WORDBREAKS (the
+	// default), "migration:d" arrives as "migration", ":" and "d".
+	tests := []struct {
+		line  string
+		words []string
+		want  string
+	}{
+		{"mage ", []string{"mage", ""}, "fmt migration:create migration:down migration:up"},
+		{"mage f", []string{"mage", "f"}, "fmt"},
+		{"mage migration:", []string{"mage", "migration", ":"}, "create down up"},
+		{"mage migration:d", []string{"mage", "migration", ":", "d"}, "down"},
+		{"mage fmt migration:u", []string{"mage", "fmt", "migration", ":", "u"}, "up"},
+		{"mage -ver", []string{"mage", "-ver"}, "-version"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.line, func(t *testing.T) {
+			words := make([]string, len(tt.words))
+			for i, w := range tt.words {
+				words[i] = "'" + w + "'"
+			}
+			cmd := exec.CommandContext(context.Background(), bash, "--norc", "--noprofile", "-c", `source "$1"
+COMP_LINE=$2 COMP_POINT=${#2}
+COMP_WORDS=(`+strings.Join(words, " ")+`) COMP_CWORD=$((${#COMP_WORDS[@]} - 1))
+_mage_completions
+echo "${COMPREPLY[*]}"`, "bash", script, tt.line)
+			out, err := cmd.CombinedOutput()
+			if err != nil {
+				t.Fatalf("bash failed: %v\n%s", err, out)
+			}
+			if got := strings.TrimSpace(string(out)); got != tt.want {
+				t.Errorf("completing %q: got %q, want %q", tt.line, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestZshCompletionNamespacedTargets(t *testing.T) {
+	zsh, err := exec.LookPath("zsh")
+	if err != nil {
+		t.Skip("zsh not found")
+	}
+	bin := fakeMageForCompletion(t, "fmt", "migration:create", "migration:down")
+	script := filepath.Join(t.TempDir(), "completion.zsh")
+	if err := os.WriteFile(script, []byte(zshCompletionScript(bin)), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	// _describe reads "name:description" pairs, so a ':' inside a target name
+	// must reach it escaped as "\:". Stub compdef and _describe to see exactly
+	// what _mage hands over.
+	cmd := exec.CommandContext(context.Background(), zsh, "-f", "-c", `compdef() { : }
+_describe() { print -rl -- "${(@P)2}" }
+source "$1"
+PREFIX=''
+_mage`, "zsh", script)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("zsh failed: %v\n%s", err, out)
+	}
+	want := "fmt\nmigration\\:create\nmigration\\:down"
+	if got := strings.TrimSpace(string(out)); got != want {
+		t.Errorf("_describe got targets:\n%s\nwant:\n%s", got, want)
+	}
 }
