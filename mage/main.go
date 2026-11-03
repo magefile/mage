@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/sha256"
 	_ "embed" // so we can use //go:embed for the magefile template and colors
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -515,26 +516,43 @@ func Invoke(inv Invocation) int {
 	data.PrintNameFunc = colorsFile[idx:]
 
 	main := filepath.Join(inv.Dir, mainfile)
-	err = GenerateMainfile(data, main)
-	if err != nil {
-		errlog.Println("Error:", err)
-		return 1
-	}
+	var overlay string
 	if !inv.Keep {
-		defer func() { _ = os.RemoveAll(main) }()
+		// Write the mainfile outside the magefiles directory, and let go build
+		// read it from there through an overlay, so that concurrent runs in
+		// the same directory do not overwrite or delete each other's mainfile.
+		var cleanup func()
+		overlay, cleanup, err = generateMainfileOverlay(data, main)
+		if err != nil {
+			errlog.Println("Error:", err)
+			return 1
+		}
+		defer cleanup()
+	} else {
+		err = GenerateMainfile(data, main)
+		if err != nil {
+			errlog.Println("Error:", err)
+			return 1
+		}
+		if !inv.Keep {
+			defer func() { _ = os.RemoveAll(main) }()
+		}
 	}
 	files = append(files, main)
-	if err := Compile(inv.GOOS, inv.GOARCH, inv.Ldflags, inv.Dir, inv.GoCmd, exePath, files, inv.Debug, inv.Stderr, inv.Stdout); err != nil {
+	if err := compile(inv.GOOS, inv.GOARCH, inv.Ldflags, inv.Dir, inv.GoCmd, exePath, overlay, files, inv.Debug, inv.Stderr, inv.Stdout); err != nil {
 		errlog.Println("Error:", err)
 		return 1
 	}
-	if !inv.Keep {
-		// move aside this file before we run the compiled version, in case the
-		// compiled file screws things up.  Yes this doubles up with the above
-		// defer, that's ok.
-		_ = os.RemoveAll(main)
-	} else {
-		debug.Print("keeping mainfile")
+	// With an overlay, the mainfile never existed in the magefiles directory.
+	if overlay == "" {
+		if !inv.Keep {
+			// move aside this file before we run the compiled version, in case the
+			// compiled file screws things up.  Yes this doubles up with the above
+			// defer, that's ok.
+			_ = os.RemoveAll(main)
+		} else {
+			debug.Print("keeping mainfile")
+		}
 	}
 
 	if inv.CompileOut != "" {
@@ -810,6 +828,12 @@ func Magefiles(magePath, goos, goarch string, isMagefilesDirectory bool) ([]stri
 
 // Compile uses the go tool to compile the files into an executable at path.
 func Compile(goos, goarch, ldflags, magePath, goCmd, compileTo string, gofiles []string, isDebug bool, stderr, stdout io.Writer) error {
+	return compile(goos, goarch, ldflags, magePath, goCmd, compileTo, "", gofiles, isDebug, stderr, stdout)
+}
+
+// compile is Compile with an optional go build overlay file. With an overlay,
+// gofiles may name files that exist only in the overlay.
+func compile(goos, goarch, ldflags, magePath, goCmd, compileTo, overlay string, gofiles []string, isDebug bool, stderr, stdout io.Writer) error {
 	debug.Println("compiling to", compileTo)
 	debug.Println("compiling using gocmd:", goCmd)
 	if isDebug {
@@ -827,6 +851,9 @@ func Compile(goos, goarch, ldflags, magePath, goCmd, compileTo string, gofiles [
 	buildArgs := []string{"build", "-o", compileTo}
 	if ldflags != "" {
 		buildArgs = append(buildArgs, "-ldflags", ldflags)
+	}
+	if overlay != "" {
+		buildArgs = append(buildArgs, "-overlay", overlay)
 	}
 	args := append([]string{}, buildArgs...)
 	args = append(args, gofiles...)
@@ -870,6 +897,46 @@ func GenerateMainfile(data mainfileTemplateData, path string) error {
 		return fmt.Errorf("error setting old modtime on generated mainfile: %w", err)
 	}
 	return nil
+}
+
+// goBuildOverlay is the JSON file that go build -overlay reads.
+type goBuildOverlay struct {
+	// Replace maps a file path to the file that go build reads in its place.
+	Replace map[string]string `json:"Replace"`
+}
+
+// generateMainfileOverlay generates the mage mainfile in a new temporary
+// directory, and an overlay file there that makes go build read it as path.
+// It returns the overlay file, and a function that removes the directory.
+func generateMainfileOverlay(data mainfileTemplateData, path string) (overlay string, cleanup func(), err error) {
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return "", nil, fmt.Errorf("error resolving mainfile path: %w", err)
+	}
+	dir, err := os.MkdirTemp("", "mage")
+	if err != nil {
+		return "", nil, fmt.Errorf("error creating directory for generated mainfile: %w", err)
+	}
+	cleanup = func() { _ = os.RemoveAll(dir) }
+
+	tmpMain := filepath.Join(dir, mainfile)
+	if err := GenerateMainfile(data, tmpMain); err != nil {
+		cleanup()
+		return "", nil, err
+	}
+	b, err := json.Marshal(goBuildOverlay{
+		Replace: map[string]string{absPath: tmpMain},
+	})
+	if err != nil {
+		cleanup()
+		return "", nil, fmt.Errorf("error encoding overlay: %w", err)
+	}
+	overlay = filepath.Join(dir, "overlay.json")
+	if err := os.WriteFile(overlay, b, 0o600); err != nil {
+		cleanup()
+		return "", nil, fmt.Errorf("error writing overlay: %w", err)
+	}
+	return overlay, cleanup, nil
 }
 
 // ExeName reports the executable filename that this version of Mage would

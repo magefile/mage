@@ -1233,6 +1233,43 @@ func TestKeepFlag(t *testing.T) {
 	}
 }
 
+// Test that mage writes nothing into the magefiles directory, so that runs at
+// the same time in one directory do not overwrite or delete each other's
+// mainfile (#247). A read-only directory makes a write fail.
+func TestNoWriteToMagefilesDir(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("a read-only directory mode does not stop writes on windows")
+	}
+	if os.Geteuid() == 0 {
+		t.Skip("root can write to a read-only directory")
+	}
+	dir := t.TempDir()
+	src, err := os.ReadFile("./testdata/keep_flag/magefile.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "magefile.go"), src, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(dir, 0o555); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(dir, 0o755) })
+
+	w := tLogWriter{t}
+	code := Invoke(Invocation{
+		Dir:      dir,
+		CacheDir: t.TempDir(),
+		Stdout:   w,
+		Stderr:   w,
+		Args:     []string{"noop"},
+		Force:    true,
+	})
+	if code != 0 {
+		t.Fatalf("expected code 0, but got %v", code)
+	}
+}
+
 type tLogWriter struct {
 	*testing.T
 }
