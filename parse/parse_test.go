@@ -270,7 +270,7 @@ func TestSanitizeSynopsis(t *testing.T) {
 }
 
 func TestGetImportSelf(t *testing.T) {
-	imp, err := getImport("go", "github.com/magefile/mage/parse/testdata/importself", "", false)
+	imp, err := getImport("go", ".", "github.com/magefile/mage/parse/testdata/importself", "", false)
 	if err != nil {
 		t.Fatal(err)
 	}
