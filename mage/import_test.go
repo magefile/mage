@@ -2,8 +2,22 @@ package mage
 
 import (
 	"bytes"
+	"path/filepath"
 	"testing"
 )
+
+func TestMageImportsFromModule(t *testing.T) {
+	t.Setenv("GOWORK", "off")
+	workDir := t.TempDir()
+	var stdout, stderr bytes.Buffer
+	code := ParseAndRun(&stdout, &stderr, nil, []string{"-d", "testdata/mageimport_module", "-w", workDir, "workingDir"})
+	if code != 0 {
+		t.Fatalf("mage exited with code %d: %s", code, &stderr)
+	}
+	if want := filepath.Base(workDir) + "\n"; stdout.String() != want {
+		t.Errorf("expected %q, got %q", want, &stdout)
+	}
+}
 
 func TestMageImportsList(t *testing.T) {
 	stdout := &bytes.Buffer{}

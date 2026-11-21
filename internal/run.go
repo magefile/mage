@@ -43,6 +43,11 @@ func RunDebug(cmd string, args ...string) error {
 
 // OutputDebug runs a command in debug mode and returns its stdout output.
 func OutputDebug(cmd string, args ...string) (string, error) {
+	return OutputDebugInDir("", cmd, args...)
+}
+
+// OutputDebugInDir runs a command in dir and returns its stdout output.
+func OutputDebugInDir(dir, cmd string, args ...string) (string, error) {
 	env, err := EnvWithCurrentGOOS()
 	if err != nil {
 		return "", err
@@ -51,6 +56,7 @@ func OutputDebug(cmd string, args ...string) (string, error) {
 	errbuf := &bytes.Buffer{}
 	debug.Println("running", cmd, strings.Join(args, " "))
 	c := exec.CommandContext(context.Background(), cmd, args...)
+	c.Dir = dir
 	c.Env = env
 	c.Stderr = errbuf
 	c.Stdout = buf

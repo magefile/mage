@@ -412,7 +412,7 @@ func PrimaryPackage(gocmd, path string, files []string, multiline bool) (*PkgInf
 		return nil, err
 	}
 
-	if err := setImports(gocmd, info); err != nil {
+	if err := setImports(gocmd, path, info); err != nil {
 		return nil, err
 	}
 
@@ -525,11 +525,11 @@ func Package(path string, files []string, multiline bool) (*PkgInfo, error) {
 	return pi, nil
 }
 
-func getNamedImports(gocmd string, pkgs map[string]string, multiline bool) ([]*Import, error) {
+func getNamedImports(gocmd, mageDir string, pkgs map[string]string, multiline bool) ([]*Import, error) {
 	var imports []*Import
 	for pkg, alias := range pkgs {
 		debug.Printf("getting import package %q, alias %q", pkg, alias)
-		imp, err := getImport(gocmd, pkg, alias, multiline)
+		imp, err := getImport(gocmd, mageDir, pkg, alias, multiline)
 		if err != nil {
 			return nil, err
 		}
@@ -539,8 +539,8 @@ func getNamedImports(gocmd string, pkgs map[string]string, multiline bool) ([]*I
 }
 
 // getImport returns the metadata about a package that has been mage:import'ed.
-func getImport(gocmd, importpath, alias string, multiline bool) (*Import, error) {
-	out, err := internal.OutputDebug(gocmd, "list", "-f", "{{.Dir}}||{{.Name}}", importpath)
+func getImport(gocmd, mageDir, importpath, alias string, multiline bool) (*Import, error) {
+	out, err := internal.OutputDebugInDir(mageDir, gocmd, "list", "-f", "{{.Dir}}||{{.Name}}", importpath)
 	if err != nil {
 		return nil, err
 	}
@@ -554,7 +554,7 @@ func getImport(gocmd, importpath, alias string, multiline bool) (*Import, error)
 	// we use go list to get the list of files, since go/parser doesn't differentiate between
 	// go files with build tags etc, and go list does. This prevents weird problems if you
 	// have more than one package in a folder because of build tags.
-	out, err = internal.OutputDebug(gocmd, "list", "-f", `{{join .GoFiles "||"}}`, importpath)
+	out, err = internal.OutputDebugInDir(mageDir, gocmd, "list", "-f", `{{join .GoFiles "||"}}`, importpath)
 	if err != nil {
 		return nil, err
 	}
@@ -651,7 +651,7 @@ func funcFromDoc(f *doc.Func, importpath, funcname string, multiline bool, field
 	return fn, true
 }
 
-func setImports(gocmd string, pi *PkgInfo) error {
+func setImports(gocmd, mageDir string, pi *PkgInfo) error {
 	importNames := map[string]string{}
 	rootImports := []string{}
 	for _, f := range pi.AstPkg.Files {
@@ -683,12 +683,12 @@ func setImports(gocmd string, pi *PkgInfo) error {
 			}
 		}
 	}
-	imports, err := getNamedImports(gocmd, importNames, pi.Multiline)
+	imports, err := getNamedImports(gocmd, mageDir, importNames, pi.Multiline)
 	if err != nil {
 		return err
 	}
 	for _, s := range rootImports {
-		imp, err := getImport(gocmd, s, "", pi.Multiline)
+		imp, err := getImport(gocmd, mageDir, s, "", pi.Multiline)
 		if err != nil {
 			return err
 		}
