@@ -33,6 +33,46 @@ not coughing
 	}
 }
 
+func TestDefaultTargetWithRequiredArg(t *testing.T) {
+	stderr := &bytes.Buffer{}
+	stdout := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:    "./testdata/defaultargs",
+		Stderr: stderr,
+		Stdout: stdout,
+		Args:   []string{"build", "hello"},
+	}
+	code := Invoke(inv)
+	if code != 0 {
+		t.Log(stderr.String())
+		t.Fatalf("expected 0, but got %v", code)
+	}
+	actual := stdout.String()
+	expected := "got: hello\n"
+	if actual != expected {
+		t.Fatalf("output is not expected:\n%q", actual)
+	}
+}
+
+func TestDefaultTargetWithRequiredArgMissing(t *testing.T) {
+	stderr := &bytes.Buffer{}
+	stdout := &bytes.Buffer{}
+	inv := Invocation{
+		Dir:    "./testdata/defaultargs",
+		Stderr: stderr,
+		Stdout: stdout,
+	}
+	code := Invoke(inv)
+	if code != 2 {
+		t.Log("stderr:", stderr)
+		t.Log("stdout:", stdout)
+		t.Fatalf("expected code 2, but got %v", code)
+	}
+	if actual, want := stderr.String(), "not enough arguments for target \"Build\", expected 1, got 0\n"; actual != want {
+		t.Fatalf("output is not expected:\n%q", actual)
+	}
+}
+
 func TestBadIntArg(t *testing.T) {
 	stderr := &bytes.Buffer{}
 	stdout := &bytes.Buffer{}

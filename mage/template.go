@@ -300,6 +300,16 @@ Options:
 			}
 			return
 		}
+		{{- if .DefaultFunc.Args}}
+		x := 0
+		_ = x
+		{{- if gt .DefaultFunc.NumRequiredArgs 0}}
+		if x+{{.DefaultFunc.NumRequiredArgs}} > len(args.Args) {
+			logger.Printf("not enough arguments for target \"{{.DefaultFunc.TargetName}}\", expected %v, got %v\n", {{.DefaultFunc.NumRequiredArgs}}, len(args.Args))
+			_os.Exit(2)
+		}
+		{{- end}}
+		{{- end}}
 		{{.DefaultFunc.ExecCode}}
 		handleError(logger, ret)
 		return
